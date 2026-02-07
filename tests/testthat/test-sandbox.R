@@ -351,3 +351,275 @@ test_that("bwrap sandbox cleans up wrapper on close", {
 
   expect_false(file.exists(wrapper_path))
 })
+
+# ── Windows sandbox unit tests ─────────────────────────────────────────
+
+test_that("build_sandbox_windows returns config with env and warning", {
+  # This test can run on any platform since it tests the function directly
+  expect_warning(
+    config <- build_sandbox_windows("/tmp/test.sock", R.home()),
+    "environment isolation only"
+  )
+
+  # No wrapper or profile on Windows
+
+  expect_null(config$wrapper)
+  expect_null(config$profile_path)
+
+  # Must have env field with restrictive variables
+  expect_true(!is.null(config$env))
+  expect_true(is.character(config$env))
+  expect_true("R_LIBS_USER" %in% names(config$env))
+  expect_true("HOME" %in% names(config$env))
+  expect_true("TMPDIR" %in% names(config$env))
+  expect_true("R_ENVIRON_USER" %in% names(config$env))
+  expect_true("R_PROFILE_USER" %in% names(config$env))
+  expect_true("R_USER" %in% names(config$env))
+
+  # R_LIBS_USER should be empty to prevent user packages
+  expect_equal(unname(config$env["R_LIBS_USER"]), "")
+
+  # Cleanup sandbox temp dir
+  if (!is.null(config$sandbox_tmp)) unlink(config$sandbox_tmp, recursive = TRUE)
+})
+
+test_that("build_sandbox_windows creates a clean temp directory", {
+  expect_warning(
+    config <- build_sandbox_windows("/tmp/test.sock", R.home()),
+    "environment isolation only"
+  )
+  on.exit({
+    if (!is.null(config$sandbox_tmp)) unlink(config$sandbox_tmp, recursive = TRUE)
+  })
+
+  expect_true(!is.null(config$sandbox_tmp))
+  expect_true(dir.exists(config$sandbox_tmp))
+
+  # HOME, TMPDIR, TMP, TEMP should all point to the sandbox temp dir
+  expect_equal(unname(config$env["HOME"]), config$sandbox_tmp)
+  expect_equal(unname(config$env["TMPDIR"]), config$sandbox_tmp)
+  expect_equal(unname(config$env["TMP"]), config$sandbox_tmp)
+  expect_equal(unname(config$env["TEMP"]), config$sandbox_tmp)
+  expect_equal(unname(config$env["R_USER"]), config$sandbox_tmp)
+})
+
+test_that("build_sandbox_windows clears startup scripts", {
+  expect_warning(
+    config <- build_sandbox_windows("/tmp/test.sock", R.home()),
+    "environment isolation only"
+  )
+  on.exit({
+    if (!is.null(config$sandbox_tmp)) unlink(config$sandbox_tmp, recursive = TRUE)
+  })
+
+  # R_ENVIRON_USER and R_PROFILE_USER should be empty to prevent
+  # user startup code from running
+  expect_equal(unname(config$env["R_ENVIRON_USER"]), "")
+  expect_equal(unname(config$env["R_PROFILE_USER"]), "")
+})
+
+# ── Resource limits (rlimits) unit tests ──────────────────────────────
+
+test_that("generate_ulimit_commands returns empty for NULL limits", {
+  expect_equal(generate_ulimit_commands(NULL), character(0))
+  expect_equal(generate_ulimit_commands(list()), character(0))
+})
+
+test_that("generate_ulimit_commands produces correct CPU limit", {
+  cmds <- generate_ulimit_commands(list(cpu = 30))
+  expect_length(cmds, 1)
+  expect_equal(cmds, "ulimit -t 30")
+})
+
+test_that("generate_ulimit_commands converts memory from bytes to KB", {
+  cmds <- generate_ulimit_commands(list(memory = 512 * 1024 * 1024))
+  expect_length(cmds, 1)
+  expect_equal(cmds, "ulimit -v 524288")
+})
+
+test_that("generate_ulimit_commands converts fsize from bytes to 512-byte blocks", {
+  cmds <- generate_ulimit_commands(list(fsize = 10 * 1024 * 1024))
+  expect_length(cmds, 1)
+  expect_equal(cmds, "ulimit -f 20480")
+})
+
+test_that("generate_ulimit_commands handles multiple limits", {
+  cmds <- generate_ulimit_commands(list(cpu = 10, memory = 256 * 1024 * 1024, nproc = 50))
+  expect_length(cmds, 3)
+  expect_true(any(grepl("ulimit -t 10", cmds)))
+  expect_true(any(grepl("ulimit -v 262144", cmds)))
+  expect_true(any(grepl("ulimit -u 50", cmds)))
+})
+
+test_that("generate_ulimit_commands handles nproc and nofile", {
+  cmds <- generate_ulimit_commands(list(nproc = 100, nofile = 256))
+  expect_length(cmds, 2)
+  expect_true(any(grepl("ulimit -u 100", cmds)))
+  expect_true(any(grepl("ulimit -n 256", cmds)))
+})
+
+test_that("generate_ulimit_commands handles stack limit", {
+  cmds <- generate_ulimit_commands(list(stack = 8 * 1024 * 1024))
+  expect_length(cmds, 1)
+  expect_equal(cmds, "ulimit -s 8192")
+})
+
+test_that("generate_ulimit_commands rounds up fractional conversions", {
+  # 1 byte -> should round up to 1 KB
+  cmds <- generate_ulimit_commands(list(memory = 1))
+  expect_equal(cmds, "ulimit -v 1")
+})
+
+test_that("validate_limits rejects unknown limit names", {
+  expect_error(
+    validate_limits(list(bogus = 10)),
+    "Unknown limit name"
+  )
+})
+
+test_that("validate_limits rejects non-positive values", {
+  expect_error(
+    validate_limits(list(cpu = -1)),
+    "must be a single positive number"
+  )
+  expect_error(
+    validate_limits(list(cpu = 0)),
+    "must be a single positive number"
+  )
+})
+
+test_that("validate_limits rejects non-numeric values", {
+  expect_error(
+    validate_limits(list(cpu = "ten")),
+    "must be a single positive number"
+  )
+})
+
+test_that("validate_limits rejects vector values", {
+  expect_error(
+    validate_limits(list(cpu = c(10, 20))),
+    "must be a single positive number"
+  )
+})
+
+test_that("macOS wrapper includes ulimit commands when limits provided", {
+  skip_on_os(c("windows", "linux"))
+  skip_if_not(file.exists("/usr/bin/sandbox-exec"), "sandbox-exec not available")
+
+  socket_path <- tempfile("test_sock_", fileext = ".sock")
+  limits <- list(cpu = 30, memory = 512 * 1024 * 1024)
+  config <- build_sandbox_macos(socket_path, R.home(), limits = limits)
+  on.exit({
+    unlink(config$wrapper)
+    unlink(config$profile_path)
+  })
+
+  wrapper_lines <- readLines(config$wrapper)
+  expect_true(any(grepl("ulimit -t 30", wrapper_lines)))
+  expect_true(any(grepl("ulimit -v 524288", wrapper_lines)))
+  # ulimit lines should come before the exec line
+  ulimit_idx <- which(grepl("ulimit", wrapper_lines))
+  exec_idx <- which(grepl("^exec", wrapper_lines))
+  expect_true(all(ulimit_idx < exec_idx))
+})
+
+test_that("macOS wrapper has no ulimit lines when limits is NULL", {
+  skip_on_os(c("windows", "linux"))
+  skip_if_not(file.exists("/usr/bin/sandbox-exec"), "sandbox-exec not available")
+
+  socket_path <- tempfile("test_sock_", fileext = ".sock")
+  config <- build_sandbox_macos(socket_path, R.home())
+  on.exit({
+    unlink(config$wrapper)
+    unlink(config$profile_path)
+  })
+
+  wrapper_lines <- readLines(config$wrapper)
+  expect_false(any(grepl("ulimit", wrapper_lines)))
+})
+
+test_that("build_limits_only_wrapper creates script with ulimit", {
+  config <- build_limits_only_wrapper(list(cpu = 15, fsize = 1024 * 1024))
+  on.exit(unlink(config$wrapper))
+
+  expect_true(!is.null(config$wrapper))
+  expect_true(file.exists(config$wrapper))
+  expect_null(config$profile_path)
+
+  wrapper_lines <- readLines(config$wrapper)
+  expect_true(any(grepl("#!/bin/sh", wrapper_lines)))
+  expect_true(any(grepl("ulimit -t 15", wrapper_lines)))
+  expect_true(any(grepl("ulimit -f 2048", wrapper_lines)))
+  expect_true(any(grepl("^exec", wrapper_lines)))
+  # No sandbox-exec reference
+  expect_false(any(grepl("sandbox-exec", wrapper_lines)))
+})
+
+test_that("build_limits_only_wrapper returns NULL wrapper for NULL limits", {
+  config <- build_limits_only_wrapper(list())
+  expect_null(config$wrapper)
+  expect_null(config$profile_path)
+})
+
+# ── Resource limits integration tests ─────────────────────────────────
+
+test_that("Session with limits can execute simple code", {
+  skip_on_os("windows")
+
+  session <- SecureSession$new(
+    sandbox = FALSE,
+    limits = list(cpu = 60)
+  )
+  on.exit(session$close())
+
+  result <- session$execute("1 + 1")
+  expect_equal(result, 2)
+})
+
+test_that("Session with sandbox + limits can execute code", {
+  skip_on_os(c("windows", "linux"))
+  skip_if_not(file.exists("/usr/bin/sandbox-exec"), "sandbox-exec not available")
+
+  session <- SecureSession$new(
+    sandbox = TRUE,
+    limits = list(cpu = 60, memory = 1024 * 1024 * 1024)
+  )
+  on.exit(session$close())
+
+  result <- session$execute("1 + 1")
+  expect_equal(result, 2)
+})
+
+test_that("CPU limit causes error on infinite loop", {
+  skip_on_os("windows")
+
+  session <- SecureSession$new(
+    sandbox = FALSE,
+    limits = list(cpu = 1)
+  )
+  on.exit(session$close())
+
+  # A tight loop consuming CPU should hit the 1-second CPU limit
+  expect_error(
+    session$execute("while(TRUE) { }", timeout = 10)
+  )
+})
+
+test_that("File size limit restricts large writes", {
+  skip_on_os("windows")
+
+  # Set fsize limit to 1 MB
+  session <- SecureSession$new(
+    sandbox = FALSE,
+    limits = list(fsize = 1 * 1024 * 1024)
+  )
+  on.exit(session$close())
+
+  # Trying to write a 5 MB file should fail
+  expect_error(
+    session$execute('
+      tf <- tempfile()
+      writeBin(raw(5 * 1024 * 1024), tf)
+    ')
+  )
+})

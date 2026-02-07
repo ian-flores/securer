@@ -8,6 +8,8 @@
 #'   of functions (legacy format).
 #' @param timeout Timeout in seconds for the execution (default 30).
 #' @param sandbox Logical, whether to enable OS-level sandboxing (default TRUE).
+#' @param limits Optional named list of resource limits (see
+#'   [SecureSession] for details).
 #'
 #' @return The result of evaluating `code` in the secure session.
 #'
@@ -25,11 +27,16 @@
 #'       args = list(a = "numeric", b = "numeric"))
 #'   )
 #' )
+#'
+#' # With resource limits
+#' execute_r("1 + 1", limits = list(cpu = 10, memory = 256 * 1024 * 1024))
 #' }
 #'
 #' @export
-execute_r <- function(code, tools = list(), timeout = 30, sandbox = TRUE) {
-  session <- SecureSession$new(tools = tools, sandbox = sandbox)
+execute_r <- function(code, tools = list(), timeout = 30, sandbox = TRUE,
+                      limits = NULL) {
+  session <- SecureSession$new(tools = tools, sandbox = sandbox,
+                               limits = limits)
   on.exit(session$close())
   session$execute(code, timeout = timeout)
 }

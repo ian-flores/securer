@@ -80,9 +80,11 @@ generate_bwrap_args <- function(socket_path, r_home) {
 #'
 #' @param socket_path Path to the UDS socket
 #' @param r_home      Path to the R installation
+#' @param limits      Optional named list of resource limits (see
+#'   [generate_ulimit_commands()])
 #' @return A sandbox config list (see [build_sandbox_config()])
 #' @keywords internal
-build_sandbox_linux <- function(socket_path, r_home) {
+build_sandbox_linux <- function(socket_path, r_home, limits = NULL) {
   bwrap_path <- Sys.which("bwrap")
   if (!nzchar(bwrap_path)) {
     warning(
@@ -97,11 +99,15 @@ build_sandbox_linux <- function(socket_path, r_home) {
   # Determine the R binary path
   r_bin <- file.path(r_home, "bin", "R")
 
-  # Create wrapper script: exec bwrap <args> -- R "$@"
+  # Build ulimit commands for resource limits
+  ulimit_cmds <- generate_ulimit_commands(limits)
+
+  # Create wrapper script: ulimit commands then exec bwrap <args> -- R "$@"
   wrapper_path <- tempfile("securer_r_", fileext = ".sh")
   args_str <- paste(shQuote(bwrap_args), collapse = " ")
   writeLines(c(
     "#!/bin/sh",
+    ulimit_cmds,
     sprintf(
       'exec %s %s -- %s "$@"',
       shQuote(bwrap_path), args_str, shQuote(r_bin)

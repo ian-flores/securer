@@ -69,9 +69,11 @@ generate_seatbelt_profile <- function(socket_path, r_home) {
 #'
 #' @param socket_path Path to the UDS socket
 #' @param r_home      Path to the R installation
+#' @param limits      Optional named list of resource limits (see
+#'   [generate_ulimit_commands()])
 #' @return A sandbox config list (see [build_sandbox_config()])
 #' @keywords internal
-build_sandbox_macos <- function(socket_path, r_home) {
+build_sandbox_macos <- function(socket_path, r_home, limits = NULL) {
   if (!file.exists("/usr/bin/sandbox-exec")) {
     warning(
       "sandbox-exec not found; falling back to unsandboxed session",
@@ -90,10 +92,14 @@ build_sandbox_macos <- function(socket_path, r_home) {
 
   r_bin <- file.path(r_home, "bin", "R")
 
+  # Build ulimit commands for resource limits
+  ulimit_cmds <- generate_ulimit_commands(limits)
+
   # Create a thin wrapper script that execs sandbox-exec around R
   wrapper_path <- tempfile("securer_r_", fileext = ".sh")
   writeLines(c(
     "#!/bin/sh",
+    ulimit_cmds,
     sprintf(
       'exec /usr/bin/sandbox-exec -f "%s" "%s" "$@"',
       profile_path, r_bin

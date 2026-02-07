@@ -39,10 +39,16 @@ SecureSession <- R6::R6Class("SecureSession",
     #'   denies network access and restricts file writes to temp
     #'   directories.  On other platforms a warning is issued and the
     #'   session runs without sandboxing.
-    initialize = function(tools = list(), sandbox = FALSE) {
+    #' @param limits An optional named list of resource limits to apply to the
+    #'   child process via `ulimit`.  Supported names: `cpu` (seconds),
+    #'   `memory` (bytes, virtual address space), `fsize` (bytes, max file
+    #'   size), `nproc` (max processes), `nofile` (max open files),
+    #'   `stack` (bytes, stack size).  `NULL` (the default) means no limits.
+    initialize = function(tools = list(), sandbox = FALSE, limits = NULL) {
       private$raw_tools <- tools
       private$tool_fns <- validate_tools(tools)
       private$sandbox_enabled <- sandbox
+      private$limits <- limits
       private$start_session()
     },
 
@@ -54,6 +60,15 @@ SecureSession <- R6::R6Class("SecureSession",
       if (is.null(private$session) || !private$session$is_alive()) {
         stop("Session is not running", call. = FALSE)
       }
+      if (private$executing) {
+        stop(
+          "SecureSession does not support concurrent execute() calls; ",
+          "wait for the current execution to complete",
+          call. = FALSE
+        )
+      }
+      private$executing <- TRUE
+      on.exit(private$executing <- FALSE)
       private$run_with_tools(code, timeout)
     },
 
@@ -71,13 +86,16 @@ SecureSession <- R6::R6Class("SecureSession",
       if (!is.null(private$socket_path) && file.exists(private$socket_path)) {
         unlink(private$socket_path)
       }
-      # Clean up sandbox temp files (wrapper script + seatbelt profile)
+      # Clean up sandbox temp files (wrapper script + seatbelt profile + tmp dir)
       if (!is.null(private$sandbox_config)) {
         if (!is.null(private$sandbox_config$wrapper)) {
           unlink(private$sandbox_config$wrapper)
         }
         if (!is.null(private$sandbox_config$profile_path)) {
           unlink(private$sandbox_config$profile_path)
+        }
+        if (!is.null(private$sandbox_config$sandbox_tmp)) {
+          unlink(private$sandbox_config$sandbox_tmp, recursive = TRUE)
         }
         private$sandbox_config <- NULL
       }
@@ -97,8 +115,10 @@ SecureSession <- R6::R6Class("SecureSession",
     socket_path = NULL,
     raw_tools = list(),
     tool_fns = list(),
+    executing = FALSE,
     sandbox_enabled = FALSE,
     sandbox_config = NULL,
+    limits = NULL,
 
     start_session = function() {
       # Create socket path in /tmp to keep the path short.
@@ -120,12 +140,26 @@ SecureSession <- R6::R6Class("SecureSession",
 
       if (private$sandbox_enabled) {
         private$sandbox_config <- build_sandbox_config(
-          private$socket_path, R.home()
+          private$socket_path, R.home(), limits = private$limits
         )
         if (!is.null(private$sandbox_config$wrapper)) {
           # Override the R binary with our sandbox wrapper script.
           # callr interprets `arch` values containing "/" as a direct
           # path to the R executable (see callr:::setup_r_binary_and_args).
+          session_opts$arch <- private$sandbox_config$wrapper
+        }
+        if (!is.null(private$sandbox_config$env)) {
+          # Merge sandbox environment variables (used on Windows where
+          # the arch/wrapper trick is not available).
+          session_opts$env <- c(session_opts$env, private$sandbox_config$env)
+        }
+      } else if (!is.null(private$limits)) {
+        # No sandbox, but resource limits requested: create a minimal
+        # wrapper script that applies ulimit commands before exec'ing R.
+        private$sandbox_config <- build_limits_only_wrapper(
+          private$limits
+        )
+        if (!is.null(private$sandbox_config$wrapper)) {
           session_opts$arch <- private$sandbox_config$wrapper
         }
       }

@@ -76,4 +76,4 @@ Sandbox tests use `skip_on_os()` and `skip_if_not(file.exists("/usr/bin/sandbox-
 - Linux sandbox (bwrap) not yet implemented
 - No resource limits (rlimits) applied yet — only Seatbelt file/network restrictions
 - Tool argument type annotations (`args = list(x = "numeric")`) are metadata only — no runtime type checking in the child
-- Single concurrent session per `SecureSession` instance (no parallel `$execute()` calls)
+- Single concurrent session per `SecureSession` instance — concurrent `$execute()` calls are detected and rejected with an error
