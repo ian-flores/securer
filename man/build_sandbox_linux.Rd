@@ -2,7 +2,7 @@
 % Please edit documentation in R/sandbox-linux.R
 \name{build_sandbox_linux}
 \alias{build_sandbox_linux}
-\title{Build Linux sandbox configuration (stub)}
+\title{Build Linux sandbox configuration}
 \usage{
 build_sandbox_linux(socket_path, r_home)
 }
@@ -15,10 +15,8 @@ build_sandbox_linux(socket_path, r_home)
 A sandbox config list (see \code{\link[=build_sandbox_config]{build_sandbox_config()}})
 }
 \description{
-Linux sandbox using bubblewrap (\code{bwrap}) with namespace isolation,
-read-only bind-mounts, and network denial.
-}
-\details{
-\strong{Not yet implemented} -- falls back to \code{\link[=build_sandbox_fallback]{build_sandbox_fallback()}}.
+Locates \code{bwrap} (bubblewrap) and creates a wrapper shell script that
+launches R inside a fully-isolated sandbox.  The wrapper can be passed to
+\code{\link[callr:r_session_options]{callr::r_session_options()}} via the \code{arch} parameter.
 }
 \keyword{internal}
