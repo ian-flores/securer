@@ -110,3 +110,141 @@ test_that("Legacy tool format still works with SecureSession", {
   result <- session$execute(".securer_call_tool('add', a = 10, b = 5)")
   expect_equal(result, 15)
 })
+
+# --- Type checking tests ---
+
+test_that("generate_type_checks() produces validation code for typed args", {
+  code <- generate_type_checks("add", list(a = "numeric", b = "numeric"))
+  expect_true(grepl("is.numeric(a)", code, fixed = TRUE))
+  expect_true(grepl("is.numeric(b)", code, fixed = TRUE))
+  expect_true(grepl("Tool 'add': argument 'a' must be numeric", code, fixed = TRUE))
+})
+
+test_that("generate_type_checks() skips args without type annotations", {
+  code <- generate_type_checks("my_tool", list(x = "numeric", y = NULL))
+  expect_true(grepl("is.numeric(x)", code, fixed = TRUE))
+  expect_false(grepl("argument 'y'", code, fixed = TRUE))
+})
+
+test_that("generate_type_checks() returns empty for no typed args", {
+  code <- generate_type_checks("my_tool", list(x = NULL, y = ""))
+  expect_equal(code, "")
+})
+
+test_that("generate_type_checks() skips unknown type annotations", {
+  code <- generate_type_checks("my_tool", list(x = "foobar"))
+  expect_equal(code, "")
+})
+
+test_that("generate_type_checks() supports all standard types", {
+  types <- c("numeric", "character", "logical", "integer", "list", "data.frame")
+  fns <- c("is.numeric", "is.character", "is.logical", "is.integer", "is.list", "is.data.frame")
+  for (i in seq_along(types)) {
+    args <- setNames(list(types[i]), "x")
+    code <- generate_type_checks("t", args)
+    expect_true(grepl(fns[i], code, fixed = TRUE),
+                info = paste("type:", types[i]))
+  }
+})
+
+test_that("generate_tool_wrappers() includes type checks in wrapper code", {
+  tools <- list(
+    securer_tool(
+      "add", "Add numbers",
+      function(a, b) a + b,
+      args = list(a = "numeric", b = "numeric")
+    )
+  )
+  code <- generate_tool_wrappers(tools)
+  expect_true(grepl("is.numeric(a)", code, fixed = TRUE))
+  expect_true(grepl("is.numeric(b)", code, fixed = TRUE))
+  expect_true(grepl(".securer_call_tool", code, fixed = TRUE))
+})
+
+test_that("generate_tool_wrappers() skips checks for tools with no typed args", {
+  tools <- list(
+    securer_tool(
+      "ping", "Ping",
+      function() "pong",
+      args = list()
+    )
+  )
+  code <- generate_tool_wrappers(tools)
+  expect_false(grepl("is\\.", code))
+})
+
+test_that("Type checking passes for correct types end-to-end", {
+  tools <- list(
+    securer_tool(
+      "add", "Add numbers",
+      function(a, b) a + b,
+      args = list(a = "numeric", b = "numeric")
+    )
+  )
+  session <- SecureSession$new(tools = tools)
+  on.exit(session$close())
+
+  result <- session$execute("add(2, 3)")
+  expect_equal(result, 5)
+})
+
+test_that("Type checking rejects wrong types end-to-end", {
+  tools <- list(
+    securer_tool(
+      "add", "Add numbers",
+      function(a, b) a + b,
+      args = list(a = "numeric", b = "numeric")
+    )
+  )
+  session <- SecureSession$new(tools = tools)
+  on.exit(session$close())
+
+  expect_error(
+    session$execute('add("hello", 3)'),
+    "Tool 'add': argument 'a' must be numeric, got character"
+  )
+})
+
+test_that("Type checking validates multiple args independently", {
+  tools <- list(
+    securer_tool(
+      "greet", "Greet",
+      function(name, times) paste(rep(name, times), collapse = " "),
+      args = list(name = "character", times = "numeric")
+    )
+  )
+  session <- SecureSession$new(tools = tools)
+  on.exit(session$close())
+
+  # Correct types work
+  result <- session$execute('greet("hi", 3)')
+  expect_equal(result, "hi hi hi")
+
+  # Wrong first arg
+  expect_error(
+    session$execute("greet(123, 3)"),
+    "Tool 'greet': argument 'name' must be character"
+  )
+
+  # Wrong second arg
+  expect_error(
+    session$execute('greet("hi", "three")'),
+    "Tool 'greet': argument 'times' must be numeric"
+  )
+})
+
+test_that("Type checking skips unannotated args end-to-end", {
+  tools <- list(
+    securer_tool(
+      "flexible", "Flexible tool",
+      function(a, b) paste(a, b),
+      args = list(a = "character", b = NULL)
+    )
+  )
+  session <- SecureSession$new(tools = tools)
+  on.exit(session$close())
+
+  # b has no type annotation so any type is accepted
+  result <- session$execute('flexible("hello", 42)')
+  expect_equal(result, "hello 42")
+})

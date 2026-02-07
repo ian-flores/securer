@@ -94,18 +94,65 @@ generate_tool_wrappers <- function(tools) {
     if (length(arg_names) == 0) {
       formals_str <- "..."
       call_args <- ", ..."
+      validation_code <- ""
     } else {
       formals_str <- paste(arg_names, collapse = ", ")
       call_args <- paste0(
         ", ",
         paste(paste0(arg_names, " = ", arg_names), collapse = ", ")
       )
+      validation_code <- generate_type_checks(tool$name, tool$args)
     }
-    sprintf(
-      '%s <- function(%s) .securer_call_tool("%s"%s)',
-      tool$name, formals_str, tool$name, call_args
-    )
+    if (nzchar(validation_code)) {
+      sprintf(
+        '%s <- function(%s) {\n%s\n  .securer_call_tool("%s"%s)\n}',
+        tool$name, formals_str, validation_code, tool$name, call_args
+      )
+    } else {
+      sprintf(
+        '%s <- function(%s) .securer_call_tool("%s"%s)',
+        tool$name, formals_str, tool$name, call_args
+      )
+    }
   }, character(1))
 
   paste(code_parts, collapse = "\n")
+}
+
+#' Map of type annotation strings to R type-checking functions
+#'
+#' @keywords internal
+type_check_map <- c(
+  numeric = "is.numeric",
+  character = "is.character",
+  logical = "is.logical",
+  integer = "is.integer",
+  list = "is.list",
+  data.frame = "is.data.frame"
+)
+
+#' Generate type validation code for tool arguments
+#'
+#' Produces R code as a character string that checks each argument's type
+#' against its declared type annotation. Arguments without type annotations
+#' are skipped.
+#'
+#' @param tool_name Character, the tool name (for error messages)
+#' @param args Named list mapping argument names to type strings
+#' @return Character string of R code performing type checks (may be empty)
+#' @keywords internal
+generate_type_checks <- function(tool_name, args) {
+  arg_names <- names(args)
+  checks <- character(0)
+  for (nm in arg_names) {
+    type_str <- args[[nm]]
+    if (is.null(type_str) || !nzchar(type_str)) next
+    check_fn <- type_check_map[type_str]
+    if (is.na(check_fn)) next
+    checks <- c(checks, sprintf(
+      '  if (!%s(%s)) stop("Tool \'%s\': argument \'%s\' must be %s, got ", class(%s)[1], call. = FALSE)',
+      check_fn, nm, tool_name, nm, type_str, nm
+    ))
+  }
+  paste(checks, collapse = "\n")
 }
