@@ -18,7 +18,7 @@ The main entry points are:
 }
 }
 \author{
-\strong{Maintainer}: Posit PBC \email{engineering@posit.co}
+\strong{Maintainer}: Ian Flores Siaca \email{iflores.siaca@hey.com}
 
 }
 \keyword{internal}
