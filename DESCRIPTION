@@ -1,0 +1,19 @@
+Package: securer
+Title: Secure R Code Execution with Tool-Call IPC
+Version: 0.0.0.9000
+Authors@R:
+    person("Posit", "PBC", email = "engineering@posit.co", role = c("aut", "cre"))
+Description: Wraps callr::r_session with a bidirectional IPC protocol for
+    pause/resume tool calls, enabling safe execution of LLM-generated R code.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
+Imports:
+    callr (>= 3.7.0),
+    processx (>= 3.8.0),
+    R6,
+    jsonlite
+Suggests:
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
