@@ -11,7 +11,8 @@ SecureSession (R6)
 ├── callr::r_session — child R process
 ├── Unix domain socket — bidirectional IPC (tool calls + responses)
 ├── Tool registry — securer_tool() objects → child wrapper functions
-└── Sandbox — macOS Seatbelt via sandbox-exec wrapper script
+├── Sandbox — macOS Seatbelt / Linux bwrap / Windows env isolation
+└── Resource limits — ulimit-based CPU, memory, fsize, nproc, nofile, stack
 ```
 
 Key files:
@@ -20,6 +21,9 @@ Key files:
 - `R/ipc.R` — UDS helpers (create, accept, read, write)
 - `R/tool-registry.R` — `securer_tool()`, validation, wrapper code generation
 - `R/sandbox-macos.R` — Seatbelt profile generation + wrapper script
+- `R/sandbox-linux.R` — Bubblewrap (bwrap) namespace isolation + wrapper script
+- `R/sandbox-windows.R` — Environment-variable-only isolation for Windows
+- `R/rlimits.R` — ulimit command generation and validation
 - `R/execute.R` — `execute_r()` convenience function
 
 ## Critical Implementation Details
@@ -60,20 +64,18 @@ Rscript -e "devtools::load_all('.')"
 - `test-secure-session.R` — Session lifecycle (start, execute, close, errors)
 - `test-ipc.R` — Tool call pause/resume via `.securer_call_tool()` directly
 - `test-tool-registry.R` — securer_tool(), validation, wrappers, end-to-end
-- `test-sandbox.R` — Seatbelt restrictions (network, filesystem, tool calls)
+- `test-sandbox.R` — Sandbox restrictions (macOS/Linux/Windows), rlimits
 - `test-execute.R` — `execute_r()` convenience API
 
 ## Platform Notes
 
 - **macOS**: Full sandbox via Seatbelt. Requires `/usr/bin/sandbox-exec`.
-- **Linux**: Stub — warns and runs unsandboxed. Future: bwrap with namespaces.
-- **Windows**: Stub — warns and runs unsandboxed.
+- **Linux**: Full sandbox via bubblewrap (`bwrap`). Requires `bwrap` on PATH.
+- **Windows**: Environment isolation only (clean HOME/TMPDIR, empty R_LIBS_USER). No filesystem/network restrictions.
 
-Sandbox tests use `skip_on_os()` and `skip_if_not(file.exists("/usr/bin/sandbox-exec"))`.
+Sandbox tests use `skip_on_os()` and `skip_if_not()` to gate platform-specific tests.
 
 ## Known Limitations
 
-- Linux sandbox (bwrap) not yet implemented
-- No resource limits (rlimits) applied yet — only Seatbelt file/network restrictions
-- Tool argument type annotations (`args = list(x = "numeric")`) are metadata only — no runtime type checking in the child
+- Windows sandbox provides environment isolation only — no filesystem or network restrictions without admin privileges
 - Single concurrent session per `SecureSession` instance — concurrent `$execute()` calls are detected and rejected with an error
