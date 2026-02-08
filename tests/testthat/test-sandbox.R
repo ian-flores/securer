@@ -247,9 +247,23 @@ test_that("Non-sandbox session still works (regression)", {
 
 # ── Linux bwrap integration tests (require bwrap) ─────────────────────
 
+# Helper: check if bwrap can actually create namespaces (fails in containers)
+bwrap_works <- function() {
+  bwrap <- Sys.which("bwrap")
+  if (!nzchar(bwrap)) return(FALSE)
+  res <- tryCatch(
+    processx::run(bwrap, c("--unshare-all", "--ro-bind", "/usr", "/usr",
+                           "--dev", "/dev", "--proc", "/proc",
+                           "--", "/usr/bin/true"),
+                  timeout = 5, error_on_status = FALSE),
+    error = function(e) list(status = 1)
+  )
+  res$status == 0
+}
+
 test_that("bwrap sandbox session can execute simple code", {
   skip_on_os(c("windows", "mac"))
-  skip_if_not(nzchar(Sys.which("bwrap")), "bwrap not available")
+  skip_if_not(bwrap_works(), "bwrap cannot create namespaces (likely in a container)")
 
   session <- SecureSession$new(sandbox = TRUE)
   on.exit(session$close())
@@ -260,7 +274,7 @@ test_that("bwrap sandbox session can execute simple code", {
 
 test_that("bwrap sandbox session can execute multi-line code", {
   skip_on_os(c("windows", "mac"))
-  skip_if_not(nzchar(Sys.which("bwrap")), "bwrap not available")
+  skip_if_not(bwrap_works(), "bwrap cannot create namespaces (likely in a container)")
 
   session <- SecureSession$new(sandbox = TRUE)
   on.exit(session$close())
@@ -275,7 +289,7 @@ test_that("bwrap sandbox session can execute multi-line code", {
 
 test_that("bwrap sandbox blocks network access", {
   skip_on_os(c("windows", "mac"))
-  skip_if_not(nzchar(Sys.which("bwrap")), "bwrap not available")
+  skip_if_not(bwrap_works(), "bwrap cannot create namespaces (likely in a container)")
 
   session <- SecureSession$new(sandbox = TRUE)
   on.exit(session$close())
@@ -291,7 +305,7 @@ test_that("bwrap sandbox blocks network access", {
 
 test_that("bwrap sandbox blocks writing to protected paths", {
   skip_on_os(c("windows", "mac"))
-  skip_if_not(nzchar(Sys.which("bwrap")), "bwrap not available")
+  skip_if_not(bwrap_works(), "bwrap cannot create namespaces (likely in a container)")
 
   session <- SecureSession$new(sandbox = TRUE)
   on.exit(session$close())
@@ -304,7 +318,7 @@ test_that("bwrap sandbox blocks writing to protected paths", {
 
 test_that("bwrap sandbox allows writing to temp directory", {
   skip_on_os(c("windows", "mac"))
-  skip_if_not(nzchar(Sys.which("bwrap")), "bwrap not available")
+  skip_if_not(bwrap_works(), "bwrap cannot create namespaces (likely in a container)")
 
   session <- SecureSession$new(sandbox = TRUE)
   on.exit(session$close())
@@ -321,7 +335,7 @@ test_that("bwrap sandbox allows writing to temp directory", {
 
 test_that("bwrap sandbox allows tool calls", {
   skip_on_os(c("windows", "mac"))
-  skip_if_not(nzchar(Sys.which("bwrap")), "bwrap not available")
+  skip_if_not(bwrap_works(), "bwrap cannot create namespaces (likely in a container)")
 
   tools <- list(
     securer_tool(
@@ -339,7 +353,7 @@ test_that("bwrap sandbox allows tool calls", {
 
 test_that("bwrap sandbox cleans up wrapper on close", {
   skip_on_os(c("windows", "mac"))
-  skip_if_not(nzchar(Sys.which("bwrap")), "bwrap not available")
+  skip_if_not(bwrap_works(), "bwrap cannot create namespaces (likely in a container)")
 
   session <- SecureSession$new(sandbox = TRUE)
 
