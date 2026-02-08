@@ -6,10 +6,14 @@
 #' @param code Character string of R code to execute.
 #' @param tools List of tools created with [securer_tool()], or a named list
 #'   of functions (legacy format).
-#' @param timeout Timeout in seconds for the execution (default 30).
+#' @param timeout Timeout in seconds for the execution, or `NULL` for no
+#'   timeout (default 30).
 #' @param sandbox Logical, whether to enable OS-level sandboxing (default TRUE).
 #' @param limits Optional named list of resource limits (see
 #'   [SecureSession] for details).
+#' @param verbose Logical, whether to emit diagnostic messages via
+#'   `message()`.  Useful for debugging.  Users can suppress with
+#'   `suppressMessages()`.
 #'
 #' @return The result of evaluating `code` in the secure session.
 #'
@@ -34,9 +38,9 @@
 #'
 #' @export
 execute_r <- function(code, tools = list(), timeout = 30, sandbox = TRUE,
-                      limits = NULL) {
+                      limits = NULL, verbose = FALSE) {
   session <- SecureSession$new(tools = tools, sandbox = sandbox,
-                               limits = limits)
+                               limits = limits, verbose = verbose)
   on.exit(session$close())
   session$execute(code, timeout = timeout)
 }

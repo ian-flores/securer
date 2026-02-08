@@ -4,7 +4,14 @@
 \alias{execute_r}
 \title{Execute R code securely with tool support}
 \usage{
-execute_r(code, tools = list(), timeout = 30, sandbox = TRUE)
+execute_r(
+  code,
+  tools = list(),
+  timeout = 30,
+  sandbox = TRUE,
+  limits = NULL,
+  verbose = FALSE
+)
 }
 \arguments{
 \item{code}{Character string of R code to execute.}
@@ -12,9 +19,17 @@ execute_r(code, tools = list(), timeout = 30, sandbox = TRUE)
 \item{tools}{List of tools created with \code{\link[=securer_tool]{securer_tool()}}, or a named list
 of functions (legacy format).}
 
-\item{timeout}{Timeout in seconds for the execution (default 30).}
+\item{timeout}{Timeout in seconds for the execution, or \code{NULL} for no
+timeout (default 30).}
 
 \item{sandbox}{Logical, whether to enable OS-level sandboxing (default TRUE).}
+
+\item{limits}{Optional named list of resource limits (see
+\link{SecureSession} for details).}
+
+\item{verbose}{Logical, whether to emit diagnostic messages via
+\code{message()}.  Useful for debugging.  Users can suppress with
+\code{suppressMessages()}.}
 }
 \value{
 The result of evaluating \code{code} in the secure session.
@@ -37,6 +52,9 @@ result <- execute_r(
       args = list(a = "numeric", b = "numeric"))
   )
 )
+
+# With resource limits
+execute_r("1 + 1", limits = list(cpu = 10, memory = 256 * 1024 * 1024))
 }
 
 }

@@ -33,6 +33,8 @@ ipc_accept <- function(server_conn, timeout = 5000L) {
 #'
 #' @param conn A connection object
 #' @param msg A list to serialize and send
+#' @return Invisible `NULL`; called for its side effect of writing to the
+#'   connection.
 #' @keywords internal
 ipc_write_message <- function(conn, msg) {
   json <- jsonlite::toJSON(msg, auto_unbox = TRUE)

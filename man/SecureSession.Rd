@@ -50,7 +50,12 @@ session$close()
 \subsection{Method \code{new()}}{
 Create a new SecureSession
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{SecureSession$new(tools = list(), sandbox = FALSE)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{SecureSession$new(
+  tools = list(),
+  sandbox = FALSE,
+  limits = NULL,
+  verbose = FALSE
+)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -64,6 +69,16 @@ On macOS this uses \code{sandbox-exec} with a Seatbelt profile that
 denies network access and restricts file writes to temp
 directories.  On other platforms a warning is issued and the
 session runs without sandboxing.}
+
+\item{\code{limits}}{An optional named list of resource limits to apply to the
+child process via \code{ulimit}.  Supported names: \code{cpu} (seconds),
+\code{memory} (bytes, virtual address space), \code{fsize} (bytes, max file
+size), \code{nproc} (max processes), \code{nofile} (max open files),
+\code{stack} (bytes, stack size).  \code{NULL} (the default) means no limits.}
+
+\item{\code{verbose}}{Logical, whether to emit diagnostic messages via
+\code{message()}.  Useful for debugging.  Users can suppress with
+\code{suppressMessages()}.}
 }
 \if{html}{\out{</div>}}
 }
@@ -74,7 +89,7 @@ session runs without sandboxing.}
 \subsection{Method \code{execute()}}{
 Execute R code in the secure session
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{SecureSession$execute(code, timeout = 30)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{SecureSession$execute(code, timeout = NULL)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -82,7 +97,7 @@ Execute R code in the secure session
 \describe{
 \item{\code{code}}{Character string of R code to execute}
 
-\item{\code{timeout}}{Timeout in seconds (default 30)}
+\item{\code{timeout}}{Timeout in seconds, or \code{NULL} for no timeout (default \code{NULL})}
 }
 \if{html}{\out{</div>}}
 }

@@ -4,12 +4,15 @@
 \alias{build_sandbox_config}
 \title{Build sandbox configuration for the current platform}
 \usage{
-build_sandbox_config(socket_path, r_home = R.home())
+build_sandbox_config(socket_path, r_home = R.home(), limits = NULL)
 }
 \arguments{
 \item{socket_path}{Path to the UDS socket (must be writable by the child)}
 
 \item{r_home}{Path to the R installation (default: \code{R.home()})}
+
+\item{limits}{Optional named list of resource limits (see
+\code{generate_ulimit_commands()})}
 }
 \value{
 A list with elements:

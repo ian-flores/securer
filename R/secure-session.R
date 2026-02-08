@@ -44,19 +44,24 @@ SecureSession <- R6::R6Class("SecureSession",
     #'   `memory` (bytes, virtual address space), `fsize` (bytes, max file
     #'   size), `nproc` (max processes), `nofile` (max open files),
     #'   `stack` (bytes, stack size).  `NULL` (the default) means no limits.
-    initialize = function(tools = list(), sandbox = FALSE, limits = NULL) {
+    #' @param verbose Logical, whether to emit diagnostic messages via
+    #'   `message()`.  Useful for debugging.  Users can suppress with
+    #'   `suppressMessages()`.
+    initialize = function(tools = list(), sandbox = FALSE, limits = NULL,
+                          verbose = FALSE) {
       private$raw_tools <- tools
       private$tool_fns <- validate_tools(tools)
       private$sandbox_enabled <- sandbox
       private$limits <- limits
+      private$verbose <- verbose
       private$start_session()
     },
 
     #' @description Execute R code in the secure session
     #' @param code Character string of R code to execute
-    #' @param timeout Timeout in seconds (default 30)
+    #' @param timeout Timeout in seconds, or `NULL` for no timeout (default `NULL`)
     #' @return The result of evaluating the code
-    execute = function(code, timeout = 30) {
+    execute = function(code, timeout = NULL) {
       if (is.null(private$session) || !private$session$is_alive()) {
         stop("Session is not running", call. = FALSE)
       }
@@ -75,6 +80,7 @@ SecureSession <- R6::R6Class("SecureSession",
     #' @description Close the session and clean up resources
     #' @return Invisible self
     close = function() {
+      private$log("Session closed")
       if (!is.null(private$session)) {
         try(private$session$close(), silent = TRUE)
         private$session <- NULL
@@ -119,6 +125,11 @@ SecureSession <- R6::R6Class("SecureSession",
     sandbox_enabled = FALSE,
     sandbox_config = NULL,
     limits = NULL,
+    verbose = FALSE,
+
+    log = function(msg) {
+      if (private$verbose) message("[securer] ", msg)
+    },
 
     start_session = function() {
       # Create socket path in /tmp to keep the path short.
@@ -206,29 +217,42 @@ SecureSession <- R6::R6Class("SecureSession",
           private$session$read()
         }
       }
+
+      private$log(sprintf(
+        "Session started (sandbox=%s, pid=%s)",
+        tolower(as.character(private$sandbox_enabled)),
+        private$session$get_pid()
+      ))
     },
 
     run_with_tools = function(code, timeout) {
+      exec_start <- Sys.time()
+
       # Send code to child for execution via non-blocking call
       private$session$call(function(code) {
         eval(parse(text = code), envir = globalenv())
       }, args = list(code = code))
 
       # Event loop: poll UDS for tool calls and check process completion
-      deadline <- Sys.time() + timeout
+      deadline <- if (!is.null(timeout)) Sys.time() + timeout else NULL
 
       while (TRUE) {
-        remaining <- as.numeric(
-          difftime(deadline, Sys.time(), units = "secs")
-        ) * 1000
-        if (remaining <= 0) {
-          stop("Execution timed out", call. = FALSE)
+        poll_ms <- 200L
+
+        if (!is.null(deadline)) {
+          remaining_ms <- as.numeric(
+            difftime(deadline, Sys.time(), units = "secs")
+          ) * 1000
+          if (remaining_ms <= 0) {
+            private$handle_timeout(timeout)
+          }
+          poll_ms <- as.integer(min(remaining_ms, 200))
         }
 
         # Poll the UDS for tool calls from the child
         poll_result <- processx::poll(
           list(private$ipc_conn),
-          as.integer(min(remaining, 200))
+          poll_ms
         )
 
         # Check if there's data on the UDS (tool call)
@@ -242,6 +266,17 @@ SecureSession <- R6::R6Class("SecureSession",
               tool_name <- request$tool
               tool_args <- request$args
 
+              # Log the tool call with arguments
+              if (private$verbose) {
+                args_str <- paste(
+                  names(tool_args),
+                  tool_args,
+                  sep = "=", collapse = ", "
+                )
+                private$log(sprintf("Tool call: %s(%s)", tool_name, args_str))
+              }
+
+              tool_start <- Sys.time()
               response <- tryCatch({
                 if (is.null(private$tool_fns[[tool_name]])) {
                   list(error = paste0("Unknown tool: ", tool_name))
@@ -252,6 +287,29 @@ SecureSession <- R6::R6Class("SecureSession",
               }, error = function(e) {
                 list(error = conditionMessage(e))
               })
+
+              # Log the tool result
+              if (private$verbose) {
+                elapsed <- sprintf(
+                  "%.2fs",
+                  as.numeric(difftime(Sys.time(), tool_start, units = "secs"))
+                )
+                if (!is.null(response$error)) {
+                  private$log(sprintf(
+                    "Tool result: %s -> error: %s (%s)",
+                    tool_name, response$error, elapsed
+                  ))
+                } else {
+                  result_str <- tryCatch(
+                    paste(utils::head(response$value, 1), collapse = ", "),
+                    error = function(e) "<complex>"
+                  )
+                  private$log(sprintf(
+                    "Tool result: %s -> %s (%s)",
+                    tool_name, result_str, elapsed
+                  ))
+                }
+              }
 
               # Send response back to child
               response_json <- jsonlite::toJSON(response, auto_unbox = TRUE)
@@ -267,12 +325,44 @@ SecureSession <- R6::R6Class("SecureSession",
         proc_poll <- private$session$poll_process(0)
         if (proc_poll == "ready") {
           result <- private$session$read()
+          elapsed <- sprintf(
+            "%.2fs",
+            as.numeric(difftime(Sys.time(), exec_start, units = "secs"))
+          )
           if (!is.null(result$error)) {
+            private$log(sprintf(
+              "Execution error: %s (%s)",
+              conditionMessage(result$error), elapsed
+            ))
             stop(result$error)
           }
+          private$log(sprintf("Execution complete (%s)", elapsed))
           return(result$result)
         }
       }
+    },
+
+    handle_timeout = function(timeout) {
+      private$log(sprintf("Execution timed out after %ss", timeout))
+      # Kill the child process and restart so the session remains usable
+      try(private$session$close(), silent = TRUE)
+      private$session <- NULL
+      if (!is.null(private$ipc_conn)) {
+        try(close(private$ipc_conn), silent = TRUE)
+        private$ipc_conn <- NULL
+      }
+      if (!is.null(private$socket_path) && file.exists(private$socket_path)) {
+        unlink(private$socket_path)
+      }
+
+      # Restart the session so it's usable for future execute() calls
+      private$start_session()
+
+      label <- if (timeout == 1) "1 second" else paste(timeout, "seconds")
+      stop(
+        paste("Execution timed out after", label),
+        call. = FALSE
+      )
     }
   )
 )

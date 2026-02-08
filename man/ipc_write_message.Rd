@@ -11,6 +11,10 @@ ipc_write_message(conn, msg)
 
 \item{msg}{A list to serialize and send}
 }
+\value{
+Invisible \code{NULL}; called for its side effect of writing to the
+connection.
+}
 \description{
 Serializes a list to JSON and writes it as a single newline-terminated line.
 }

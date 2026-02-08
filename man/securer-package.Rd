@@ -17,6 +17,14 @@ The main entry points are:
 \item \code{\link[=securer_tool]{securer_tool()}} -- define tools that child code can call
 }
 }
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://github.com/ian-flores/securer}
+  \item Report bugs at \url{https://github.com/ian-flores/securer/issues}
+}
+
+}
 \author{
 \strong{Maintainer}: Ian Flores Siaca \email{iflores.siaca@hey.com}
 

@@ -4,12 +4,15 @@
 \alias{build_sandbox_macos}
 \title{Build macOS sandbox configuration}
 \usage{
-build_sandbox_macos(socket_path, r_home)
+build_sandbox_macos(socket_path, r_home, limits = NULL)
 }
 \arguments{
 \item{socket_path}{Path to the UDS socket}
 
 \item{r_home}{Path to the R installation}
+
+\item{limits}{Optional named list of resource limits (see
+\code{generate_ulimit_commands()})}
 }
 \value{
 A sandbox config list (see \code{\link[=build_sandbox_config]{build_sandbox_config()}})

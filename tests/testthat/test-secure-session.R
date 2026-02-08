@@ -75,3 +75,47 @@ test_that("concurrent execute() is rejected", {
   env$executing <- FALSE
   expect_equal(session$execute("1 + 1"), 2)
 })
+
+test_that("execute() completes within timeout", {
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  result <- session$execute("1 + 1", timeout = 5)
+  expect_equal(result, 2)
+})
+
+test_that("execute() times out on infinite loop", {
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  expect_error(
+    session$execute("while(TRUE) {}", timeout = 1),
+    "timed out after 1 second"
+  )
+})
+
+test_that("execute() with NULL timeout works normally (no timeout)", {
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  # NULL timeout means no limit; a fast expression should complete fine
+  result <- session$execute("42", timeout = NULL)
+  expect_equal(result, 42)
+})
+
+test_that("session is usable after a timeout", {
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  # First, cause a timeout
+
+  expect_error(
+    session$execute("while(TRUE) {}", timeout = 1),
+    "timed out"
+  )
+
+  # Session should still be alive and usable
+  expect_true(session$is_alive())
+  result <- session$execute("100 + 1")
+  expect_equal(result, 101)
+})

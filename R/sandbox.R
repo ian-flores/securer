@@ -7,7 +7,7 @@
 #' @param socket_path Path to the UDS socket (must be writable by the child)
 #' @param r_home      Path to the R installation (default: `R.home()`)
 #' @param limits      Optional named list of resource limits (see
-#'   [generate_ulimit_commands()])
+#'   `generate_ulimit_commands()`)
 #' @return A list with elements:
 #'   \describe{
 #'     \item{wrapper}{Path to a shell wrapper script, or `NULL`}

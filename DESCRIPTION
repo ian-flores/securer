@@ -6,6 +6,8 @@ Authors@R:
 Description: Wraps callr::r_session with a bidirectional IPC protocol for
     pause/resume tool calls, enabling safe execution of LLM-generated R code.
 License: MIT + file LICENSE
+URL: https://github.com/ian-flores/securer
+BugReports: https://github.com/ian-flores/securer/issues
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
@@ -15,5 +17,8 @@ Imports:
     R6,
     jsonlite
 Suggests:
+    knitr,
+    rmarkdown,
     testthat (>= 3.0.0)
+VignetteBuilder: knitr
 Config/testthat/edition: 3
