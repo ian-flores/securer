@@ -17,8 +17,20 @@ reference:
     desc: Primary API for secure code execution
     contents:
       - SecureSession
+      - SecureSessionPool
       - execute_r
       - securer_tool
+
+  - title: Validation & Logging
+    desc: Code validation and audit logging
+    contents:
+      - validate_code
+      - format_tool_result
+
+  - title: Integrations
+    desc: LLM framework adapters
+    contents:
+      - securer_as_ellmer_tool
 
   - title: Sandbox
     desc: OS-level sandboxing backends

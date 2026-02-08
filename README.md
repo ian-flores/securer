@@ -6,9 +6,28 @@
 [![pkgdown](https://github.com/ian-flores/securer/actions/workflows/pkgdown.yml/badge.svg)](https://ian-flores.github.io/securer/)
 <!-- badges: end -->
 
-Secure R code execution with tool-call IPC. Designed for LLM agents that generate R code calling registered tools — execution pauses at each tool call, the host fulfills it, and execution resumes.
+**Let LLMs write R code that calls your functions — safely.**
 
-Wraps `callr::r_session` with a bidirectional Unix domain socket protocol for pause/resume and OS-level sandboxing.
+When an LLM generates R code, you need two things: a way for that code to call back into your application (tool calls), and confidence that the code can't do anything dangerous (sandboxing). securer provides both.
+
+```r
+library(securer)
+
+# Your functions become tools the LLM's code can call
+tools <- list(
+  securer_tool("query_db", "Query a database table",
+    fn = function(table, limit) head(get(table, "package:datasets"), limit),
+    args = list(table = "character", limit = "numeric"))
+)
+
+# LLM-generated code runs sandboxed — tool calls pause, execute on your side, resume
+result <- execute_r('
+  data <- query_db("mtcars", 5)
+  mean(data$mpg)
+', tools = tools, sandbox = TRUE)
+```
+
+The child R process is sandboxed at the OS level. Tool functions execute on the host side, outside the sandbox, with full access to your resources. The LLM's code never touches your filesystem, network, or data directly.
 
 ## Installation
 
@@ -17,178 +36,138 @@ Wraps `callr::r_session` with a bidirectional Unix domain socket protocol for pa
 pak::pak("ian-flores/securer")
 ```
 
-## Quick Start
+## Why securer?
 
-```r
-library(securer)
-
-# Define tools the LLM code can call
-tools <- list(
-  securer_tool("get_weather", "Get weather for a city",
-    fn = function(city) list(temp = 72, condition = "sunny"),
-    args = list(city = "character")),
-  securer_tool("add", "Add two numbers",
-    fn = function(a, b) a + b,
-    args = list(a = "numeric", b = "numeric"))
-)
-
-# One-liner: execute code in a sandboxed session
-result <- execute_r(
-  code = '
-    weather <- get_weather("Boston")
-    paste("Temperature:", weather$temp)
-  ',
-  tools = tools
-)
-```
-
-## Session-Based Usage
-
-For multiple executions, reuse a session to avoid startup overhead:
-
-```r
-session <- SecureSession$new(tools = tools, sandbox = TRUE)
-
-result1 <- session$execute('add(2, 3)')
-result2 <- session$execute('
-  x <- add(10, 20)
-  x * 2
-')
-
-session$close()
-```
+| Problem | How securer solves it |
+|---------|----------------------|
+| LLM code could access the filesystem | OS sandbox blocks writes; reads restricted to R libraries |
+| LLM code could make network requests | Network access blocked via namespace isolation (Linux) or Seatbelt (macOS) |
+| LLM code needs to call your APIs/databases | Register tool functions that execute on the host side, outside the sandbox |
+| LLM code could run forever | Execution timeouts with automatic session recovery |
+| LLM code could consume all memory | Resource limits (CPU, memory, file size, processes) via ulimit |
+| LLM code has syntax errors | Pre-validation catches parse errors before execution |
 
 ## How It Works
 
 ```
-┌─────────────────────┐        ┌─────────────────────┐
-│     Parent (host)    │        │   Child (sandboxed)  │
-│                      │        │                      │
-│  1. Send code ───────┼───────>│  2. eval(code)       │
-│                      │        │                      │
-│                      │  UDS   │  3. Code calls       │
-│  5. Execute tool <───┼────────│     get_weather()    │
-│     on host side     │        │     → pauses         │
-│                      │        │                      │
-│  6. Send result ─────┼───────>│  7. Resumes with     │
-│                      │        │     tool result      │
-│                      │  fd3   │                      │
-│  9. Receive final <──┼────────│  8. Returns final    │
-│     result           │        │     value            │
-└─────────────────────┘        └─────────────────────┘
+┌──────────────────────┐        ┌──────────────────────┐
+│    Parent (host)      │        │  Child (sandboxed R)  │
+│                       │        │                       │
+│  1. Send code ────────┼───────>│  2. eval(code)        │
+│                       │  UDS   │                       │
+│  3. Execute tool  <───┼────────│  Code calls tool()    │
+│     (your function)   │        │  → pauses on socket   │
+│                       │        │                       │
+│  4. Send result ──────┼───────>│  5. Resumes with      │
+│                       │        │     tool result       │
+│                       │        │                       │
+│  6. Receive final <───┼────────│  Returns final value  │
+│     result            │        │                       │
+└──────────────────────┘        └──────────────────────┘
 ```
 
-1. Parent creates a Unix domain socket and starts a `callr::r_session` child process
-2. Child connects to the socket on startup
-3. Parent sends LLM-generated code via `$call()`
-4. When code calls a registered tool, the child writes a JSON request to the UDS and blocks
-5. Parent reads the request, executes the tool function locally, writes the result back
-6. Child receives the result and continues execution
-7. Final result returns via callr's normal fd3 channel
+Communication happens over a Unix domain socket. Tool calls are synchronous: the child blocks while the parent fulfills the request.
 
-## Sandbox
+## Features
 
-When `sandbox = TRUE`, the child R process runs inside OS-level restrictions:
+### Persistent Sessions
 
-### macOS (Seatbelt)
-
-Uses `sandbox-exec` with a generated Seatbelt profile:
-
-- **File writes blocked** except to temp directories
-- **Network access blocked** (no TCP/UDP)
-- **File reads allowed** (R needs access to system libs, packages)
-- **Unix domain sockets allowed** (IPC with parent)
+Reuse a session across multiple executions to avoid startup overhead:
 
 ```r
-session <- SecureSession$new(sandbox = TRUE)
+session <- SecureSession$new(tools = tools, sandbox = TRUE)
 
-# This works:
-session$execute("1 + 1")
-
-# This is blocked (no network):
-session$execute('readLines(url("http://example.com"))')
-# Error: Operation not permitted
-
-# This is blocked (no file write outside temp):
-session$execute('writeLines("hack", "~/evil.txt")')
-# Error: Operation not permitted
+session$execute('query_db("iris", 3)')
+session$execute('query_db("mtcars", 5)')
 
 session$close()
 ```
 
-### Linux (bubblewrap)
+### Session Pooling
 
-Uses `bwrap` (bubblewrap) with full namespace isolation:
-
-- **All namespaces isolated** (PID, net, user, mount, UTS, IPC)
-- **Network access blocked** via network namespace isolation
-- **Filesystem restricted** -- system libraries and R are mounted read-only; `/tmp` is writable
-- **R package libraries** are bind-mounted read-only automatically
-
-Requires `bwrap` to be installed (e.g. `apt install bubblewrap`). Falls back to unsandboxed with a warning if not found.
-
-### Windows
-
-Provides environment-variable isolation only:
-
-- Clears `R_LIBS_USER`, `R_ENVIRON_USER`, `R_PROFILE_USER`
-- Redirects `HOME` and `TMPDIR` to a clean temp directory
-
-No filesystem or network restrictions are enforced. A warning is issued when `sandbox = TRUE`.
-
-## Tool Definition
-
-Tools are defined with `securer_tool()`:
+Pre-warm multiple sessions for low-latency concurrent execution:
 
 ```r
-my_tool <- securer_tool(
-  name = "query_db",
-  description = "Query a database table",
-  fn = function(table, limit) {
-    head(get(table, "package:datasets"), n = limit)
-  },
-  args = list(table = "character", limit = "numeric")
-)
+pool <- SecureSessionPool$new(size = 4, tools = tools, sandbox = TRUE)
+
+result <- pool$execute('query_db("iris", 3)')
+
+pool$close()
 ```
 
-- `name` — function name available to LLM code in the child process
-- `description` — metadata for LLM tool-use prompts
-- `fn` — the actual implementation, runs on the **parent** side (outside the sandbox)
-- `args` — named list of argument types, used to generate typed wrapper functions in the child
+### Resource Limits
 
-## Resource Limits
-
-Apply `ulimit`-based caps to the child process regardless of whether the sandbox is enabled:
+Constrain CPU, memory, and file size regardless of sandbox mode:
 
 ```r
-result <- execute_r(
-  "Sys.sleep(0.1); 42",
+result <- execute_r("1 + 1",
   limits = list(cpu = 10, memory = 256 * 1024 * 1024)
 )
 ```
 
-Supported limits:
+### Execution Timeouts
 
-| Name     | Unit    | Description                 |
-|----------|---------|-----------------------------|
-| `cpu`    | seconds | CPU time                    |
-| `memory` | bytes   | Virtual address space       |
-| `fsize`  | bytes   | Maximum file size           |
-| `nproc`  | count   | Maximum processes           |
-| `nofile` | count   | Maximum open files          |
-| `stack`  | bytes   | Stack size                  |
+Kill long-running code automatically. The session recovers and is reusable:
+
+```r
+session <- SecureSession$new()
+session$execute("Sys.sleep(100)", timeout = 5)
+# Error: Execution timed out after 5 seconds
+session$execute("1 + 1")  # still works
+```
+
+### Code Pre-Validation
+
+Catch syntax errors before sending code to the child process:
+
+```r
+session$execute("if (TRUE {")  # immediate error, no child round-trip
+```
+
+### ellmer Integration
+
+Use securer as a code execution tool in [ellmer](https://ellmer.tidyverse.org/) LLM chats:
+
+```r
+library(ellmer)
+chat <- chat_openai()
+chat$register_tool(securer_as_ellmer_tool())
+chat$chat("Calculate the mean of 1 through 100 using R")
+```
+
+### Audit Logging
+
+Write structured JSONL logs of all session events for compliance and debugging:
+
+```r
+session <- SecureSession$new(audit_log = "session.jsonl")
+```
+
+### Verbose Logging
+
+Debug session behavior with human-readable `message()` output:
+
+```r
+session <- SecureSession$new(verbose = TRUE)
+# [securer] Session started (sandbox=FALSE, pid=1234)
+# [securer] Tool call: query_db(table="iris", limit=3)
+# [securer] Execution complete (0.5s)
+```
+
+## Platform Support
+
+| Platform | Sandbox | Network blocked | Filesystem restricted |
+|----------|---------|-----------------|----------------------|
+| **Linux** | bubblewrap (`bwrap`) | Yes (namespace isolation) | Yes (read-only mounts) |
+| **macOS** | Seatbelt (`sandbox-exec`) | Yes (IP denied) | Yes (writes to /tmp only) |
+| **Windows** | Environment isolation | No | No |
+
+Linux and macOS provide full OS-level sandboxing. Windows provides environment variable isolation only (clean HOME, empty R_LIBS_USER). All platforms support resource limits and tool call IPC.
 
 ## Documentation
 
-See `vignette("getting-started", package = "securer")` for a detailed
-walkthrough of sessions, tools, sandboxing, and resource limits.
-
-## Dependencies
-
-- [callr](https://callr.r-lib.org/) (>= 3.7.0) — child R session management
-- [processx](https://processx.r-lib.org/) (>= 3.8.0) — Unix domain sockets
-- [R6](https://r6.r-lib.org/) — class system
-- [jsonlite](https://jeroen.r-universe.dev/jsonlite) — IPC message serialization
+- `vignette("getting-started", package = "securer")` — full walkthrough
+- [pkgdown site](https://ian-flores.github.io/securer/) — API reference
 
 ## License
 

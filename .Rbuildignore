@@ -1,8 +1,6 @@
 ^\.claude$
 ^CLAUDE\.md$
 ^LICENSE\.md$
-^approach-a-analysis\.md$
-^comparison-report\.md$
 ^\.github$
 ^README\.Rmd$
 ^_pkgdown\.yml$
