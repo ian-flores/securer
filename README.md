@@ -1,5 +1,11 @@
 # securer
 
+<!-- badges: start -->
+[![R-CMD-check](https://github.com/ian-flores/securer/actions/workflows/check.yml/badge.svg)](https://github.com/ian-flores/securer/actions/workflows/check.yml)
+[![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
+[![pkgdown](https://github.com/ian-flores/securer/actions/workflows/pkgdown.yml/badge.svg)](https://ian-flores.github.io/securer/)
+<!-- badges: end -->
+
 Secure R code execution with tool-call IPC. Designed for LLM agents that generate R code calling registered tools — execution pauses at each tool call, the host fulfills it, and execution resumes.
 
 Wraps `callr::r_session` with a bidirectional Unix domain socket protocol for pause/resume and OS-level sandboxing.

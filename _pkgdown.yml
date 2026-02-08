@@ -1,0 +1,52 @@
+url: https://ian-flores.github.io/securer/
+
+template:
+  bootstrap: 5
+
+navbar:
+  structure:
+    left: [intro, reference, articles]
+    right: [search, github]
+  components:
+    github:
+      icon: fa-github
+      href: https://github.com/ian-flores/securer
+
+reference:
+  - title: Core
+    desc: Primary API for secure code execution
+    contents:
+      - SecureSession
+      - execute_r
+      - securer_tool
+
+  - title: Sandbox
+    desc: OS-level sandboxing backends
+    contents:
+      - build_sandbox_config
+      - build_sandbox_macos
+      - build_sandbox_linux
+      - build_sandbox_windows
+      - build_sandbox_fallback
+      - generate_seatbelt_profile
+      - generate_bwrap_args
+
+  - title: Resource Limits
+    desc: Process resource restrictions
+    contents:
+      - validate_limits
+      - generate_ulimit_commands
+      - build_limits_only_wrapper
+
+  - title: Internals
+    desc: Low-level IPC and child runtime
+    contents:
+      - child_runtime_code
+      - ipc_create_server
+      - ipc_accept
+      - ipc_read_message
+      - ipc_write_message
+      - validate_tools
+      - generate_tool_wrappers
+      - generate_type_checks
+      - type_check_map

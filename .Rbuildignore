@@ -5,3 +5,6 @@
 ^comparison-report\.md$
 ^\.github$
 ^README\.Rmd$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$
