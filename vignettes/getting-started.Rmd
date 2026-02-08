@@ -1,0 +1,297 @@
+---
+title: "Getting Started with securer"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting Started with securer}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+## Overview
+
+securer runs R code in a child process that is isolated by an OS-level sandbox.
+Code running in the child can call named "tools" --- functions that execute on
+the host side, outside the sandbox. Communication happens over a Unix domain
+socket using JSON messages.
+
+This is designed for LLM agent systems where the model generates R code that
+needs to call host-provided tools (database queries, API calls, file operations)
+while being prevented from accessing the network or writing to arbitrary
+filesystem locations.
+
+## Quick start
+
+The simplest way to execute code is with `execute_r()`. It creates a session,
+runs the code, and tears everything down automatically:
+
+```{r}
+library(securer)
+
+execute_r("1 + 1")
+#> [1] 2
+
+execute_r("paste('Hello from', R.version.string)")
+#> [1] "Hello from R version 4.4.2 (2024-10-31)"
+```
+
+By default `execute_r()` enables the OS sandbox (`sandbox = TRUE`). Pass
+`sandbox = FALSE` to disable it.
+
+## Defining tools
+
+Tools let sandboxed code call functions on the host. Define them with
+`securer_tool()`:
+
+```{r}
+add_tool <- securer_tool(
+  name = "add",
+  description = "Add two numbers",
+  fn = function(a, b) a + b,
+  args = list(a = "numeric", b = "numeric")
+)
+```
+
+Each tool has four components:
+
+- **name** -- the function name available to code in the child process
+- **description** -- metadata (useful for LLM tool-use prompts)
+- **fn** -- the implementation, which runs on the host side (outside the sandbox)
+- **args** -- a named list mapping argument names to type strings; used to
+  generate typed wrapper functions and runtime type checks in the child
+
+The child process receives a wrapper function (e.g. `add()`) that serializes
+the call as JSON, sends it over the Unix domain socket, blocks until the host
+responds, and returns the result. From the child's perspective it looks like a
+normal function call.
+
+### Supported type annotations
+
+| Type string   | Check function     |
+|---------------|--------------------|
+| `"numeric"`   | `is.numeric()`     |
+| `"character"` | `is.character()`   |
+| `"logical"`   | `is.logical()`     |
+| `"integer"`   | `is.integer()`     |
+| `"list"`      | `is.list()`        |
+| `"data.frame"`| `is.data.frame()`  |
+
+Type annotations are optional. Arguments without type annotations skip
+validation.
+
+## Using tools with execute_r()
+
+Pass tools as a list:
+
+```{r}
+tools <- list(
+  securer_tool("add", "Add two numbers",
+    fn = function(a, b) a + b,
+    args = list(a = "numeric", b = "numeric")),
+  securer_tool("get_weather", "Get weather for a city",
+    fn = function(city) list(temp = 72, condition = "sunny"),
+    args = list(city = "character"))
+)
+
+execute_r('add(2, 3)', tools = tools)
+#> [1] 5
+
+execute_r('get_weather("Boston")', tools = tools)
+#> $temp
+#> [1] 72
+#>
+#> $condition
+#> [1] "sunny"
+```
+
+## Persistent sessions with SecureSession
+
+If you need to execute multiple pieces of code, reuse a `SecureSession` to
+avoid the overhead of starting a new child process each time:
+
+```{r}
+session <- SecureSession$new(tools = tools, sandbox = TRUE)
+
+session$execute('x <- add(10, 20)')
+session$execute('x * 2')
+#> [1] 60
+
+session$is_alive()
+#> [1] TRUE
+
+session$close()
+```
+
+State persists across `$execute()` calls within the same session. The variable
+`x` assigned in the first call is available in the second.
+
+Always call `$close()` when done. This terminates the child process, removes
+the Unix domain socket, and cleans up any temporary sandbox files.
+
+## Sandbox
+
+When `sandbox = TRUE`, the child process runs inside platform-native OS-level
+restrictions.
+
+### macOS (Seatbelt)
+
+Uses `sandbox-exec` with a generated Seatbelt profile:
+
+- File reads are allowed everywhere (R needs system libs and packages)
+- File writes are blocked except to temp directories (`/tmp`, `/var/folders/`)
+- All remote network access is blocked (TCP/UDP)
+- Unix domain sockets are allowed (needed for IPC with the host)
+
+```{r}
+session <- SecureSession$new(sandbox = TRUE)
+
+# Computation works normally:
+session$execute("1 + 1")
+#> [1] 2
+
+# Network access is blocked:
+session$execute('readLines(url("http://example.com"))')
+#> Error: Operation not permitted
+
+# Writing outside temp is blocked:
+session$execute('writeLines("test", "~/file.txt")')
+#> Error: Operation not permitted
+
+session$close()
+```
+
+### Linux (bubblewrap)
+
+Uses `bwrap` with full namespace isolation (PID, network, user, mount, UTS,
+IPC). System libraries and R are bind-mounted read-only. `/tmp` is a clean
+writable tmpfs. Network access is blocked via the network namespace.
+
+Requires `bwrap` to be installed. On Debian/Ubuntu: `apt install bubblewrap`.
+Falls back to unsandboxed execution with a warning if not found.
+
+### Windows
+
+Provides environment-variable isolation only (clears `R_LIBS_USER`,
+`R_ENVIRON_USER`, `R_PROFILE_USER`; redirects `HOME`/`TMPDIR` to a clean temp
+directory). No filesystem or network restrictions. A warning is issued.
+
+## Resource limits
+
+Apply `ulimit`-based caps to the child process. These work with or without the
+sandbox:
+
+```{r}
+# Limit CPU to 10 seconds and memory to 256 MB
+execute_r(
+  "1 + 1",
+  limits = list(cpu = 10, memory = 256 * 1024 * 1024)
+)
+```
+
+With a persistent session:
+
+```{r}
+session <- SecureSession$new(
+  sandbox = TRUE,
+  limits = list(cpu = 30, fsize = 10 * 1024 * 1024)
+)
+
+session$execute("1 + 1")
+session$close()
+```
+
+Supported limits:
+
+| Name     | Unit    | ulimit flag | Description                 |
+|----------|---------|-------------|-----------------------------|
+| `cpu`    | seconds | `-t`        | CPU time                    |
+| `memory` | bytes   | `-v`        | Virtual address space       |
+| `fsize`  | bytes   | `-f`        | Maximum file size           |
+| `nproc`  | count   | `-u`        | Maximum processes           |
+| `nofile` | count   | `-n`        | Maximum open files          |
+| `stack`  | bytes   | `-s`        | Stack size                  |
+
+## Execution timeout
+
+Each `$execute()` call accepts a `timeout` parameter (in seconds, default 30).
+If the code does not complete within the timeout, an error is raised:
+
+```{r}
+session <- SecureSession$new()
+
+session$execute("Sys.sleep(60)", timeout = 5)
+#> Error: Execution timed out
+
+session$close()
+```
+
+The timeout applies to the total wall-clock time of the execution, including
+any tool calls.
+
+## Error handling
+
+Errors in the child process are propagated to the host:
+
+```{r}
+execute_r('stop("something went wrong")')
+#> Error: something went wrong
+```
+
+Errors in tool execution are also propagated:
+
+```{r}
+bad_tool <- securer_tool("fail", "Always fails",
+  fn = function() stop("tool error"),
+  args = list()
+)
+
+execute_r('fail()', tools = list(bad_tool))
+#> Error: tool error
+```
+
+If a tool name is not registered, the child receives an error:
+
+```{r}
+execute_r('nonexistent_tool()', tools = list())
+#> Error: Unknown tool: nonexistent_tool
+```
+
+## Architecture
+
+```
+Host process                          Child R process (sandboxed)
+-----------                          ---------------------------
+SecureSession$new()
+  |-- callr::r_session$new()  ------>  R starts inside sandbox
+  |-- UDS server socket        <---->  UDS client connect
+  |-- inject runtime code      ------>  .securer_call_tool() defined
+  |-- inject tool wrappers     ------>  tool_name() wrappers defined
+
+$execute("tool_name('arg')")
+  |                                     eval("tool_name('arg')")
+  |                                       |-- serialize as JSON
+  |   <---- {"tool":"tool_name",...} -----+
+  |-- execute fn("arg")                   |   (child blocks)
+  |-- write result JSON ---------------> |
+  |                                       +-- return result
+  |   <---- process complete -------------|
+  +-- return final value
+```
+
+Key implementation details:
+
+- The child process uses `processx::conn_connect_unix_socket()` to connect to
+  the host's server socket
+- `processx::conn_accept_unix_socket()` transitions the server connection
+  in-place to a bidirectional data connection (it does not return a new object)
+- The sandbox wrapper script is injected via `callr::r_session_options(arch = ...)`
+  which callr treats as a direct path to the R binary when it contains `/`
+- Socket paths use `/tmp` directly to stay under the ~104 character limit for
+  Unix domain socket paths on macOS

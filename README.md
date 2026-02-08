@@ -8,7 +8,7 @@ Wraps `callr::r_session` with a bidirectional Unix domain socket protocol for pa
 
 ```r
 # install.packages("pak")
-pak::pak("posit-dev/securer")
+pak::pak("ian-flores/securer")
 ```
 
 ## Quick Start
@@ -110,13 +110,25 @@ session$execute('writeLines("hack", "~/evil.txt")')
 session$close()
 ```
 
-### Linux
+### Linux (bubblewrap)
 
-Planned: bubblewrap (`bwrap`) with namespace isolation, read-only mounts, no network. Currently falls back to unsandboxed with a warning.
+Uses `bwrap` (bubblewrap) with full namespace isolation:
 
-### Windows / Other
+- **All namespaces isolated** (PID, net, user, mount, UTS, IPC)
+- **Network access blocked** via network namespace isolation
+- **Filesystem restricted** -- system libraries and R are mounted read-only; `/tmp` is writable
+- **R package libraries** are bind-mounted read-only automatically
 
-Falls back to unsandboxed execution with a warning.
+Requires `bwrap` to be installed (e.g. `apt install bubblewrap`). Falls back to unsandboxed with a warning if not found.
+
+### Windows
+
+Provides environment-variable isolation only:
+
+- Clears `R_LIBS_USER`, `R_ENVIRON_USER`, `R_PROFILE_USER`
+- Redirects `HOME` and `TMPDIR` to a clean temp directory
+
+No filesystem or network restrictions are enforced. A warning is issued when `sandbox = TRUE`.
 
 ## Tool Definition
 
@@ -137,6 +149,33 @@ my_tool <- securer_tool(
 - `description` — metadata for LLM tool-use prompts
 - `fn` — the actual implementation, runs on the **parent** side (outside the sandbox)
 - `args` — named list of argument types, used to generate typed wrapper functions in the child
+
+## Resource Limits
+
+Apply `ulimit`-based caps to the child process regardless of whether the sandbox is enabled:
+
+```r
+result <- execute_r(
+  "Sys.sleep(0.1); 42",
+  limits = list(cpu = 10, memory = 256 * 1024 * 1024)
+)
+```
+
+Supported limits:
+
+| Name     | Unit    | Description                 |
+|----------|---------|-----------------------------|
+| `cpu`    | seconds | CPU time                    |
+| `memory` | bytes   | Virtual address space       |
+| `fsize`  | bytes   | Maximum file size           |
+| `nproc`  | count   | Maximum processes           |
+| `nofile` | count   | Maximum open files          |
+| `stack`  | bytes   | Stack size                  |
+
+## Documentation
+
+See `vignette("getting-started", package = "securer")` for a detailed
+walkthrough of sessions, tools, sandboxing, and resource limits.
 
 ## Dependencies
 
