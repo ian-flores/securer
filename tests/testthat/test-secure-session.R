@@ -119,3 +119,50 @@ test_that("session is usable after a timeout", {
   result <- session$execute("100 + 1")
   expect_equal(result, 101)
 })
+
+# --- Streaming output capture tests ---
+
+test_that("execute() captures cat() output", {
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  # cat() + explicit return value so we can check the output attribute
+  result <- session$execute('cat("hello world"); TRUE')
+  expect_true(result)
+  expect_equal(attr(result, "output"), "hello world")
+})
+
+test_that("execute() captures print() output", {
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  result <- session$execute("print(1:3)")
+  output <- attr(result, "output")
+  expect_true(length(output) > 0)
+  expect_true(any(grepl("1 2 3", output)))
+})
+
+test_that("output_handler receives lines as they arrive", {
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  collected <- character()
+  handler <- function(line) {
+    collected <<- c(collected, line)
+  }
+
+  result <- session$execute('cat("line1\\nline2\\n"); TRUE', output_handler = handler)
+  expect_true(length(collected) > 0)
+  expect_true("line1" %in% collected)
+  expect_true("line2" %in% collected)
+})
+
+test_that("output and return value are separate", {
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  result <- session$execute('cat("msg\\n"); 42')
+  expect_equal(result, 42, ignore_attr = TRUE)
+  output <- attr(result, "output")
+  expect_true(any(grepl("msg", output)))
+})

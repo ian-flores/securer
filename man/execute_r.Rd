@@ -10,7 +10,9 @@ execute_r(
   timeout = 30,
   sandbox = TRUE,
   limits = NULL,
-  verbose = FALSE
+  verbose = FALSE,
+  validate = TRUE,
+  audit_log = NULL
 )
 }
 \arguments{
@@ -30,6 +32,12 @@ timeout (default 30).}
 \item{verbose}{Logical, whether to emit diagnostic messages via
 \code{message()}.  Useful for debugging.  Users can suppress with
 \code{suppressMessages()}.}
+
+\item{validate}{Logical, whether to pre-validate the code for syntax
+errors before sending it to the child process (default \code{TRUE}).}
+
+\item{audit_log}{Optional path to a JSONL file for persistent audit
+logging (default \code{NULL}, no file logging).}
 }
 \value{
 The result of evaluating \code{code} in the secure session.

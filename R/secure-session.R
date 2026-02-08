@@ -47,21 +47,37 @@ SecureSession <- R6::R6Class("SecureSession",
     #' @param verbose Logical, whether to emit diagnostic messages via
     #'   `message()`.  Useful for debugging.  Users can suppress with
     #'   `suppressMessages()`.
+    #' @param audit_log Optional path to a JSONL file for persistent audit
+    #'   logging.  If `NULL` (the default), no file logging is performed.
+    #'   When a path is provided, structured JSON entries are appended for
+    #'   session lifecycle events, executions, and tool calls.
     initialize = function(tools = list(), sandbox = FALSE, limits = NULL,
-                          verbose = FALSE) {
+                          verbose = FALSE, audit_log = NULL) {
       private$raw_tools <- tools
       private$tool_fns <- validate_tools(tools)
       private$sandbox_enabled <- sandbox
       private$limits <- limits
       private$verbose <- verbose
+      private$session_id <- basename(tempfile("sess_"))
+      if (!is.null(audit_log)) {
+        private$audit <- new_audit_logger(audit_log, private$session_id)
+      }
       private$start_session()
     },
 
     #' @description Execute R code in the secure session
     #' @param code Character string of R code to execute
     #' @param timeout Timeout in seconds, or `NULL` for no timeout (default `NULL`)
-    #' @return The result of evaluating the code
-    execute = function(code, timeout = NULL) {
+    #' @param validate Logical, whether to pre-validate the code for syntax
+    #'   errors before sending it to the child process (default `TRUE`).
+    #' @param output_handler An optional callback function that receives output
+    #'   lines (character) as they arrive from the child process. If `NULL`
+    #'   (default), output is only collected and returned as the `"output"`
+    #'   attribute on the result.
+    #' @return The result of evaluating the code, with an `"output"` attribute
+    #'   containing all captured stdout/stderr as a character vector.
+    execute = function(code, timeout = NULL, validate = TRUE,
+                       output_handler = NULL) {
       if (is.null(private$session) || !private$session$is_alive()) {
         stop("Session is not running", call. = FALSE)
       }
@@ -72,14 +88,24 @@ SecureSession <- R6::R6Class("SecureSession",
           call. = FALSE
         )
       }
+      if (isTRUE(validate)) {
+        check <- validate_code(code)
+        if (!check$valid) {
+          stop(
+            "Code has a syntax error and was not executed:\n", check$error,
+            call. = FALSE
+          )
+        }
+      }
       private$executing <- TRUE
       on.exit(private$executing <- FALSE)
-      private$run_with_tools(code, timeout)
+      private$run_with_tools(code, timeout, output_handler)
     },
 
     #' @description Close the session and clean up resources
     #' @return Invisible self
     close = function() {
+      private$audit_log("session_close")
       private$log("Session closed")
       if (!is.null(private$session)) {
         try(private$session$close(), silent = TRUE)
@@ -126,6 +152,12 @@ SecureSession <- R6::R6Class("SecureSession",
     sandbox_config = NULL,
     limits = NULL,
     verbose = FALSE,
+    session_id = NULL,
+    audit = NULL,
+
+    audit_log = function(event, ...) {
+      if (!is.null(private$audit)) private$audit$log(event, ...)
+    },
 
     log = function(msg) {
       if (private$verbose) message("[securer] ", msg)
@@ -144,9 +176,13 @@ SecureSession <- R6::R6Class("SecureSession",
         private$socket_path
       )
 
-      # Build session options; optionally wrap with OS sandbox
+      # Build session options; optionally wrap with OS sandbox.
+      # Pipe stdout/stderr so output can be read incrementally during
+      # the event loop (enables streaming output capture).
       session_opts <- callr::r_session_options(
-        env = c(SECURER_SOCKET = private$socket_path)
+        env = c(SECURER_SOCKET = private$socket_path),
+        stdout = "|",
+        stderr = "|"
       )
 
       if (private$sandbox_enabled) {
@@ -223,10 +259,30 @@ SecureSession <- R6::R6Class("SecureSession",
         tolower(as.character(private$sandbox_enabled)),
         private$session$get_pid()
       ))
+      private$audit_log("session_start",
+        sandbox = private$sandbox_enabled,
+        pid = private$session$get_pid()
+      )
     },
 
-    run_with_tools = function(code, timeout) {
+    run_with_tools = function(code, timeout, output_handler = NULL) {
       exec_start <- Sys.time()
+      private$audit_log("execute_start", code = code)
+      output_lines <- character()
+
+      # Helper: drain any available stdout/stderr from the child process
+      drain_output <- function() {
+        repeat {
+          out <- private$session$read_output_lines(n = 100)
+          err <- private$session$read_error_lines(n = 100)
+          lines <- c(out, err)
+          if (length(lines) == 0) break
+          output_lines <<- c(output_lines, lines)
+          if (is.function(output_handler)) {
+            for (ln in lines) output_handler(ln)
+          }
+        }
+      }
 
       # Send code to child for execution via non-blocking call
       private$session$call(function(code) {
@@ -248,6 +304,9 @@ SecureSession <- R6::R6Class("SecureSession",
           }
           poll_ms <- as.integer(min(remaining_ms, 200))
         }
+
+        # Drain stdout/stderr from the child process
+        drain_output()
 
         # Poll the UDS for tool calls from the child
         poll_result <- processx::poll(
@@ -275,6 +334,9 @@ SecureSession <- R6::R6Class("SecureSession",
                 )
                 private$log(sprintf("Tool call: %s(%s)", tool_name, args_str))
               }
+
+              private$audit_log("tool_call",
+                tool = tool_name, args = tool_args)
 
               tool_start <- Sys.time()
               response <- tryCatch({
@@ -311,6 +373,14 @@ SecureSession <- R6::R6Class("SecureSession",
                 }
               }
 
+              private$audit_log("tool_result",
+                tool = tool_name,
+                error = response$error,
+                elapsed_secs = as.numeric(
+                  difftime(Sys.time(), tool_start, units = "secs")
+                )
+              )
+
               # Send response back to child
               response_json <- jsonlite::toJSON(response, auto_unbox = TRUE)
               processx::conn_write(
@@ -324,7 +394,21 @@ SecureSession <- R6::R6Class("SecureSession",
         # Check if the session has finished (poll the process)
         proc_poll <- private$session$poll_process(0)
         if (proc_poll == "ready") {
+          # Final drain to capture any remaining complete lines
+          drain_output()
           result <- private$session$read()
+          # Also capture any partial lines that didn't end with newline
+          trailing_out <- private$session$read_output()
+          trailing_err <- private$session$read_error()
+          for (raw in c(trailing_out, trailing_err)) {
+            if (nzchar(raw)) {
+              parts <- strsplit(raw, "\n", fixed = TRUE)[[1]]
+              output_lines <- c(output_lines, parts)
+              if (is.function(output_handler)) {
+                for (ln in parts) output_handler(ln)
+              }
+            }
+          }
           elapsed <- sprintf(
             "%.2fs",
             as.numeric(difftime(Sys.time(), exec_start, units = "secs"))
@@ -334,16 +418,26 @@ SecureSession <- R6::R6Class("SecureSession",
               "Execution error: %s (%s)",
               conditionMessage(result$error), elapsed
             ))
+            private$audit_log("execute_error",
+              error = conditionMessage(result$error),
+              elapsed = elapsed
+            )
             stop(result$error)
           }
           private$log(sprintf("Execution complete (%s)", elapsed))
-          return(result$result)
+          private$audit_log("execute_complete", elapsed = elapsed)
+          val <- result$result
+          if (length(output_lines) > 0) {
+            attr(val, "output") <- output_lines
+          }
+          return(val)
         }
       }
     },
 
     handle_timeout = function(timeout) {
       private$log(sprintf("Execution timed out after %ss", timeout))
+      private$audit_log("execute_timeout", timeout_secs = timeout)
       # Kill the child process and restart so the session remains usable
       try(private$session$close(), silent = TRUE)
       private$session <- NULL

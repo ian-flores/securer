@@ -14,6 +14,10 @@
 #' @param verbose Logical, whether to emit diagnostic messages via
 #'   `message()`.  Useful for debugging.  Users can suppress with
 #'   `suppressMessages()`.
+#' @param validate Logical, whether to pre-validate the code for syntax
+#'   errors before sending it to the child process (default `TRUE`).
+#' @param audit_log Optional path to a JSONL file for persistent audit
+#'   logging (default `NULL`, no file logging).
 #'
 #' @return The result of evaluating `code` in the secure session.
 #'
@@ -38,9 +42,11 @@
 #'
 #' @export
 execute_r <- function(code, tools = list(), timeout = 30, sandbox = TRUE,
-                      limits = NULL, verbose = FALSE) {
+                      limits = NULL, verbose = FALSE, validate = TRUE,
+                      audit_log = NULL) {
   session <- SecureSession$new(tools = tools, sandbox = sandbox,
-                               limits = limits, verbose = verbose)
+                               limits = limits, verbose = verbose,
+                               audit_log = audit_log)
   on.exit(session$close())
-  session$execute(code, timeout = timeout)
+  session$execute(code, timeout = timeout, validate = validate)
 }

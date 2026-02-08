@@ -54,7 +54,8 @@ Create a new SecureSession
   tools = list(),
   sandbox = FALSE,
   limits = NULL,
-  verbose = FALSE
+  verbose = FALSE,
+  audit_log = NULL
 )}\if{html}{\out{</div>}}
 }
 
@@ -79,6 +80,11 @@ size), \code{nproc} (max processes), \code{nofile} (max open files),
 \item{\code{verbose}}{Logical, whether to emit diagnostic messages via
 \code{message()}.  Useful for debugging.  Users can suppress with
 \code{suppressMessages()}.}
+
+\item{\code{audit_log}}{Optional path to a JSONL file for persistent audit
+logging.  If \code{NULL} (the default), no file logging is performed.
+When a path is provided, structured JSON entries are appended for
+session lifecycle events, executions, and tool calls.}
 }
 \if{html}{\out{</div>}}
 }
@@ -89,7 +95,12 @@ size), \code{nproc} (max processes), \code{nofile} (max open files),
 \subsection{Method \code{execute()}}{
 Execute R code in the secure session
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{SecureSession$execute(code, timeout = NULL)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{SecureSession$execute(
+  code,
+  timeout = NULL,
+  validate = TRUE,
+  output_handler = NULL
+)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -98,11 +109,20 @@ Execute R code in the secure session
 \item{\code{code}}{Character string of R code to execute}
 
 \item{\code{timeout}}{Timeout in seconds, or \code{NULL} for no timeout (default \code{NULL})}
+
+\item{\code{validate}}{Logical, whether to pre-validate the code for syntax
+errors before sending it to the child process (default \code{TRUE}).}
+
+\item{\code{output_handler}}{An optional callback function that receives output
+lines (character) as they arrive from the child process. If \code{NULL}
+(default), output is only collected and returned as the \code{"output"}
+attribute on the result.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-The result of evaluating the code
+The result of evaluating the code, with an \code{"output"} attribute
+containing all captured stdout/stderr as a character vector.
 }
 }
 \if{html}{\out{<hr>}}
