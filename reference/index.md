@@ -1,0 +1,83 @@
+# Package index
+
+## Core
+
+Primary API for secure code execution
+
+- [`SecureSession`](https://ian-flores.github.io/securer/reference/SecureSession.md)
+  : SecureSession
+- [`SecureSessionPool`](https://ian-flores.github.io/securer/reference/SecureSessionPool.md)
+  : SecureSessionPool
+- [`execute_r()`](https://ian-flores.github.io/securer/reference/execute_r.md)
+  : Execute R code securely with tool support
+- [`securer_tool()`](https://ian-flores.github.io/securer/reference/securer_tool.md)
+  : Create a tool definition
+
+## Validation & Logging
+
+Code validation and audit logging
+
+- [`validate_code()`](https://ian-flores.github.io/securer/reference/validate_code.md)
+  : Validate R code before execution
+- [`format_tool_result()`](https://ian-flores.github.io/securer/reference/format_tool_result.md)
+  : Format an R value as a tool result string
+
+## Integrations
+
+LLM framework adapters
+
+- [`securer_as_ellmer_tool()`](https://ian-flores.github.io/securer/reference/securer_as_ellmer_tool.md)
+  : Create an ellmer tool for secure R code execution
+
+## Sandbox
+
+OS-level sandboxing backends
+
+- [`build_sandbox_config()`](https://ian-flores.github.io/securer/reference/build_sandbox_config.md)
+  : Build sandbox configuration for the current platform
+- [`build_sandbox_macos()`](https://ian-flores.github.io/securer/reference/build_sandbox_macos.md)
+  : Build macOS sandbox configuration
+- [`build_sandbox_linux()`](https://ian-flores.github.io/securer/reference/build_sandbox_linux.md)
+  : Build Linux sandbox configuration
+- [`build_sandbox_windows()`](https://ian-flores.github.io/securer/reference/build_sandbox_windows.md)
+  : Build Windows sandbox configuration
+- [`build_sandbox_fallback()`](https://ian-flores.github.io/securer/reference/build_sandbox_fallback.md)
+  : Build fallback sandbox configuration (no OS sandbox)
+- [`generate_seatbelt_profile()`](https://ian-flores.github.io/securer/reference/generate_seatbelt_profile.md)
+  : Generate a macOS Seatbelt profile for the sandboxed R session
+- [`generate_bwrap_args()`](https://ian-flores.github.io/securer/reference/generate_bwrap_args.md)
+  : Generate bubblewrap CLI arguments for the sandboxed R session
+
+## Resource Limits
+
+Process resource restrictions
+
+- [`validate_limits()`](https://ian-flores.github.io/securer/reference/validate_limits.md)
+  : Validate a limits list
+- [`generate_ulimit_commands()`](https://ian-flores.github.io/securer/reference/generate_ulimit_commands.md)
+  : Generate ulimit shell commands from a limits list
+- [`build_limits_only_wrapper()`](https://ian-flores.github.io/securer/reference/build_limits_only_wrapper.md)
+  : Build a minimal wrapper script that only applies resource limits
+
+## Internals
+
+Low-level IPC and child runtime
+
+- [`child_runtime_code()`](https://ian-flores.github.io/securer/reference/child_runtime_code.md)
+  : Generate the R code to inject into the child process
+- [`ipc_create_server()`](https://ian-flores.github.io/securer/reference/ipc_create_server.md)
+  : Create a Unix domain socket server
+- [`ipc_accept()`](https://ian-flores.github.io/securer/reference/ipc_accept.md)
+  : Accept a client connection on a Unix domain socket server
+- [`ipc_read_message()`](https://ian-flores.github.io/securer/reference/ipc_read_message.md)
+  : Read a message from an IPC connection
+- [`ipc_write_message()`](https://ian-flores.github.io/securer/reference/ipc_write_message.md)
+  : Write a message to an IPC connection
+- [`validate_tools()`](https://ian-flores.github.io/securer/reference/validate_tools.md)
+  : Validate a list of tools
+- [`generate_tool_wrappers()`](https://ian-flores.github.io/securer/reference/generate_tool_wrappers.md)
+  : Generate wrapper code for tools in the child process
+- [`generate_type_checks()`](https://ian-flores.github.io/securer/reference/generate_type_checks.md)
+  : Generate type validation code for tool arguments
+- [`type_check_map`](https://ian-flores.github.io/securer/reference/type_check_map.md)
+  : Map of type annotation strings to R type-checking functions

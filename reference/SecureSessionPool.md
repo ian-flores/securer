@@ -1,0 +1,159 @@
+# SecureSessionPool
+
+R6 class for a pool of pre-warmed
+[SecureSession](https://ian-flores.github.io/securer/reference/SecureSession.md)
+instances.
+
+Creates multiple sessions at initialization time so that `$execute()`
+calls can run immediately on an idle session without waiting for process
+startup. Sessions are returned to the pool after each execution
+completes (or errors).
+
+## Methods
+
+### Public methods
+
+- [`SecureSessionPool$new()`](#method-SecureSessionPool-new)
+
+- [`SecureSessionPool$execute()`](#method-SecureSessionPool-execute)
+
+- [`SecureSessionPool$size()`](#method-SecureSessionPool-size)
+
+- [`SecureSessionPool$available()`](#method-SecureSessionPool-available)
+
+- [`SecureSessionPool$close()`](#method-SecureSessionPool-close)
+
+- [`SecureSessionPool$clone()`](#method-SecureSessionPool-clone)
+
+------------------------------------------------------------------------
+
+### Method `new()`
+
+Create a new SecureSessionPool
+
+#### Usage
+
+    SecureSessionPool$new(
+      size = 4L,
+      tools = list(),
+      sandbox = TRUE,
+      limits = NULL,
+      verbose = FALSE
+    )
+
+#### Arguments
+
+- `size`:
+
+  Integer, number of sessions to pre-warm (default 4, minimum 1).
+
+- `tools`:
+
+  A list of
+  [`securer_tool()`](https://ian-flores.github.io/securer/reference/securer_tool.md)
+  objects passed to each session.
+
+- `sandbox`:
+
+  Logical, whether to enable OS-level sandboxing.
+
+- `limits`:
+
+  Optional named list of resource limits.
+
+- `verbose`:
+
+  Logical, whether to emit diagnostic messages.
+
+------------------------------------------------------------------------
+
+### Method `execute()`
+
+Execute R code on an available pooled session
+
+#### Usage
+
+    SecureSessionPool$execute(code, timeout = NULL)
+
+#### Arguments
+
+- `code`:
+
+  Character string of R code to execute.
+
+- `timeout`:
+
+  Timeout in seconds, or `NULL` for no timeout.
+
+#### Returns
+
+The result of evaluating the code.
+
+------------------------------------------------------------------------
+
+### Method `size()`
+
+Number of sessions in the pool
+
+#### Usage
+
+    SecureSessionPool$size()
+
+#### Returns
+
+Integer
+
+------------------------------------------------------------------------
+
+### Method `available()`
+
+Number of idle (non-busy) sessions
+
+#### Usage
+
+    SecureSessionPool$available()
+
+#### Returns
+
+Integer
+
+------------------------------------------------------------------------
+
+### Method [`close()`](https://rdrr.io/r/base/connections.html)
+
+Close all sessions and shut down the pool
+
+#### Usage
+
+    SecureSessionPool$close()
+
+#### Returns
+
+Invisible self
+
+------------------------------------------------------------------------
+
+### Method `clone()`
+
+The objects of this class are cloneable with this method.
+
+#### Usage
+
+    SecureSessionPool$clone(deep = FALSE)
+
+#### Arguments
+
+- `deep`:
+
+  Whether to make a deep clone.
+
+## Examples
+
+``` r
+if (FALSE) { # \dontrun{
+pool <- SecureSessionPool$new(size = 4)
+pool$execute("1 + 1")
+pool$execute("2 + 2")
+pool$close()
+} # }
+```
