@@ -14,7 +14,14 @@ SecureSession (R6)
 ├── Sandbox — macOS Seatbelt / Linux bwrap / Windows env isolation
 ├── Resource limits — ulimit-based CPU, memory, fsize, nproc, nofile, stack
 ├── Execution timeouts — deadline-based abort with session recovery
-└── Verbose logging — optional structured message() output
+├── Verbose logging — optional structured message() output
+├── Code pre-validation — syntax check + dangerous pattern warnings
+├── Streaming output — capture cat()/print() via piped stdout/stderr
+├── File-based audit log — JSONL event log for compliance/debugging
+└── ellmer integration — securer_as_ellmer_tool() for LLM chat
+
+SecureSessionPool (R6)
+└── Pre-warmed pool of SecureSession instances for low-latency execution
 ```
 
 Key files:
@@ -27,6 +34,10 @@ Key files:
 - `R/sandbox-windows.R` — Environment-variable-only isolation for Windows
 - `R/rlimits.R` — ulimit command generation and validation
 - `R/execute.R` — `execute_r()` convenience function
+- `R/validate.R` — Code pre-validation (syntax + dangerous patterns)
+- `R/audit-log.R` — JSONL file-based audit logging
+- `R/session-pool.R` — SecureSessionPool R6 class
+- `R/ellmer.R` — ellmer tool integration (`securer_as_ellmer_tool()`)
 
 ## Critical Implementation Details
 
@@ -57,6 +68,21 @@ Tool wrappers generated for the child process include runtime type validation wh
 ### Concurrent Execution Guard
 A private `executing` flag prevents parallel `$execute()` calls on the same session. The flag is reset via `on.exit()` to guarantee cleanup even on errors.
 
+### Code Pre-Validation
+`$execute(code, validate = TRUE)` parses code with `parse(text=)` before sending to the child, catching syntax errors immediately. Also warns on dangerous patterns (`system()`, `.Internal()`, etc.) — advisory only, the sandbox handles actual restriction.
+
+### Streaming Output
+`$execute(code, output_handler = function(line) ...)` pipes child stdout/stderr and drains output each event loop iteration. Output is also available as `attr(result, "output")` on the return value.
+
+### File-Based Audit Log
+`SecureSession$new(audit_log = "/path/to/log.jsonl")` writes structured JSONL entries for session lifecycle, tool calls, and execution events. Each session gets a unique `session_id` for correlation.
+
+### Session Pooling
+`SecureSessionPool$new(size = 4)` pre-warms N sessions. `$execute()` acquires an idle session, runs code, and returns it to the pool. Dead sessions are auto-restarted on acquire.
+
+### ellmer Integration
+`securer_as_ellmer_tool()` wraps a SecureSession as an `ellmer::tool()` definition. Errors are returned as `ContentToolResult(error=...)` so they don't crash the LLM chat. ellmer is a soft dependency (Suggests).
+
 ## Development Commands
 
 ```bash
@@ -81,6 +107,10 @@ Rscript -e "devtools::load_all('.')"
 - `test-sandbox.R` — Sandbox restrictions (macOS/Linux/Windows), rlimits
 - `test-execute.R` — `execute_r()` convenience API
 - `test-logging.R` — Verbose logging output verification
+- `test-validate.R` — Code pre-validation (syntax errors, dangerous patterns)
+- `test-audit-log.R` — JSONL audit log events and structure
+- `test-session-pool.R` — Pool lifecycle, acquire/release, error recovery
+- `test-ellmer.R` — ellmer tool definition, execution, error handling
 
 ## Platform Notes
 
