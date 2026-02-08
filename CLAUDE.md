@@ -10,9 +10,11 @@ An R package for secure LLM code execution. LLMs write R code that calls registe
 SecureSession (R6)
 ├── callr::r_session — child R process
 ├── Unix domain socket — bidirectional IPC (tool calls + responses)
-├── Tool registry — securer_tool() objects → child wrapper functions
+├── Tool registry — securer_tool() objects → child wrapper functions + type checking
 ├── Sandbox — macOS Seatbelt / Linux bwrap / Windows env isolation
-└── Resource limits — ulimit-based CPU, memory, fsize, nproc, nofile, stack
+├── Resource limits — ulimit-based CPU, memory, fsize, nproc, nofile, stack
+├── Execution timeouts — deadline-based abort with session recovery
+└── Verbose logging — optional structured message() output
 ```
 
 Key files:
@@ -43,6 +45,18 @@ Unix domain sockets are limited to ~104 chars on macOS. We use `/tmp` directly i
 ### Event Loop
 `run_with_tools()` polls the UDS for tool-call JSON and the callr process for completion in a loop with 200ms poll intervals. Tool calls are synchronous: child blocks on UDS read, parent executes tool, writes result back.
 
+### Execution Timeouts
+`$execute(code, timeout = N)` tracks elapsed time in the event loop. On timeout, the child process is killed, the UDS is cleaned up, and the session is automatically restarted so it remains usable for subsequent calls.
+
+### Tool Argument Type Checking
+Tool wrappers generated for the child process include runtime type validation when `args` have type annotations (e.g., `args = list(x = "numeric")`). Supported types: numeric, character, logical, integer, list, data.frame. Mismatches produce clear errors before the tool call is dispatched.
+
+### Verbose Logging
+`SecureSession$new(verbose = TRUE)` logs lifecycle events via `message()`: session start/close, tool calls with args and timing, execution completion, errors, and timeouts. Users can suppress with `suppressMessages()`.
+
+### Concurrent Execution Guard
+A private `executing` flag prevents parallel `$execute()` calls on the same session. The flag is reset via `on.exit()` to guarantee cleanup even on errors.
+
 ## Development Commands
 
 ```bash
@@ -61,11 +75,12 @@ Rscript -e "devtools::load_all('.')"
 
 ## Test Structure
 
-- `test-secure-session.R` — Session lifecycle (start, execute, close, errors)
+- `test-secure-session.R` — Session lifecycle, timeouts, concurrent execution guard
 - `test-ipc.R` — Tool call pause/resume via `.securer_call_tool()` directly
-- `test-tool-registry.R` — securer_tool(), validation, wrappers, end-to-end
+- `test-tool-registry.R` — securer_tool(), validation, wrappers, type checking, end-to-end
 - `test-sandbox.R` — Sandbox restrictions (macOS/Linux/Windows), rlimits
 - `test-execute.R` — `execute_r()` convenience API
+- `test-logging.R` — Verbose logging output verification
 
 ## Platform Notes
 
