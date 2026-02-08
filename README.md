@@ -6,6 +6,9 @@
 [![pkgdown](https://github.com/ian-flores/securer/actions/workflows/pkgdown.yml/badge.svg)](https://ian-flores.github.io/securer/)
 <!-- badges: end -->
 
+> [!WARNING]
+> **This package is fully experimental.** The API is unstable and may change without notice. Use at your own risk — not recommended for production workloads.
+
 **Let LLMs write R code that calls your functions — safely.**
 
 When an LLM generates R code, you need two things: a way for that code to call back into your application (tool calls), and confidence that the code can't do anything dangerous (sandboxing). securer provides both.
