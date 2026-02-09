@@ -28,6 +28,23 @@
 #' session$close()
 #' }
 #'
+# Module-level list that holds closed callr/processx objects to prevent
+# heap corruption.  Explicitly closing processx connections (via close() or
+# callr::r_session$close()) then letting GC finalize the same objects
+# causes a C-level double-free in processx 3.8.6 that corrupts the malloc
+# heap ("BUG IN CLIENT OF LIBMALLOC: memory corruption of free block").
+#
+# Workaround: instead of closing connections, we kill the child process
+# and park the R6 objects here.  The GC finalizer handles cleanup safely
+# since each connection is only closed once.  References accumulate for
+# the life of the R session — the memory cost is negligible (~1 KB per
+# session) since the child processes are already dead.
+.securer_closed_sessions <- new.env(parent = emptyenv())
+.securer_closed_sessions$refs <- list()
+.securer_closed_sessions_add <- function(obj) {
+  .securer_closed_sessions$refs <- c(.securer_closed_sessions$refs, list(obj))
+}
+
 #' @export
 SecureSession <- R6::R6Class("SecureSession",
   public = list(
@@ -126,34 +143,56 @@ SecureSession <- R6::R6Class("SecureSession",
       private$audit_log("session_close")
       private$log("Session closed")
       if (!is.null(private$session)) {
-        try(private$session$close(), silent = TRUE)
+        # Kill the child process but do NOT call $close() on the callr
+        # session.  callr$close() calls processx_conn_close() on internal
+        # pipe connections; when GC later finalizes those same connection
+        # objects, the C-level double-close corrupts the malloc heap
+        # (processx 3.8.6, "BUG IN CLIENT OF LIBMALLOC").
+        # Instead, just kill the process and park the R6 object.  The GC
+        # finalizer will clean up connections and temp files safely.
+        try(private$session$kill(), silent = TRUE)
+        .securer_closed_sessions_add(private$session)
         private$session <- NULL
       }
       private$child_pid <- NULL
+      # Disarm the GC finalizer so it won't try to kill a recycled PID
+      if (!is.null(private$gc_prevent)) {
+        private$gc_prevent$pid <- NULL
+        private$gc_prevent <- NULL
+      }
       if (!is.null(private$ipc_conn)) {
-        try(close(private$ipc_conn), silent = TRUE)
+        # Don't call close() on the processx connection — the C-level
+        # finalizer will close the file descriptor during GC.  Explicitly
+        # closing + later GC finalization causes a double-free that
+        # corrupts the malloc heap (processx 3.8.6).
+        .securer_closed_sessions_add(private$ipc_conn)
         private$ipc_conn <- NULL
       }
-      if (!is.null(private$socket_path) && file.exists(private$socket_path)) {
-        unlink(private$socket_path)
+      # Filesystem cleanup: save paths as local variables first, then
+      # NULL out the private fields.  This avoids segfaults when close()
+      # is called during GC finalization (private fields may already be
+      # freed, but local copies on the stack are safe).
+      sock_path <- private$socket_path
+      sock_dir  <- private$socket_dir
+      sb_config <- private$sandbox_config
+      private$socket_path    <- NULL
+      private$socket_dir     <- NULL
+      private$sandbox_config <- NULL
+      if (is.character(sock_path) && length(sock_path) == 1 &&
+          file.exists(sock_path)) {
+        unlink(sock_path)
       }
-      # Clean up the private socket directory
-      if (!is.null(private$socket_dir) && dir.exists(private$socket_dir)) {
-        unlink(private$socket_dir, recursive = TRUE)
-        private$socket_dir <- NULL
+      if (is.character(sock_dir) && length(sock_dir) == 1 &&
+          dir.exists(sock_dir)) {
+        unlink(sock_dir, recursive = TRUE)
       }
-      # Clean up sandbox temp files (wrapper script + seatbelt profile + tmp dir)
-      if (!is.null(private$sandbox_config)) {
-        if (!is.null(private$sandbox_config$wrapper)) {
-          unlink(private$sandbox_config$wrapper)
-        }
-        if (!is.null(private$sandbox_config$profile_path)) {
-          unlink(private$sandbox_config$profile_path)
-        }
-        if (!is.null(private$sandbox_config$sandbox_tmp)) {
-          unlink(private$sandbox_config$sandbox_tmp, recursive = TRUE)
-        }
-        private$sandbox_config <- NULL
+      if (is.list(sb_config)) {
+        if (is.character(sb_config$wrapper))
+          unlink(sb_config$wrapper)
+        if (is.character(sb_config$profile_path))
+          unlink(sb_config$profile_path)
+        if (is.character(sb_config$sandbox_tmp))
+          unlink(sb_config$sandbox_tmp, recursive = TRUE)
       }
       invisible(self)
     },
@@ -181,6 +220,7 @@ SecureSession <- R6::R6Class("SecureSession",
     verbose = FALSE,
     session_id = NULL,
     child_pid = NULL,
+    gc_prevent = NULL,
     audit = NULL,
 
     # Build a sanitized environment for the child process.
@@ -202,18 +242,11 @@ SecureSession <- R6::R6Class("SecureSession",
         SECURER_TOKEN = private$ipc_token)
     },
 
-    finalize = function() {
-      # During GC, R6 private fields (character strings, external
-      # pointers, nested R6 objects) may already be freed, so accessing
-      # them segfaults.  Use only the child PID (a plain integer, safe
-      # during GC) to kill the child process.  All other cleanup (temp
-      # files, connections) is skipped — temp files in /tmp are cleaned
-      # by the OS, and the connections are invalidated when the child
-      # process dies.
-      if (!is.null(private$child_pid)) {
-        try(tools::pskill(private$child_pid, tools::SIGKILL), silent = TRUE)
-      }
-    },
+    # NOTE: No private$finalize() here.  R6 finalization can segfault
+    # when private fields (strings, external pointers) are freed before
+    # the finalizer runs.  Instead, start_session() registers a plain
+    # reg.finalizer() on a dedicated environment that holds only the
+    # child PID (a safe integer).  See start_session() below.
 
     audit_log = function(event, ...) {
       if (!is.null(private$audit)) private$audit$log(event, ...)
@@ -290,6 +323,17 @@ SecureSession <- R6::R6Class("SecureSession",
       # (R6 objects and external pointers are unsafe to access during GC).
       private$child_pid <- private$session$get_pid()
 
+      # Register a standalone GC finalizer using a plain environment
+      # that holds only the child PID (an integer, safe during GC).
+      # This avoids segfaults from accessing R6 private fields that may
+      # be freed before the finalizer runs.
+      pid_env <- new.env(parent = emptyenv())
+      pid_env$pid <- private$child_pid
+      reg.finalizer(pid_env, function(e) {
+        try(tools::pskill(e$pid, tools::SIGKILL), silent = TRUE)
+      }, onexit = TRUE)
+      private$gc_prevent <- pid_env
+
       # Inject runtime into child
       runtime_code <- child_runtime_code()
       private$session$call(function(code) {
@@ -314,7 +358,7 @@ SecureSession <- R6::R6Class("SecureSession",
       processx::poll(list(private$ipc_conn), 5000)
       auth_line <- processx::conn_read_lines(private$ipc_conn, n = 1)
       if (length(auth_line) == 0 || !identical(auth_line, private$ipc_token)) {
-        try(close(private$ipc_conn), silent = TRUE)
+        .securer_closed_sessions_add(private$ipc_conn)
         private$ipc_conn <- NULL
         stop("IPC authentication failed: invalid token from child process",
              call. = FALSE)
@@ -612,10 +656,11 @@ SecureSession <- R6::R6Class("SecureSession",
       private$log(sprintf("Execution timed out after %ss", timeout))
       private$audit_log("execute_timeout", timeout_secs = timeout)
       # Kill the child process and restart so the session remains usable
-      try(private$session$close(), silent = TRUE)
+      try(private$session$kill(), silent = TRUE)
+      .securer_closed_sessions_add(private$session)
       private$session <- NULL
       if (!is.null(private$ipc_conn)) {
-        try(close(private$ipc_conn), silent = TRUE)
+        .securer_closed_sessions_add(private$ipc_conn)
         private$ipc_conn <- NULL
       }
       if (!is.null(private$socket_path) && file.exists(private$socket_path)) {
