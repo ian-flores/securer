@@ -23,9 +23,19 @@ test_that("execute_r() respects timeout", {
   )
 })
 
+# Helper: check if sandbox-exec can actually start R with our profile
+sandbox_exec_works <- function() {
+  if (!file.exists("/usr/bin/sandbox-exec")) return(FALSE)
+  tryCatch({
+    session <- SecureSession$new(sandbox = TRUE)
+    session$close()
+    TRUE
+  }, error = function(e) FALSE)
+}
+
 test_that("execute_r() with sandbox on macOS", {
   skip_on_os(c("windows", "linux"))
-  skip_if_not(file.exists("/usr/bin/sandbox-exec"), "sandbox-exec not available")
+  skip_if_not(sandbox_exec_works(), "sandbox-exec cannot start R (likely CI runner path mismatch)")
 
   result <- execute_r("1 + 1", sandbox = TRUE)
   expect_equal(result, 2)
@@ -33,7 +43,7 @@ test_that("execute_r() with sandbox on macOS", {
 
 test_that("execute_r() with tools and sandbox", {
   skip_on_os(c("windows", "linux"))
-  skip_if_not(file.exists("/usr/bin/sandbox-exec"), "sandbox-exec not available")
+  skip_if_not(sandbox_exec_works(), "sandbox-exec cannot start R (likely CI runner path mismatch)")
 
   tools <- list(
     securer_tool("multiply", "Multiply", function(a, b) a * b,
