@@ -52,9 +52,10 @@ Create a new SecureSession
   Logical, whether to enable the OS-level sandbox. On macOS this uses
   `sandbox-exec` with a Seatbelt profile that denies network access and
   restricts file writes to temp directories. On Linux this uses
-  bubblewrap (`bwrap`) with full namespace isolation. On Windows only
-  environment variable isolation is applied (a warning is issued). On
-  other platforms the session runs without sandboxing.
+  bubblewrap (`bwrap`) with full namespace isolation. On Windows,
+  `sandbox = TRUE` raises an error because OS-level isolation is not
+  available; use `sandbox = FALSE` with explicit limits, or run inside a
+  container. On other platforms the session runs without sandboxing.
 
 - `limits`:
 
@@ -62,7 +63,11 @@ Create a new SecureSession
   process via `ulimit`. Supported names: `cpu` (seconds), `memory`
   (bytes, virtual address space), `fsize` (bytes, max file size),
   `nproc` (max processes), `nofile` (max open files), `stack` (bytes,
-  stack size). `NULL` (the default) means no limits.
+  stack size). When `sandbox = TRUE` and `limits` is `NULL` (the
+  default), sensible defaults are applied automatically (see
+  [`default_limits()`](https://ian-flores.github.io/securer/reference/default_limits.md)).
+  Pass `limits = list()` to explicitly disable resource limits. When
+  `sandbox = FALSE`, `NULL` means no limits.
 
 - `verbose`:
 

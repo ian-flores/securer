@@ -87,9 +87,11 @@ functions (legacy format for backward compatibility)</p></dd>
 On macOS this uses <code>sandbox-exec</code> with a Seatbelt profile that
 denies network access and restricts file writes to temp
 directories.  On Linux this uses bubblewrap (<code>bwrap</code>) with full
-namespace isolation.  On Windows only environment variable
-isolation is applied (a warning is issued).  On other platforms
-the session runs without sandboxing.</p></dd>
+namespace isolation.  On Windows, <code>sandbox = TRUE</code> raises an
+error because OS-level isolation is not available; use
+<code>sandbox = FALSE</code> with explicit limits, or run inside a
+container.  On other platforms the session runs without
+sandboxing.</p></dd>
 
 
 <dt><code>limits</code></dt>
@@ -97,7 +99,11 @@ the session runs without sandboxing.</p></dd>
 child process via <code>ulimit</code>.  Supported names: <code>cpu</code> (seconds),
 <code>memory</code> (bytes, virtual address space), <code>fsize</code> (bytes, max file
 size), <code>nproc</code> (max processes), <code>nofile</code> (max open files),
-<code>stack</code> (bytes, stack size).  <code>NULL</code> (the default) means no limits.</p></dd>
+<code>stack</code> (bytes, stack size).  When <code>sandbox = TRUE</code> and <code>limits</code>
+is <code>NULL</code> (the default), sensible defaults are applied automatically
+(see <code><a href="default_limits.html">default_limits()</a></code>).  Pass <code>limits = list()</code> to explicitly
+disable resource limits.  When <code>sandbox = FALSE</code>, <code>NULL</code> means
+no limits.</p></dd>
 
 
 <dt><code>verbose</code></dt>
