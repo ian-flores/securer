@@ -103,3 +103,38 @@ test_that("default pool size is 4", {
 
   expect_equal(pool$size(), 4)
 })
+
+test_that("dead session is auto-restarted on acquire", {
+  pool <- SecureSessionPool$new(size = 2, sandbox = FALSE)
+  on.exit(pool$close())
+
+  # Kill the first session so it is no longer alive
+  priv <- pool$.__enclos_env__$private
+  priv$sessions[[1]]$close()
+  expect_false(priv$sessions[[1]]$is_alive())
+
+  # execute() should transparently restart the dead session and succeed
+
+  result <- pool$execute("1 + 1")
+  expect_equal(result, 2)
+
+  # The restarted session should now be alive
+  expect_true(priv$sessions[[1]]$is_alive())
+
+  # Pool should still report both sessions available after execution
+  expect_equal(pool$available(), 2)
+})
+
+test_that("execute errors when all sessions are busy", {
+  pool <- SecureSessionPool$new(size = 1, sandbox = FALSE)
+  on.exit(pool$close())
+
+  # Simulate the single session being busy by setting the flag directly
+  priv <- pool$.__enclos_env__$private
+  priv$busy[[1]] <- TRUE
+
+  expect_error(pool$execute("1 + 1"), "All sessions are busy")
+
+  # Reset the flag so cleanup can proceed normally
+  priv$busy[[1]] <- FALSE
+})

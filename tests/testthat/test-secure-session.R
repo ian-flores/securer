@@ -262,3 +262,219 @@ test_that("correct tool arguments pass parent-side validation", {
   result <- session$execute("add(2, 3)")
   expect_equal(result, 5)
 })
+
+# --- IPC message size limit tests (Finding 10) ---
+
+test_that("max_ipc_message_size private field is 1MB", {
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  priv <- session$.__enclos_env__$private
+  expect_equal(priv$max_ipc_message_size, 1048576L)
+})
+
+test_that("IPC message exceeding size limit is rejected", {
+  # Register a tool so the parent enters the tool-call dispatch path
+  tools <- list(
+    securer_tool("echo", "Echo input", function(x) x, args = list(x = "character"))
+  )
+  session <- SecureSession$new(tools = tools)
+  on.exit(session$close())
+
+  # Lower the max_ipc_message_size to a small value so we can trigger the
+  # check without sending a truly massive message over the UDS.
+  priv <- session$.__enclos_env__$private
+  priv$max_ipc_message_size <- 100L
+
+  # A normal tool call via the wrapper will produce a JSON message > 100 bytes
+  # (the JSON for tool_call + tool name + args easily exceeds 100 bytes).
+  expect_error(
+    session$execute('echo("hello world, this is a somewhat long argument string")'),
+    "IPC message too large"
+  )
+})
+
+# --- Malformed IPC JSON schema validation tests (Finding 10) ---
+
+test_that("malformed IPC message (non-object JSON) is rejected", {
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  # Send a JSON array instead of a JSON object through the UDS
+  expect_error(
+    session$execute('
+      processx::conn_write(.securer_env$conn, "[1, 2, 3]\n")
+      processx::poll(list(.securer_env$conn), 10000)
+      processx::conn_read_lines(.securer_env$conn, n = 1)
+    '),
+    "Malformed IPC message"
+  )
+})
+
+test_that("malformed IPC message (missing type field) is rejected", {
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  # Send a JSON object without a 'type' field
+  expect_error(
+    session$execute('
+      msg <- jsonlite::toJSON(list(tool = "foo"), auto_unbox = TRUE)
+      processx::conn_write(.securer_env$conn, paste0(msg, "\n"))
+      processx::poll(list(.securer_env$conn), 10000)
+      processx::conn_read_lines(.securer_env$conn, n = 1)
+    '),
+    "'type' must be a scalar string"
+  )
+})
+
+test_that("malformed IPC message (non-string type) is rejected", {
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  # Send a JSON object where 'type' is a number, not a string
+  expect_error(
+    session$execute('
+      msg <- jsonlite::toJSON(list(type = 123, tool = "foo"), auto_unbox = TRUE)
+      processx::conn_write(.securer_env$conn, paste0(msg, "\n"))
+      processx::poll(list(.securer_env$conn), 10000)
+      processx::conn_read_lines(.securer_env$conn, n = 1)
+    '),
+    "'type' must be a scalar string"
+  )
+})
+
+test_that("malformed IPC tool_call (missing tool field) is rejected", {
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  # Send a tool_call message without a 'tool' field
+  expect_error(
+    session$execute('
+      msg <- jsonlite::toJSON(list(type = "tool_call"), auto_unbox = TRUE)
+      processx::conn_write(.securer_env$conn, paste0(msg, "\n"))
+      processx::poll(list(.securer_env$conn), 10000)
+      processx::conn_read_lines(.securer_env$conn, n = 1)
+    '),
+    "'tool' must be a scalar string"
+  )
+})
+
+test_that("malformed IPC tool_call (args not a list) is rejected", {
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  # Send a tool_call where 'args' is a string instead of an object.
+  # Build the JSON using paste0 to avoid quoting headaches.
+  expect_error(
+    session$execute('
+      dq <- rawToChar(as.raw(0x22))
+      raw <- paste0("{", dq, "type", dq, ":", dq, "tool_call", dq,
+                    ",", dq, "tool", dq, ":", dq, "foo", dq,
+                    ",", dq, "args", dq, ":", dq, "bad", dq, "}\n")
+      processx::conn_write(.securer_env$conn, raw)
+      processx::poll(list(.securer_env$conn), 10000)
+      processx::conn_read_lines(.securer_env$conn, n = 1)
+    '),
+    "'args' must be a list or null"
+  )
+})
+
+# --- Tool name regex sanitization tests (Finding 10) ---
+
+test_that("injection-style tool name is sanitized to <invalid>", {
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  # Try calling a tool with a name containing shell injection characters.
+  # The parent regex should replace it with "<invalid>" and then respond
+  # with "Unknown tool: <invalid>".
+  expect_error(
+    session$execute('.securer_call_tool("x; system(\'id\')")'),
+    "Unknown tool"
+  )
+})
+
+test_that("tool name with leading digit is sanitized", {
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  # Tool names must match ^[A-Za-z.][A-Za-z0-9_.]*$ — leading digit is invalid
+  expect_error(
+    session$execute('.securer_call_tool("123bad")'),
+    "Unknown tool"
+  )
+})
+
+test_that("tool name with special characters is sanitized", {
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  # Slashes, dashes, and other special chars should be rejected
+  expect_error(
+    session$execute('.securer_call_tool("../../etc/passwd")'),
+    "Unknown tool"
+  )
+})
+
+test_that("valid tool name pattern is accepted", {
+  # Ensure the regex doesn't reject legitimate R-style names
+  tools <- list(
+    securer_tool("my.tool_v2", "A tool", function() 42, args = list())
+  )
+  session <- SecureSession$new(tools = tools)
+  on.exit(session$close())
+
+  result <- session$execute("my.tool_v2()")
+  expect_equal(result, 42)
+})
+
+# --- Non-list args coercion tests (Finding 5) ---
+
+test_that("non-list args from child are rejected", {
+  # When a child sends a tool_call with 'args' as a string (not an
+  # object/list), the parent's schema validation rejects it.  The
+  # coercion at lines 422-425 is a defense-in-depth fallback behind
+  # the schema check.  Either way, the parent handles it gracefully
+  # instead of crashing.
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  # Craft a raw tool_call where args is a string (not a list/object).
+  # Build JSON using paste0 with rawToChar to avoid quoting issues.
+  expect_error(
+    session$execute('
+      dq <- rawToChar(as.raw(0x22))
+      raw <- paste0("{", dq, "type", dq, ":", dq, "tool_call", dq,
+                    ",", dq, "tool", dq, ":", dq, "ping", dq,
+                    ",", dq, "args", dq, ":", dq, "not_a_list", dq, "}\n")
+      processx::conn_write(.securer_env$conn, raw)
+      processx::poll(list(.securer_env$conn), 10000)
+      processx::conn_read_lines(.securer_env$conn, n = 1)
+    '),
+    "'args' must be a list or null"
+  )
+})
+
+test_that("tool_call with empty object args works", {
+  # Verify the args coercion path: when args is an empty object {},
+  # jsonlite parses it as a named list (list()), which passes both the
+  # schema check and the coercion guard.  The tool should execute normally.
+  tools <- list(
+    securer_tool("ping", "Ping", function() "pong", args = list())
+  )
+  session <- SecureSession$new(tools = tools)
+  on.exit(session$close())
+
+  # Send a raw tool_call JSON with args as an empty object.
+  result <- session$execute('
+    dq <- rawToChar(as.raw(0x22))
+    raw <- paste0("{", dq, "type", dq, ":", dq, "tool_call", dq,
+                  ",", dq, "tool", dq, ":", dq, "ping", dq,
+                  ",", dq, "args", dq, ":{}}\n")
+    processx::conn_write(.securer_env$conn, raw)
+    processx::poll(list(.securer_env$conn), 10000)
+    resp <- processx::conn_read_lines(.securer_env$conn, n = 1)
+    jsonlite::fromJSON(resp, simplifyVector = FALSE)$value
+  ')
+  expect_equal(result, "pong")
+})

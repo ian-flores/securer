@@ -169,6 +169,62 @@ test_that("child receives the token via env var", {
   expect_equal(result, expected_token)
 })
 
+# --- Low-level IPC helper timeout/error tests ---
+
+test_that("ipc_accept() errors on timeout when no client connects", {
+  socket_path <- file.path("/tmp", paste0("securer_test_accept_", Sys.getpid(), ".sock"))
+  on.exit(unlink(socket_path), add = TRUE)
+
+  server <- processx::conn_create_unix_socket(socket_path)
+
+  # No client connects — should timeout
+
+  expect_error(
+    ipc_accept(server, timeout = 100L),
+    "Timeout waiting for client connection"
+  )
+})
+
+test_that("ipc_read_message() errors on timeout when no data sent", {
+  socket_path <- file.path("/tmp", paste0("securer_test_read_", Sys.getpid(), ".sock"))
+  on.exit(unlink(socket_path), add = TRUE)
+
+  server <- processx::conn_create_unix_socket(socket_path)
+  client <- processx::conn_connect_unix_socket(socket_path)
+
+  # Accept the connection (transitions server in-place)
+  ipc_accept(server, timeout = 1000L)
+
+  # No data sent — should timeout
+  expect_error(
+    ipc_read_message(server, timeout = 100L),
+    "Timeout waiting for IPC message"
+  )
+})
+
+test_that("ipc_read_message() errors on empty message (closed connection)", {
+  socket_path <- file.path("/tmp", paste0("securer_test_empty_", Sys.getpid(), ".sock"))
+  on.exit(unlink(socket_path), add = TRUE)
+
+  server <- processx::conn_create_unix_socket(socket_path)
+  client <- processx::conn_connect_unix_socket(socket_path)
+
+  # Accept the connection
+  ipc_accept(server, timeout = 1000L)
+
+  # Close the client end so server gets EOF
+  close(client)
+
+  # Brief pause to let the close propagate
+  Sys.sleep(0.1)
+
+  # Reading should get an empty message or timeout — either is an error
+  expect_error(
+    ipc_read_message(server, timeout = 1000L),
+    "Empty message received|Timeout waiting for IPC message"
+  )
+})
+
 test_that("each session gets a unique token", {
   s1 <- SecureSession$new()
   s2 <- SecureSession$new()
