@@ -30,11 +30,19 @@ A list with components:
 
 - warnings:
 
-  Character vector of warnings about potentially dangerous patterns
-  (e.g. [`system()`](https://rdrr.io/r/base/system.html),
+  Character vector of advisory warnings about potentially dangerous
+  patterns (e.g. [`system()`](https://rdrr.io/r/base/system.html),
   [`.Internal()`](https://rdrr.io/r/base/Internal.html)). Empty if none
   detected. These are advisory only — the sandbox handles actual
   restriction.
+
+## Details
+
+**Note:** Pattern-based validation is ADVISORY ONLY. It uses simple
+regex matching and can produce both false positives and false negatives.
+The OS-level sandbox (Seatbelt / bwrap) is the actual enforcement layer
+that restricts filesystem, network, and process access. Do not rely on
+validation alone to prevent dangerous operations.
 
 ## Examples
 

@@ -88,7 +88,8 @@ Execute R code in the secure session
       code,
       timeout = NULL,
       validate = TRUE,
-      output_handler = NULL
+      output_handler = NULL,
+      max_tool_calls = NULL
     )
 
 #### Arguments
@@ -111,6 +112,11 @@ Execute R code in the secure session
   An optional callback function that receives output lines (character)
   as they arrive from the child process. If `NULL` (default), output is
   only collected and returned as the `"output"` attribute on the result.
+
+- `max_tool_calls`:
+
+  Maximum number of tool calls allowed in this execution, or `NULL` for
+  unlimited (default `NULL`).
 
 #### Returns
 

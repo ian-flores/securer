@@ -4,7 +4,8 @@ Creates a Seatbelt policy string that:
 
 - Denies all operations by default
 
-- Allows file reads everywhere (low risk, needed for R + packages)
+- Allows file reads only for R installation, library paths, system
+  libraries, and temp directories (blocks ~/.ssh, ~/.env, etc.)
 
 - Allows file writes only to the temp directory (for UDS + R temp files)
 
@@ -12,12 +13,14 @@ Creates a Seatbelt policy string that:
 
 - Denies remote network access (TCP/UDP)
 
-- Allows process, mach, sysctl, and signal operations needed by R
+- Allows only process-fork and process-exec for the R binary
+
+- Allows only specific system operations R needs
 
 ## Usage
 
 ``` r
-generate_seatbelt_profile(socket_path, r_home)
+generate_seatbelt_profile(socket_path, r_home, lib_paths = .libPaths())
 ```
 
 ## Arguments
@@ -29,6 +32,11 @@ generate_seatbelt_profile(socket_path, r_home)
 - r_home:
 
   Path to the R installation
+
+- lib_paths:
+
+  Character vector of R library paths (default:
+  [`.libPaths()`](https://rdrr.io/r/base/libPaths.html))
 
 ## Value
 

@@ -20,6 +20,8 @@ The main entry points are:
 
 Useful links:
 
+- <https://ian-flores.github.io/securer/>
+
 - <https://github.com/ian-flores/securer>
 
 - Report bugs at <https://github.com/ian-flores/securer/issues>
