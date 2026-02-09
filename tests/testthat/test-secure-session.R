@@ -166,3 +166,99 @@ test_that("output and return value are separate", {
   output <- attr(result, "output")
   expect_true(any(grepl("msg", output)))
 })
+
+# --- Rate limiting tests (Finding 14) ---
+
+test_that("max_tool_calls limits tool invocations", {
+  tools <- list(
+    securer_tool(
+      "counter", "Count calls",
+      function() 1,
+      args = list()
+    )
+  )
+  session <- SecureSession$new(tools = tools)
+  on.exit(session$close())
+
+  # Allow exactly 2 tool calls; code calls 3 times
+  expect_error(
+    session$execute("counter(); counter(); counter()", max_tool_calls = 2),
+    "Maximum tool calls \\(2\\) exceeded"
+  )
+})
+
+test_that("max_tool_calls NULL allows unlimited tool calls", {
+  tools <- list(
+    securer_tool(
+      "inc", "Increment",
+      function(x) x + 1,
+      args = list(x = "numeric")
+    )
+  )
+  session <- SecureSession$new(tools = tools)
+  on.exit(session$close())
+
+  result <- session$execute("
+    a <- inc(1)
+    b <- inc(a)
+    c <- inc(b)
+    c
+  ", max_tool_calls = NULL)
+  expect_equal(result, 4)
+})
+
+test_that("max_tool_calls allows exactly the limit", {
+  tools <- list(
+    securer_tool(
+      "inc", "Increment",
+      function(x) x + 1,
+      args = list(x = "numeric")
+    )
+  )
+  session <- SecureSession$new(tools = tools)
+  on.exit(session$close())
+
+  # Allow exactly 2 tool calls, and code makes exactly 2
+
+  result <- session$execute("
+    a <- inc(1)
+    b <- inc(a)
+    b
+  ", max_tool_calls = 2)
+  expect_equal(result, 3)
+})
+
+# --- Parent-side argument validation tests (Finding 5) ---
+
+test_that("unexpected tool arguments are rejected by parent", {
+  tools <- list(
+    securer_tool(
+      "add", "Add numbers",
+      function(a, b) a + b,
+      args = list(a = "numeric", b = "numeric")
+    )
+  )
+  session <- SecureSession$new(tools = tools)
+  on.exit(session$close())
+
+  # Call with an unexpected argument name via .securer_call_tool()
+  expect_error(
+    session$execute('.securer_call_tool("add", a = 1, b = 2, evil = 999)'),
+    "Unexpected arguments.*'evil'"
+  )
+})
+
+test_that("correct tool arguments pass parent-side validation", {
+  tools <- list(
+    securer_tool(
+      "add", "Add numbers",
+      function(a, b) a + b,
+      args = list(a = "numeric", b = "numeric")
+    )
+  )
+  session <- SecureSession$new(tools = tools)
+  on.exit(session$close())
+
+  result <- session$execute("add(2, 3)")
+  expect_equal(result, 5)
+})

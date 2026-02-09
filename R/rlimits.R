@@ -41,7 +41,7 @@ generate_ulimit_commands <- function(limits) {
   for (name in names(limits)) {
     spec <- limit_map[[name]]
     value <- as.integer(ceiling(limits[[name]] / spec$divisor))
-    cmds <- c(cmds, sprintf("ulimit %s %d", spec$flag, value))
+    cmds <- c(cmds, sprintf("ulimit -S -H %s %d", spec$flag, value))
   }
 
   cmds

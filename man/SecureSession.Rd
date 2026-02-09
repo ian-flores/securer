@@ -99,7 +99,8 @@ Execute R code in the secure session
   code,
   timeout = NULL,
   validate = TRUE,
-  output_handler = NULL
+  output_handler = NULL,
+  max_tool_calls = NULL
 )}\if{html}{\out{</div>}}
 }
 
@@ -117,6 +118,9 @@ errors before sending it to the child process (default \code{TRUE}).}
 lines (character) as they arrive from the child process. If \code{NULL}
 (default), output is only collected and returned as the \code{"output"}
 attribute on the result.}
+
+\item{\code{max_tool_calls}}{Maximum number of tool calls allowed in this
+execution, or \code{NULL} for unlimited (default \code{NULL}).}
 }
 \if{html}{\out{</div>}}
 }

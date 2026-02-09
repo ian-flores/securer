@@ -34,5 +34,17 @@ child_runtime_code <- function() {
   }
 
   .securer_connect()
+
+  # Send authentication token to the parent as the first message.
+  # The parent validates this before accepting any tool calls.
+  processx::conn_write(
+    .securer_env$conn,
+    paste0(Sys.getenv("SECURER_TOKEN"), "\\n")
+  )
+
+  lockEnvironment(.securer_env, bindings = TRUE)
+  lockBinding(".securer_call_tool", globalenv())
+  lockBinding(".securer_connect", globalenv())
+  lockBinding(".securer_env", globalenv())
   '
 }

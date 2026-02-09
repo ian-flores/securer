@@ -16,6 +16,59 @@ test_that("securer_tool() validates inputs", {
   expect_error(securer_tool("name", "desc", "not_a_function"))
 })
 
+test_that("securer_tool() rejects names that are not valid R identifiers", {
+  # Code injection via tool name
+  expect_error(
+    securer_tool('x; system("whoami"); y', "desc", identity),
+    "valid R identifier"
+  )
+  # Spaces
+  expect_error(
+    securer_tool("my tool", "desc", identity),
+    "valid R identifier"
+  )
+  # Starting with a digit
+  expect_error(
+    securer_tool("1tool", "desc", identity),
+    "valid R identifier"
+  )
+  # Special characters
+  expect_error(
+    securer_tool("tool$name", "desc", identity),
+    "valid R identifier"
+  )
+  # Quotes
+  expect_error(
+    securer_tool('tool"name', "desc", identity),
+    "valid R identifier"
+  )
+  # Valid names still work
+  expect_no_error(securer_tool("my_tool", "desc", identity))
+  expect_no_error(securer_tool("tool.name", "desc", identity))
+  expect_no_error(securer_tool("myTool2", "desc", identity))
+  expect_no_error(securer_tool(".hidden", "desc", identity))
+})
+
+test_that("securer_tool() rejects argument names that are not valid R identifiers", {
+  # Code injection via arg name
+  expect_error(
+    securer_tool("tool", "desc", identity,
+      args = list('x; system("whoami")' = "numeric")),
+    "valid R identifier"
+  )
+  # Spaces in arg name
+  expect_error(
+    securer_tool("tool", "desc", identity,
+      args = list("my arg" = "numeric")),
+    "valid R identifier"
+  )
+  # Valid arg names still work
+  expect_no_error(
+    securer_tool("tool", "desc", identity,
+      args = list(x = "numeric", y_2 = "character", .z = "logical"))
+  )
+})
+
 test_that("validate_tools() detects duplicates", {
   tools <- list(
     securer_tool("add", "Add", function(a, b) a + b),
@@ -27,7 +80,29 @@ test_that("validate_tools() detects duplicates", {
 test_that("validate_tools() accepts legacy named function lists", {
   tools <- list(add = function(a, b) a + b)
   result <- validate_tools(tools)
-  expect_true(is.function(result$add))
+  expect_true(is.function(result$fns$add))
+  # Legacy tools have NULL arg metadata
+  expect_null(result$arg_meta$add)
+})
+
+test_that("validate_tools() returns arg metadata for securer_tool objects", {
+  tools <- list(
+    securer_tool("add", "Add", function(a, b) a + b,
+                 args = list(a = "numeric", b = "numeric")),
+    securer_tool("greet", "Greet", function(name) paste("hello", name),
+                 args = list(name = "character"))
+  )
+  result <- validate_tools(tools)
+  expect_equal(result$arg_meta$add, c("a", "b"))
+  expect_equal(result$arg_meta$greet, "name")
+  expect_true(is.function(result$fns$add))
+  expect_true(is.function(result$fns$greet))
+})
+
+test_that("validate_tools() returns empty lists for no tools", {
+  result <- validate_tools(list())
+  expect_equal(result$fns, list())
+  expect_equal(result$arg_meta, list())
 })
 
 test_that("generate_tool_wrappers() creates callable code", {

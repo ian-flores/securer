@@ -3,41 +3,98 @@
 #' Creates a Seatbelt policy string that:
 #' \itemize{
 #'   \item Denies all operations by default
-#'   \item Allows file reads everywhere (low risk, needed for R + packages)
+#'   \item Allows file reads only for R installation, library paths, system
+#'     libraries, and temp directories (blocks ~/.ssh, ~/.env, etc.)
 #'   \item Allows file writes only to the temp directory (for UDS + R temp files)
 #'   \item Allows Unix domain socket operations (IPC with the parent)
 #'   \item Denies remote network access (TCP/UDP)
-#'   \item Allows process, mach, sysctl, and signal operations needed by R
+#'   \item Allows only process-fork and process-exec for the R binary
+#'   \item Allows only specific system operations R needs
 #' }
 #'
 #' @param socket_path Path to the UDS socket
 #' @param r_home      Path to the R installation
+#' @param lib_paths   Character vector of R library paths (default: `.libPaths()`)
 #' @return A single character string containing the Seatbelt profile
 #' @keywords internal
-generate_seatbelt_profile <- function(socket_path, r_home) {
+generate_seatbelt_profile <- function(socket_path, r_home,
+                                      lib_paths = .libPaths()) {
   tmp_dir <- dirname(socket_path)
 
-  sprintf(
+  # Build explicit file-read rules for each R library path.
+  # Deduplicate and exclude paths already covered by r_home.
+  lib_read_rules <- character(0)
+  for (lp in unique(lib_paths)) {
+    # Skip if already under r_home (will be covered by the r_home subpath rule)
+    if (!startsWith(lp, r_home)) {
+      lib_read_rules <- c(
+        lib_read_rules,
+        sprintf('(allow file-read* (subpath "%s"))', lp)
+      )
+    }
+  }
+  lib_read_section <- paste(lib_read_rules, collapse = "\n")
+
+  # R bin directory for process-exec restriction.
+  # R startup chain: bin/R (shell script) -> bin/exec/R (actual binary).
+  # Allow exec of anything under R's bin/ directory to cover both.
+  r_bin_dir <- file.path(r_home, "bin")
+
+  # Build process-exec rules
+  exec_rules <- sprintf('(allow process-exec (subpath "%s"))', r_bin_dir)
+
+  paste0(
     '(version 1)
 (deny default)
 
-;; -- File access ------------------------------------------------------
-;; Allow reading everywhere.  Reads are low-risk and R needs access to
-;; system libraries, frameworks, locale data, the R installation, and
-;; every package directory on .libPaths().
-(allow file-read*)
+;; -- File access (reads) ----------------------------------------------
+;; Allow file-read-metadata globally (stat, readdir for path traversal).
+;; This reveals file existence/size but NOT contents.
+(allow file-read-metadata)
 
-;; Allow writes ONLY to temp directories (UDS socket + R session temp
-;; files live here) and /dev/null (R startup writes to it).
-(allow file-write* (subpath "/tmp"))
-(allow file-write* (subpath "/private/tmp"))
+;; Allow reading root directory listing (shell needs this for path resolution)
+(allow file-read-data (literal "/"))
+(allow file-read-data (literal "/private"))
+
+;; R installation (R.home())
+(allow file-read* (subpath "', r_home, '"))
+
+;; R library paths (.libPaths() outside R.home())
+', lib_read_section, '
+
+;; System libraries, frameworks, and shared objects
+(allow file-read* (subpath "/usr"))
+(allow file-read* (subpath "/Library/Frameworks"))
+(allow file-read* (subpath "/System/Library"))
+(allow file-read* (subpath "/opt/homebrew"))
+(allow file-read* (subpath "/bin"))
+
+;; Device nodes R needs
+(allow file-read* (subpath "/dev"))
+
+;; Selective /etc reads (timezone, resolv.conf, locale)
+(allow file-read* (subpath "/etc"))
+(allow file-read* (subpath "/private/etc"))
+
+;; Temp and cache directories
+(allow file-read* (subpath "/tmp"))
+(allow file-read* (subpath "/private/tmp"))
+(allow file-read* (regex #"^/private/var/folders/"))
+(allow file-read* (regex #"^/var/folders/"))
+
+;; Seatbelt profile itself (sandbox-exec needs to read it)
+(allow file-read* (subpath "', tmp_dir, '"))
+
+;; -- File access (writes) ---------------------------------------------
+;; Allow writes ONLY to the session-specific socket directory and R temp
+;; directories.  Blocks writes to other sessions or other apps in /tmp.
+(allow file-write* (subpath "', tmp_dir, '"))
 (allow file-write* (regex #"^/private/var/folders/"))
 (allow file-write* (regex #"^/var/folders/"))
 (allow file-write* (literal "/dev/null"))
 (allow file-write* (literal "/dev/tty"))
 (allow file-write* (literal "/dev/random"))
 (allow file-write* (literal "/dev/urandom"))
-(allow file-write* (subpath "%s"))
 
 ;; -- Network ----------------------------------------------------------
 ;; Allow local Unix domain sockets (our IPC mechanism).
@@ -46,18 +103,35 @@ generate_seatbelt_profile <- function(socket_path, r_home) {
 ;; DENY all remote IP network access (TCP and UDP).
 (deny network* (remote ip))
 
-;; -- Process / system -------------------------------------------------
-;; R needs to exec, fork, look up mach services, read sysctl, etc.
-(allow process*)
+;; -- Process ----------------------------------------------------------
+;; Allow fork and exec of R binaries (bin/R script + bin/exec/R binary).
+;; Allow core POSIX utilities needed by R startup script (sed, grep, etc.).
+;; Blocks execution of interpreters (python, perl, ruby, etc.).
+(allow process-fork)
+', exec_rules, '
+(allow process-exec (literal "/bin/sh"))
+(allow process-exec (literal "/bin/bash"))
+(allow process-exec (literal "/bin/rm"))
+(allow process-exec (literal "/usr/bin/sed"))
+(allow process-exec (literal "/usr/bin/uname"))
+(allow process-exec (literal "/usr/bin/grep"))
+(allow process-exec (literal "/usr/bin/dirname"))
+(allow process-exec (literal "/usr/bin/basename"))
+
+;; -- Mach / IPC -------------------------------------------------------
+;; R needs mach lookups for system services, dyld, etc.
 (allow sysctl*)
 (allow mach*)
 (allow signal)
 (allow ipc-posix*)
 (allow iokit*)
-(allow system*)
-',
-    tmp_dir
-  )
+
+;; -- System -----------------------------------------------------------
+;; Only allow specific system operations R needs, not blanket system*.
+(allow system-socket)
+(allow system-fsctl)
+(allow system-info)
+')
 }
 
 #' Build macOS sandbox configuration

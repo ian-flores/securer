@@ -30,6 +30,26 @@ securer_tool <- function(name, description, fn, args = list()) {
     is.function(fn),
     is.list(args)
   )
+
+  # Validate tool name is a valid R identifier (prevents code injection
+  # since names are interpolated into eval'd code strings)
+  if (!grepl("^[A-Za-z.][A-Za-z0-9_.]*$", name)) {
+    stop("Tool name must be a valid R identifier: ", sQuote(name), call. = FALSE)
+  }
+
+  # Validate argument names are valid R identifiers
+  arg_names <- names(args)
+  if (length(arg_names) > 0) {
+    bad <- arg_names[!grepl("^[A-Za-z.][A-Za-z0-9_.]*$", arg_names)]
+    if (length(bad) > 0) {
+      stop(
+        "Argument names must be valid R identifiers: ",
+        paste(sQuote(bad), collapse = ", "),
+        call. = FALSE
+      )
+    }
+  }
+
   structure(
     list(name = name, description = description, fn = fn, args = args),
     class = "securer_tool"
@@ -40,18 +60,23 @@ securer_tool <- function(name, description, fn, args = list()) {
 #'
 #' Accepts either a named list of bare functions (legacy format from
 #' increment 1) or a list of [securer_tool()] objects. Returns a named
-#' list of tool functions keyed by tool name.
+#' list with two components: `fns` (tool functions keyed by name) and
+#' `arg_meta` (expected argument names keyed by tool name).
 #'
 #' @param tools List of `securer_tool` objects or a named list of functions
-#' @return Named list of tool functions (keyed by tool name)
+#' @return A list with `fns` (named list of functions) and `arg_meta`
+#'   (named list of character vectors of expected arg names, `NULL` for
+#'   legacy tools without metadata)
 #' @keywords internal
 validate_tools <- function(tools) {
-  if (length(tools) == 0) return(list())
+  if (length(tools) == 0) return(list(fns = list(), arg_meta = list()))
 
   # Accept named list of bare functions (legacy / backward compat)
   if (is.list(tools) && !is.null(names(tools)) &&
       all(vapply(tools, is.function, logical(1)))) {
-    return(tools)
+    # No arg metadata available for legacy tools
+    arg_meta <- lapply(tools, function(f) NULL)
+    return(list(fns = tools, arg_meta = arg_meta))
   }
 
   # Otherwise expect securer_tool objects
@@ -71,10 +96,12 @@ validate_tools <- function(tools) {
     )
   }
 
-  # Return named list of functions
+  # Return named list of functions + arg metadata
   fns <- lapply(tools, function(t) t$fn)
   names(fns) <- names_vec
-  fns
+  arg_meta <- lapply(tools, function(t) names(t$args))
+  names(arg_meta) <- names_vec
+  list(fns = fns, arg_meta = arg_meta)
 }
 
 #' Generate wrapper code for tools in the child process

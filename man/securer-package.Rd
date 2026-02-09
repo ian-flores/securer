@@ -20,6 +20,7 @@ The main entry points are:
 \seealso{
 Useful links:
 \itemize{
+  \item \url{https://ian-flores.github.io/securer/}
   \item \url{https://github.com/ian-flores/securer}
   \item Report bugs at \url{https://github.com/ian-flores/securer/issues}
 }

@@ -54,7 +54,9 @@ SecureSession <- R6::R6Class("SecureSession",
     initialize = function(tools = list(), sandbox = FALSE, limits = NULL,
                           verbose = FALSE, audit_log = NULL) {
       private$raw_tools <- tools
-      private$tool_fns <- validate_tools(tools)
+      validated <- validate_tools(tools)
+      private$tool_fns <- validated$fns
+      private$tool_arg_meta <- validated$arg_meta
       private$sandbox_enabled <- sandbox
       private$limits <- limits
       private$verbose <- verbose
@@ -74,10 +76,12 @@ SecureSession <- R6::R6Class("SecureSession",
     #'   lines (character) as they arrive from the child process. If `NULL`
     #'   (default), output is only collected and returned as the `"output"`
     #'   attribute on the result.
+    #' @param max_tool_calls Maximum number of tool calls allowed in this
+    #'   execution, or `NULL` for unlimited (default `NULL`).
     #' @return The result of evaluating the code, with an `"output"` attribute
     #'   containing all captured stdout/stderr as a character vector.
     execute = function(code, timeout = NULL, validate = TRUE,
-                       output_handler = NULL) {
+                       output_handler = NULL, max_tool_calls = NULL) {
       if (is.null(private$session) || !private$session$is_alive()) {
         stop("Session is not running", call. = FALSE)
       }
@@ -99,7 +103,7 @@ SecureSession <- R6::R6Class("SecureSession",
       }
       private$executing <- TRUE
       on.exit(private$executing <- FALSE)
-      private$run_with_tools(code, timeout, output_handler)
+      private$run_with_tools(code, timeout, output_handler, max_tool_calls)
     },
 
     #' @description Close the session and clean up resources
@@ -117,6 +121,11 @@ SecureSession <- R6::R6Class("SecureSession",
       }
       if (!is.null(private$socket_path) && file.exists(private$socket_path)) {
         unlink(private$socket_path)
+      }
+      # Clean up the private socket directory
+      if (!is.null(private$socket_dir) && dir.exists(private$socket_dir)) {
+        unlink(private$socket_dir, recursive = TRUE)
+        private$socket_dir <- NULL
       }
       # Clean up sandbox temp files (wrapper script + seatbelt profile + tmp dir)
       if (!is.null(private$sandbox_config)) {
@@ -145,8 +154,11 @@ SecureSession <- R6::R6Class("SecureSession",
     session = NULL,
     ipc_conn = NULL,
     socket_path = NULL,
+    socket_dir = NULL,
+    ipc_token = NULL,
     raw_tools = list(),
     tool_fns = list(),
+    tool_arg_meta = list(),
     executing = FALSE,
     sandbox_enabled = FALSE,
     sandbox_config = NULL,
@@ -164,12 +176,22 @@ SecureSession <- R6::R6Class("SecureSession",
     },
 
     start_session = function() {
-      # Create socket path in /tmp to keep the path short.
-      # Unix domain sockets are limited to ~104 chars on macOS.  The
-      # default tempdir() can be deeply nested (especially during
-      # R CMD check), so we use /tmp directly.
-      private$socket_path <- tempfile("securer_", tmpdir = "/tmp",
-                                      fileext = ".sock")
+      # Create a private directory for the socket with restrictive
+      # permissions (0700) to prevent TOCTOU races and unauthorized
+      # connections.  Unix domain sockets are limited to ~104 chars on
+      # macOS, so we use /tmp directly (not tempdir() which can be
+      # deeply nested during R CMD check).
+      private$socket_dir <- tempfile("securer_", tmpdir = "/tmp")
+      dir.create(private$socket_dir, mode = "0700")
+      private$socket_path <- file.path(private$socket_dir, "ipc.sock")
+
+      # Generate a random authentication token.  The child must send
+      # this as its first message after connecting; the parent rejects
+      # connections that don't present the correct token.
+      private$ipc_token <- paste0(
+        sample(c(letters, LETTERS, 0:9), 32, replace = TRUE),
+        collapse = ""
+      )
 
       # Create server socket
       private$ipc_conn <- processx::conn_create_unix_socket(
@@ -180,7 +202,10 @@ SecureSession <- R6::R6Class("SecureSession",
       # Pipe stdout/stderr so output can be read incrementally during
       # the event loop (enables streaming output capture).
       session_opts <- callr::r_session_options(
-        env = c(SECURER_SOCKET = private$socket_path),
+        env = c(
+          SECURER_SOCKET = private$socket_path,
+          SECURER_TOKEN = private$ipc_token
+        ),
         stdout = "|",
         stderr = "|"
       )
@@ -235,6 +260,18 @@ SecureSession <- R6::R6Class("SecureSession",
       processx::poll(list(private$ipc_conn), 5000)
       processx::conn_accept_unix_socket(private$ipc_conn)
 
+      # Validate the authentication token sent by the child.
+      # The child sends the token as its first message immediately
+      # after connecting.  Reject connections with wrong tokens.
+      processx::poll(list(private$ipc_conn), 5000)
+      auth_line <- processx::conn_read_lines(private$ipc_conn, n = 1)
+      if (length(auth_line) == 0 || !identical(auth_line, private$ipc_token)) {
+        try(close(private$ipc_conn), silent = TRUE)
+        private$ipc_conn <- NULL
+        stop("IPC authentication failed: invalid token from child process",
+             call. = FALSE)
+      }
+
       # Now wait for the call to finish and read the result
       private$session$poll_process(3000)
       private$session$read()
@@ -265,10 +302,17 @@ SecureSession <- R6::R6Class("SecureSession",
       )
     },
 
-    run_with_tools = function(code, timeout, output_handler = NULL) {
+    # Maximum IPC message size in bytes (1 MB default). Messages larger
+    # than this are rejected before JSON parsing to prevent resource
+    # exhaustion attacks.
+    max_ipc_message_size = 1048576L,
+
+    run_with_tools = function(code, timeout, output_handler = NULL,
+                              max_tool_calls = NULL) {
       exec_start <- Sys.time()
       private$audit_log("execute_start", code = code)
       output_lines <- character()
+      tool_call_count <- 0L
 
       # Helper: drain any available stdout/stderr from the child process
       drain_output <- function() {
@@ -318,12 +362,93 @@ SecureSession <- R6::R6Class("SecureSession",
         if (poll_result[[1]] == "ready") {
           line <- processx::conn_read_lines(private$ipc_conn, n = 1)
           if (length(line) > 0 && nzchar(line)) {
+
+            # --- IPC message size check (Finding 10) ---
+            if (nchar(line, type = "bytes") > private$max_ipc_message_size) {
+              stop(
+                "IPC message too large (",
+                nchar(line, type = "bytes"), " bytes, max ",
+                private$max_ipc_message_size, ")",
+                call. = FALSE
+              )
+            }
+
             request <- jsonlite::fromJSON(line, simplifyVector = FALSE)
 
+            # --- JSON schema validation (Finding 10) ---
+            if (!is.list(request)) {
+              stop("Malformed IPC message: expected a JSON object",
+                   call. = FALSE)
+            }
+            if (!is.character(request$type) || length(request$type) != 1) {
+              stop("Malformed IPC message: 'type' must be a scalar string",
+                   call. = FALSE)
+            }
+
             if (identical(request$type, "tool_call")) {
+              # Validate tool_call-specific fields
+              if (!is.character(request$tool) || length(request$tool) != 1) {
+                stop("Malformed IPC message: 'tool' must be a scalar string",
+                     call. = FALSE)
+              }
+              if (!is.null(request$args) && !is.list(request$args)) {
+                stop("Malformed IPC message: 'args' must be a list or null",
+                     call. = FALSE)
+              }
+
+              # --- Rate limiting (Finding 14) ---
+              tool_call_count <- tool_call_count + 1L
+              if (!is.null(max_tool_calls) &&
+                  tool_call_count > max_tool_calls) {
+                stop(
+                  sprintf("Maximum tool calls (%d) exceeded",
+                          max_tool_calls),
+                  call. = FALSE
+                )
+              }
+
               # Execute the tool on the parent side
               tool_name <- request$tool
               tool_args <- request$args
+
+              # Validate tool_name is a scalar string and in the allowlist
+              if (!is.character(tool_name) || length(tool_name) != 1 ||
+                  !nzchar(tool_name) ||
+                  !grepl("^[A-Za-z.][A-Za-z0-9_.]*$", tool_name)) {
+                tool_name <- "<invalid>"
+              }
+
+              # --- Parent-side argument validation (Finding 5) ---
+              # Ensure tool_args is a list (not some other type)
+              if (!is.null(tool_args) && !is.list(tool_args)) {
+                tool_args <- list()
+              }
+
+              # If we have arg metadata for this tool, validate arg names
+              expected_args <- private$tool_arg_meta[[tool_name]]
+              if (!is.null(expected_args) && length(expected_args) > 0 &&
+                  !is.null(tool_args) && length(tool_args) > 0) {
+                actual_names <- names(tool_args)
+                unexpected <- setdiff(actual_names, expected_args)
+                if (length(unexpected) > 0) {
+                  # Send error back to child rather than crashing
+                  response <- list(
+                    error = sprintf(
+                      "Unexpected arguments for tool '%s': %s",
+                      tool_name,
+                      paste(sQuote(unexpected), collapse = ", ")
+                    )
+                  )
+                  response_json <- jsonlite::toJSON(
+                    response, auto_unbox = TRUE
+                  )
+                  processx::conn_write(
+                    private$ipc_conn,
+                    paste0(response_json, "\n")
+                  )
+                  next
+                }
+              }
 
               # Log the tool call with arguments
               if (private$verbose) {
@@ -447,6 +572,10 @@ SecureSession <- R6::R6Class("SecureSession",
       }
       if (!is.null(private$socket_path) && file.exists(private$socket_path)) {
         unlink(private$socket_path)
+      }
+      if (!is.null(private$socket_dir) && dir.exists(private$socket_dir)) {
+        unlink(private$socket_dir, recursive = TRUE)
+        private$socket_dir <- NULL
       }
 
       # Restart the session so it's usable for future execute() calls

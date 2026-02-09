@@ -22,9 +22,90 @@ test_that("Seatbelt profile contains essential rules", {
   profile <- generate_seatbelt_profile("/tmp/test.sock", R.home())
   expect_true(grepl("deny default", profile))
   expect_true(grepl("deny network.*remote ip", profile))
-  expect_true(grepl("allow file-read\\*", profile))
   expect_true(grepl("allow network.*local unix", profile))
   expect_true(grepl("allow file-write.*subpath.*tmp", profile, ignore.case = TRUE))
+})
+
+test_that("Seatbelt profile does NOT use wildcard file-read*", {
+  skip_on_os(c("windows", "linux"))
+
+  profile <- generate_seatbelt_profile("/tmp/test.sock", R.home())
+  # The old blanket (allow file-read*) should be replaced with explicit paths
+  lines <- strsplit(profile, "\n")[[1]]
+  blanket_lines <- grep("^\\(allow file-read\\*\\)$", trimws(lines), value = TRUE)
+  expect_length(blanket_lines, 0)
+})
+
+test_that("Seatbelt profile includes explicit read paths for R", {
+  skip_on_os(c("windows", "linux"))
+
+  r_home <- R.home()
+  profile <- generate_seatbelt_profile("/tmp/test.sock", r_home)
+
+  # Must allow reading R home
+  expect_true(grepl(r_home, profile, fixed = TRUE))
+  # Must allow reading /usr (system libs, frameworks)
+  expect_true(grepl("file-read.*subpath.*/usr", profile))
+  # Must allow reading /dev (devices R needs)
+  expect_true(grepl("file-read.*subpath.*/dev", profile))
+  # Must allow reading /private/var/folders (macOS temp/cache)
+  expect_true(grepl("file-read.*private/var/folders", profile))
+  # Must allow reading /tmp
+  expect_true(grepl("file-read.*subpath.*/tmp", profile))
+})
+
+test_that("Seatbelt profile includes .libPaths() read access", {
+  skip_on_os(c("windows", "linux"))
+
+  r_home <- R.home()
+  lib_paths <- .libPaths()
+  profile <- generate_seatbelt_profile("/tmp/test.sock", r_home, lib_paths = lib_paths)
+
+  # Each library path should be readable — paths under r_home are covered
+  # by the r_home subpath rule, so they won't appear as separate entries.
+  # Paths outside r_home must appear explicitly.
+  for (lp in lib_paths) {
+    if (startsWith(lp, r_home)) {
+      # Covered by r_home subpath rule — r_home itself must be in profile
+      expect_true(
+        grepl(r_home, profile, fixed = TRUE),
+        label = paste("Profile should include r_home covering:", lp)
+      )
+    } else {
+      expect_true(
+        grepl(lp, profile, fixed = TRUE),
+        label = paste("Profile should include lib path:", lp)
+      )
+    }
+  }
+})
+
+test_that("Seatbelt profile restricts process operations", {
+  skip_on_os(c("windows", "linux"))
+
+  r_home <- R.home()
+  profile <- generate_seatbelt_profile("/tmp/test.sock", r_home)
+
+  # Should NOT have blanket (allow process*)
+  lines <- strsplit(profile, "\n")[[1]]
+  blanket_process <- grep("^\\(allow process\\*\\)$", trimws(lines), value = TRUE)
+  expect_length(blanket_process, 0)
+
+  # Should allow process-fork
+  expect_true(grepl("process-fork", profile))
+  # Should allow process-exec for R binary
+  expect_true(grepl("process-exec", profile))
+})
+
+test_that("Seatbelt profile restricts system operations", {
+  skip_on_os(c("windows", "linux"))
+
+  profile <- generate_seatbelt_profile("/tmp/test.sock", R.home())
+
+  # Should NOT have blanket (allow system*)
+  lines <- strsplit(profile, "\n")[[1]]
+  blanket_system <- grep("^\\(allow system\\*\\)$", trimws(lines), value = TRUE)
+  expect_length(blanket_system, 0)
 })
 
 test_that("Seatbelt profile includes socket directory in write rules", {
@@ -33,6 +114,28 @@ test_that("Seatbelt profile includes socket directory in write rules", {
   socket_path <- "/tmp/my_custom_dir/test.sock"
   profile <- generate_seatbelt_profile(socket_path, R.home())
   expect_true(grepl("/tmp/my_custom_dir", profile, fixed = TRUE))
+})
+
+test_that("Seatbelt profile restricts /tmp writes to socket directory only", {
+  skip_on_os(c("windows", "linux"))
+
+  socket_path <- "/tmp/securer_abc123/ipc.sock"
+  profile <- generate_seatbelt_profile(socket_path, R.home())
+
+  # Should NOT have blanket /tmp write access
+  lines <- strsplit(profile, "\n")[[1]]
+  write_lines <- grep("file-write.*subpath", lines, value = TRUE)
+  blanket_tmp <- grep('subpath "/tmp"', write_lines, fixed = TRUE, value = TRUE)
+  expect_length(blanket_tmp, 0)
+
+  blanket_private_tmp <- grep('subpath "/private/tmp"', write_lines, fixed = TRUE, value = TRUE)
+  expect_length(blanket_private_tmp, 0)
+
+  # Should have the specific socket directory
+  expect_true(any(grepl('subpath "/tmp/securer_abc123"', write_lines, fixed = TRUE)))
+
+  # Should still have /private/var/folders for R temp files
+  expect_true(any(grepl("private/var/folders", profile)))
 })
 
 test_that("build_sandbox_fallback returns NULLs with a warning", {
@@ -237,6 +340,48 @@ test_that("Sandbox session cleans up temp files on close", {
   expect_false(file.exists(profile_path))
 })
 
+test_that("Sandbox session blocks reading user home directory files", {
+  skip_on_os(c("windows", "linux"))
+  skip_if_not(file.exists("/usr/bin/sandbox-exec"), "sandbox-exec not available")
+
+  session <- SecureSession$new(sandbox = TRUE)
+  on.exit(session$close())
+
+  home <- Sys.getenv("HOME")
+  # Create a temp file in home dir, try to read it from sandbox
+  test_file <- file.path(home, ".securer_test_secret")
+  writeLines("secret", test_file)
+  on.exit(unlink(test_file), add = TRUE)
+
+  # Reading user home directory files should be blocked by the sandbox.
+  # R's file functions may produce a warning or error; either way the
+  # content should NOT be accessible.
+  result <- tryCatch(
+    session$execute(sprintf('readLines("%s")', test_file)),
+    error = function(e) "blocked_by_error"
+  )
+  # Either the call errored (sandbox denied the read) or the result
+  # should not contain the actual secret content
+  if (identical(result, "blocked_by_error")) {
+    expect_true(TRUE)  # File read was blocked at the sandbox level
+  } else {
+    expect_false(identical(result, "secret"))
+  }
+})
+
+test_that("Sandbox session blocks executing non-R binaries", {
+  skip_on_os(c("windows", "linux"))
+  skip_if_not(file.exists("/usr/bin/sandbox-exec"), "sandbox-exec not available")
+
+  session <- SecureSession$new(sandbox = TRUE)
+  on.exit(session$close())
+
+  # Executing python/perl/etc. should be blocked by restricted process-exec.
+  # system() returns the exit status; a non-zero status means it failed.
+  result <- session$execute('system("python3 -c \'print(1)\'")')
+  expect_true(result != 0)  # Non-zero exit = blocked
+})
+
 test_that("Non-sandbox session still works (regression)", {
   session <- SecureSession$new(sandbox = FALSE)
   on.exit(session$close())
@@ -372,7 +517,7 @@ test_that("build_sandbox_windows returns config with env and warning", {
   # This test can run on any platform since it tests the function directly
   expect_warning(
     config <- build_sandbox_windows("/tmp/test.sock", R.home()),
-    "environment isolation only"
+    "environment variable isolation ONLY"
   )
 
   # No wrapper or profile on Windows
@@ -397,10 +542,19 @@ test_that("build_sandbox_windows returns config with env and warning", {
   if (!is.null(config$sandbox_tmp)) unlink(config$sandbox_tmp, recursive = TRUE)
 })
 
+test_that("build_sandbox_windows warning mentions no filesystem/network restrictions", {
+  # This test can run on any platform since it tests the function directly
+  expect_warning(
+    config <- build_sandbox_windows("/tmp/test.sock", R.home()),
+    "No filesystem, network, or process restrictions"
+  )
+  if (!is.null(config$sandbox_tmp)) unlink(config$sandbox_tmp, recursive = TRUE)
+})
+
 test_that("build_sandbox_windows creates a clean temp directory", {
   expect_warning(
     config <- build_sandbox_windows("/tmp/test.sock", R.home()),
-    "environment isolation only"
+    "environment variable isolation ONLY"
   )
   on.exit({
     if (!is.null(config$sandbox_tmp)) unlink(config$sandbox_tmp, recursive = TRUE)
@@ -420,7 +574,7 @@ test_that("build_sandbox_windows creates a clean temp directory", {
 test_that("build_sandbox_windows clears startup scripts", {
   expect_warning(
     config <- build_sandbox_windows("/tmp/test.sock", R.home()),
-    "environment isolation only"
+    "environment variable isolation ONLY"
   )
   on.exit({
     if (!is.null(config$sandbox_tmp)) unlink(config$sandbox_tmp, recursive = TRUE)
@@ -439,49 +593,49 @@ test_that("generate_ulimit_commands returns empty for NULL limits", {
   expect_equal(generate_ulimit_commands(list()), character(0))
 })
 
-test_that("generate_ulimit_commands produces correct CPU limit", {
+test_that("generate_ulimit_commands produces correct CPU limit with hard limits", {
   cmds <- generate_ulimit_commands(list(cpu = 30))
   expect_length(cmds, 1)
-  expect_equal(cmds, "ulimit -t 30")
+  expect_equal(cmds, "ulimit -S -H -t 30")
 })
 
-test_that("generate_ulimit_commands converts memory from bytes to KB", {
+test_that("generate_ulimit_commands converts memory from bytes to KB with hard limits", {
   cmds <- generate_ulimit_commands(list(memory = 512 * 1024 * 1024))
   expect_length(cmds, 1)
-  expect_equal(cmds, "ulimit -v 524288")
+  expect_equal(cmds, "ulimit -S -H -v 524288")
 })
 
-test_that("generate_ulimit_commands converts fsize from bytes to 512-byte blocks", {
+test_that("generate_ulimit_commands converts fsize from bytes to 512-byte blocks with hard limits", {
   cmds <- generate_ulimit_commands(list(fsize = 10 * 1024 * 1024))
   expect_length(cmds, 1)
-  expect_equal(cmds, "ulimit -f 20480")
+  expect_equal(cmds, "ulimit -S -H -f 20480")
 })
 
-test_that("generate_ulimit_commands handles multiple limits", {
+test_that("generate_ulimit_commands handles multiple limits with hard limits", {
   cmds <- generate_ulimit_commands(list(cpu = 10, memory = 256 * 1024 * 1024, nproc = 50))
   expect_length(cmds, 3)
-  expect_true(any(grepl("ulimit -t 10", cmds)))
-  expect_true(any(grepl("ulimit -v 262144", cmds)))
-  expect_true(any(grepl("ulimit -u 50", cmds)))
+  expect_true(any(grepl("ulimit -S -H -t 10", cmds)))
+  expect_true(any(grepl("ulimit -S -H -v 262144", cmds)))
+  expect_true(any(grepl("ulimit -S -H -u 50", cmds)))
 })
 
-test_that("generate_ulimit_commands handles nproc and nofile", {
+test_that("generate_ulimit_commands handles nproc and nofile with hard limits", {
   cmds <- generate_ulimit_commands(list(nproc = 100, nofile = 256))
   expect_length(cmds, 2)
-  expect_true(any(grepl("ulimit -u 100", cmds)))
-  expect_true(any(grepl("ulimit -n 256", cmds)))
+  expect_true(any(grepl("ulimit -S -H -u 100", cmds)))
+  expect_true(any(grepl("ulimit -S -H -n 256", cmds)))
 })
 
-test_that("generate_ulimit_commands handles stack limit", {
+test_that("generate_ulimit_commands handles stack limit with hard limits", {
   cmds <- generate_ulimit_commands(list(stack = 8 * 1024 * 1024))
   expect_length(cmds, 1)
-  expect_equal(cmds, "ulimit -s 8192")
+  expect_equal(cmds, "ulimit -S -H -s 8192")
 })
 
-test_that("generate_ulimit_commands rounds up fractional conversions", {
+test_that("generate_ulimit_commands rounds up fractional conversions with hard limits", {
   # 1 byte -> should round up to 1 KB
   cmds <- generate_ulimit_commands(list(memory = 1))
-  expect_equal(cmds, "ulimit -v 1")
+  expect_equal(cmds, "ulimit -S -H -v 1")
 })
 
 test_that("validate_limits rejects unknown limit names", {
@@ -529,8 +683,8 @@ test_that("macOS wrapper includes ulimit commands when limits provided", {
   })
 
   wrapper_lines <- readLines(config$wrapper)
-  expect_true(any(grepl("ulimit -t 30", wrapper_lines)))
-  expect_true(any(grepl("ulimit -v 524288", wrapper_lines)))
+  expect_true(any(grepl("ulimit -S -H -t 30", wrapper_lines)))
+  expect_true(any(grepl("ulimit -S -H -v 524288", wrapper_lines)))
   # ulimit lines should come before the exec line
   ulimit_idx <- which(grepl("ulimit", wrapper_lines))
   exec_idx <- which(grepl("^exec", wrapper_lines))
@@ -562,8 +716,8 @@ test_that("build_limits_only_wrapper creates script with ulimit", {
 
   wrapper_lines <- readLines(config$wrapper)
   expect_true(any(grepl("#!/bin/sh", wrapper_lines)))
-  expect_true(any(grepl("ulimit -t 15", wrapper_lines)))
-  expect_true(any(grepl("ulimit -f 2048", wrapper_lines)))
+  expect_true(any(grepl("ulimit -S -H -t 15", wrapper_lines)))
+  expect_true(any(grepl("ulimit -S -H -f 2048", wrapper_lines)))
   expect_true(any(grepl("^exec", wrapper_lines)))
   # No sandbox-exec reference
   expect_false(any(grepl("sandbox-exec", wrapper_lines)))

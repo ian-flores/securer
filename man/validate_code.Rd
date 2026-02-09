@@ -15,15 +15,23 @@ A list with components:
 \item{valid}{Logical. \code{TRUE} if the code parses without error.}
 \item{error}{\code{NULL} on success, or a character string describing the
 parse error.}
-\item{warnings}{Character vector of warnings about potentially dangerous
-patterns (e.g. \code{system()}, \code{.Internal()}).  Empty if none detected.
-These are advisory only --- the sandbox handles actual restriction.}
+\item{warnings}{Character vector of advisory warnings about potentially
+dangerous patterns (e.g. \code{system()}, \code{.Internal()}).  Empty if none
+detected.  These are advisory only --- the sandbox handles actual
+restriction.}
 }
 }
 \description{
 Parses the code string to catch syntax errors and optionally checks for
 potentially dangerous function calls.  This is intended as a fast pre-check
 so that obviously broken code never reaches the child process.
+}
+\details{
+\strong{Note:} Pattern-based validation is ADVISORY ONLY.  It uses simple regex
+matching and can produce both false positives and false negatives.
+The OS-level sandbox (Seatbelt / bwrap) is the actual enforcement layer
+that restricts filesystem, network, and process access.  Do not rely on
+validation alone to prevent dangerous operations.
 }
 \examples{
 # Valid code

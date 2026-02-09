@@ -95,6 +95,85 @@ test_that("multiple dangerous patterns produce multiple warnings", {
   expect_true(length(result$warnings) >= 2)
 })
 
+# --- New dangerous patterns (Finding 7) ---
+
+test_that(".Call() is flagged", {
+  result <- validate_code('.Call("my_c_func", 1L)')
+  expect_true(result$valid)
+  expect_true(length(result$warnings) > 0)
+  expect_true(any(grepl("\\.Call", result$warnings)))
+})
+
+test_that(".C() is flagged", {
+  result <- validate_code('.C("my_func", as.integer(5))')
+  expect_true(result$valid)
+  expect_true(length(result$warnings) > 0)
+  expect_true(any(grepl("\\.C", result$warnings)))
+})
+
+test_that(".Fortran() is flagged", {
+  result <- validate_code('.Fortran("dgemm", n = 10L)')
+  expect_true(result$valid)
+  expect_true(length(result$warnings) > 0)
+  expect_true(any(grepl("\\.Fortran", result$warnings)))
+})
+
+test_that(".External() is flagged", {
+  result <- validate_code('.External(some_fn, x)')
+  expect_true(result$valid)
+  expect_true(length(result$warnings) > 0)
+  expect_true(any(grepl("\\.External", result$warnings)))
+})
+
+test_that("dyn.load() is flagged", {
+  result <- validate_code('dyn.load("mylib.so")')
+  expect_true(result$valid)
+  expect_true(length(result$warnings) > 0)
+  expect_true(any(grepl("dyn\\.load", result$warnings)))
+})
+
+test_that("pipe() is flagged", {
+  result <- validate_code('con <- pipe("ls -la")')
+  expect_true(result$valid)
+  expect_true(length(result$warnings) > 0)
+  expect_true(any(grepl("pipe", result$warnings)))
+})
+
+test_that("processx::run() is flagged", {
+  result <- validate_code('processx::run("echo", "hello")')
+  expect_true(result$valid)
+  expect_true(length(result$warnings) > 0)
+  expect_true(any(grepl("processx::run", result$warnings)))
+})
+
+test_that("callr::r() is flagged", {
+  result <- validate_code('callr::r(function() 1)')
+  expect_true(result$valid)
+  expect_true(length(result$warnings) > 0)
+  expect_true(any(grepl("callr::r", result$warnings)))
+})
+
+test_that("socketConnection() is flagged", {
+  result <- validate_code('socketConnection("localhost", 8080)')
+  expect_true(result$valid)
+  expect_true(length(result$warnings) > 0)
+  expect_true(any(grepl("socketConnection", result$warnings)))
+})
+
+test_that("url() is flagged", {
+  result <- validate_code('con <- url("http://evil.com")')
+  expect_true(result$valid)
+  expect_true(length(result$warnings) > 0)
+  expect_true(any(grepl("url", result$warnings)))
+})
+
+test_that("do.call() is flagged", {
+  result <- validate_code('do.call(system, list("ls"))')
+  expect_true(result$valid)
+  expect_true(length(result$warnings) > 0)
+  expect_true(any(grepl("do\\.call", result$warnings)))
+})
+
 # --- Integration with SecureSession$execute(validate=...) ---
 
 test_that("execute() rejects syntax errors by default", {

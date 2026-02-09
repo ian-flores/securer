@@ -29,8 +29,10 @@
 #' @keywords internal
 build_sandbox_windows <- function(socket_path, r_home) {
   warning(
-    "Windows sandbox provides environment isolation only (no filesystem ",
-    "or network restrictions). For stronger sandboxing, use macOS or Linux.",
+    "WARNING: Windows sandbox provides environment variable isolation ONLY. ",
+    "No filesystem, network, or process restrictions are enforced. ",
+    "The child process can read/write any file and make network connections. ",
+    "Use sandbox=FALSE to acknowledge this, or run on macOS/Linux for full sandboxing.",
     call. = FALSE
   )
 

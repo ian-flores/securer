@@ -4,12 +4,14 @@
 \alias{generate_seatbelt_profile}
 \title{Generate a macOS Seatbelt profile for the sandboxed R session}
 \usage{
-generate_seatbelt_profile(socket_path, r_home)
+generate_seatbelt_profile(socket_path, r_home, lib_paths = .libPaths())
 }
 \arguments{
 \item{socket_path}{Path to the UDS socket}
 
 \item{r_home}{Path to the R installation}
+
+\item{lib_paths}{Character vector of R library paths (default: \code{.libPaths()})}
 }
 \value{
 A single character string containing the Seatbelt profile
@@ -18,11 +20,13 @@ A single character string containing the Seatbelt profile
 Creates a Seatbelt policy string that:
 \itemize{
 \item Denies all operations by default
-\item Allows file reads everywhere (low risk, needed for R + packages)
+\item Allows file reads only for R installation, library paths, system
+libraries, and temp directories (blocks ~/.ssh, ~/.env, etc.)
 \item Allows file writes only to the temp directory (for UDS + R temp files)
 \item Allows Unix domain socket operations (IPC with the parent)
 \item Denies remote network access (TCP/UDP)
-\item Allows process, mach, sysctl, and signal operations needed by R
+\item Allows only process-fork and process-exec for the R binary
+\item Allows only specific system operations R needs
 }
 }
 \keyword{internal}

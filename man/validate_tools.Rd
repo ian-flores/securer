@@ -10,11 +10,14 @@ validate_tools(tools)
 \item{tools}{List of \code{securer_tool} objects or a named list of functions}
 }
 \value{
-Named list of tool functions (keyed by tool name)
+A list with \code{fns} (named list of functions) and \code{arg_meta}
+(named list of character vectors of expected arg names, \code{NULL} for
+legacy tools without metadata)
 }
 \description{
 Accepts either a named list of bare functions (legacy format from
 increment 1) or a list of \code{\link[=securer_tool]{securer_tool()}} objects. Returns a named
-list of tool functions keyed by tool name.
+list with two components: \code{fns} (tool functions keyed by name) and
+\code{arg_meta} (expected argument names keyed by tool name).
 }
 \keyword{internal}
