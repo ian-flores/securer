@@ -12,31 +12,13 @@ build_sandbox_windows(socket_path, r_home)
 \item{r_home}{Path to the R installation}
 }
 \value{
-A sandbox config list with:
-\describe{
-\item{wrapper}{\code{NULL} (no wrapper script on Windows)}
-\item{profile_path}{\code{NULL} (no sandbox profile on Windows)}
-\item{env}{Named character vector of restrictive environment variables
-to pass to \code{\link[callr:r_session_options]{callr::r_session_options()}}}
-}
+Never returns; always raises an error.
 }
 \description{
-Provides environment-variable-only isolation for Windows.
-Windows lacks an unprivileged lightweight sandbox comparable to macOS Seatbelt
-or Linux bubblewrap, so this implementation sets restrictive environment
-variables to limit the child R process.  Specifically:
-\itemize{
-\item Sets \code{R_LIBS_USER} to empty, preventing user-installed packages
-\item Sets \code{HOME} and \code{TMPDIR} to a clean temporary directory
-\item Sets \code{R_USER} to match the clean temp directory
-\item Clears \code{R_ENVIRON_USER} and \code{R_PROFILE_USER} to prevent
-user startup code from executing
-}
-}
-\details{
-\strong{Important:} This does NOT enforce filesystem or network restrictions.
-Any code running in the child process can still access the filesystem and
-network without restriction.  For true sandboxing on Windows, admin
-privileges and Windows Job Objects / AppContainers would be required.
+True OS-level sandboxing is not available on Windows without admin
+privileges (would require Windows Job Objects / AppContainers).
+This function raises an error when called, directing users to either
+use \code{sandbox = FALSE} with explicit resource limits, or run inside
+a container for real isolation.
 }
 \keyword{internal}

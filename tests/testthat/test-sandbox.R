@@ -26,6 +26,43 @@ test_that("Seatbelt profile contains essential rules", {
   expect_true(grepl("allow file-write.*subpath.*tmp", profile, ignore.case = TRUE))
 })
 
+test_that("Seatbelt profile restricts /etc to specific files", {
+  skip_on_os(c("windows", "linux"))
+
+  profile <- generate_seatbelt_profile("/tmp/test.sock", R.home())
+
+  # Must NOT have a broad /etc subpath rule
+  expect_false(grepl('(allow file-read* (subpath "/etc"))', profile, fixed = TRUE))
+  expect_false(grepl('(allow file-read* (subpath "/private/etc"))', profile, fixed = TRUE))
+
+  # Must have specific file entries
+  expect_true(grepl('literal "/etc/localtime"', profile, fixed = TRUE))
+  expect_true(grepl('literal "/etc/resolv.conf"', profile, fixed = TRUE))
+  expect_true(grepl('literal "/etc/hosts"', profile, fixed = TRUE))
+  expect_true(grepl('subpath "/etc/ssl"', profile, fixed = TRUE))
+  expect_true(grepl('subpath "/etc/pki"', profile, fixed = TRUE))
+})
+
+test_that("Seatbelt profile scopes /var/folders to current user", {
+  skip_on_os(c("windows", "linux"))
+
+  profile <- generate_seatbelt_profile("/tmp/test.sock", R.home())
+
+  # On macOS with a typical TMPDIR, should use subpath instead of broad regex
+  tmpdir_val <- normalizePath(Sys.getenv("TMPDIR", tempdir()), mustWork = FALSE)
+  var_match <- regmatches(
+    tmpdir_val,
+    regexpr("/private/var/folders/[^/]+/[^/]+", tmpdir_val)
+  )
+
+  if (length(var_match) == 1 && nzchar(var_match)) {
+    # User-specific path should appear as a subpath rule
+    expect_true(grepl(var_match, profile, fixed = TRUE))
+    # Broad regex should NOT appear
+    expect_false(grepl('^/private/var/folders/', profile, fixed = TRUE))
+  }
+})
+
 test_that("Seatbelt profile does NOT use wildcard file-read*", {
   skip_on_os(c("windows", "linux"))
 
@@ -525,77 +562,26 @@ test_that("bwrap sandbox cleans up wrapper on close", {
 
 # ── Windows sandbox unit tests ─────────────────────────────────────────
 
-test_that("build_sandbox_windows returns config with env and warning", {
+test_that("build_sandbox_windows errors on sandbox=TRUE", {
   # This test can run on any platform since it tests the function directly
-  expect_warning(
-    config <- build_sandbox_windows("/tmp/test.sock", R.home()),
-    "environment variable isolation ONLY"
+  expect_error(
+    build_sandbox_windows("/tmp/test.sock", R.home()),
+    "not available on Windows"
   )
-
-  # No wrapper or profile on Windows
-
-  expect_null(config$wrapper)
-  expect_null(config$profile_path)
-
-  # Must have env field with restrictive variables
-  expect_true(!is.null(config$env))
-  expect_true(is.character(config$env))
-  expect_true("R_LIBS_USER" %in% names(config$env))
-  expect_true("HOME" %in% names(config$env))
-  expect_true("TMPDIR" %in% names(config$env))
-  expect_true("R_ENVIRON_USER" %in% names(config$env))
-  expect_true("R_PROFILE_USER" %in% names(config$env))
-  expect_true("R_USER" %in% names(config$env))
-
-  # R_LIBS_USER should be empty to prevent user packages
-  expect_equal(unname(config$env["R_LIBS_USER"]), "")
-
-  # Cleanup sandbox temp dir
-  if (!is.null(config$sandbox_tmp)) unlink(config$sandbox_tmp, recursive = TRUE)
 })
 
-test_that("build_sandbox_windows warning mentions no filesystem/network restrictions", {
-  # This test can run on any platform since it tests the function directly
-  expect_warning(
-    config <- build_sandbox_windows("/tmp/test.sock", R.home()),
-    "No filesystem, network, or process restrictions"
+test_that("build_sandbox_windows error mentions Docker alternative", {
+  expect_error(
+    build_sandbox_windows("/tmp/test.sock", R.home()),
+    "Docker container"
   )
-  if (!is.null(config$sandbox_tmp)) unlink(config$sandbox_tmp, recursive = TRUE)
 })
 
-test_that("build_sandbox_windows creates a clean temp directory", {
-  expect_warning(
-    config <- build_sandbox_windows("/tmp/test.sock", R.home()),
-    "environment variable isolation ONLY"
+test_that("build_sandbox_windows error mentions sandbox = FALSE", {
+  expect_error(
+    build_sandbox_windows("/tmp/test.sock", R.home()),
+    "sandbox = FALSE"
   )
-  on.exit({
-    if (!is.null(config$sandbox_tmp)) unlink(config$sandbox_tmp, recursive = TRUE)
-  })
-
-  expect_true(!is.null(config$sandbox_tmp))
-  expect_true(dir.exists(config$sandbox_tmp))
-
-  # HOME, TMPDIR, TMP, TEMP should all point to the sandbox temp dir
-  expect_equal(unname(config$env["HOME"]), config$sandbox_tmp)
-  expect_equal(unname(config$env["TMPDIR"]), config$sandbox_tmp)
-  expect_equal(unname(config$env["TMP"]), config$sandbox_tmp)
-  expect_equal(unname(config$env["TEMP"]), config$sandbox_tmp)
-  expect_equal(unname(config$env["R_USER"]), config$sandbox_tmp)
-})
-
-test_that("build_sandbox_windows clears startup scripts", {
-  expect_warning(
-    config <- build_sandbox_windows("/tmp/test.sock", R.home()),
-    "environment variable isolation ONLY"
-  )
-  on.exit({
-    if (!is.null(config$sandbox_tmp)) unlink(config$sandbox_tmp, recursive = TRUE)
-  })
-
-  # R_ENVIRON_USER and R_PROFILE_USER should be empty to prevent
-  # user startup code from running
-  expect_equal(unname(config$env["R_ENVIRON_USER"]), "")
-  expect_equal(unname(config$env["R_PROFILE_USER"]), "")
 })
 
 # ── Resource limits (rlimits) unit tests ──────────────────────────────

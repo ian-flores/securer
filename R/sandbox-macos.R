@@ -21,6 +21,21 @@ generate_seatbelt_profile <- function(socket_path, r_home,
                                       lib_paths = .libPaths()) {
   tmp_dir <- dirname(socket_path)
 
+  # Determine the current user's /private/var/folders/XX/YYYYYY path
+  # so we can scope read/write rules to just this user's temp area.
+  user_var_folder <- NULL
+  tmpdir_val <- normalizePath(
+    Sys.getenv("TMPDIR", tempdir()),
+    mustWork = FALSE
+  )
+  var_folder_match <- regmatches(
+    tmpdir_val,
+    regexpr("/private/var/folders/[^/]+/[^/]+", tmpdir_val)
+  )
+  if (length(var_folder_match) == 1 && nzchar(var_folder_match)) {
+    user_var_folder <- var_folder_match
+  }
+
   # Build explicit file-read rules for each R library path.
   # Deduplicate and exclude paths already covered by r_home.
   lib_read_rules <- character(0)
@@ -72,15 +87,33 @@ generate_seatbelt_profile <- function(socket_path, r_home,
 ;; Device nodes R needs
 (allow file-read* (subpath "/dev"))
 
-;; Selective /etc reads (timezone, resolv.conf, locale)
-(allow file-read* (subpath "/etc"))
-(allow file-read* (subpath "/private/etc"))
+;; Selective /etc reads (only what R needs)
+(allow file-read* (literal "/etc/localtime"))
+(allow file-read* (literal "/private/etc/localtime"))
+(allow file-read* (literal "/etc/resolv.conf"))
+(allow file-read* (literal "/private/etc/resolv.conf"))
+(allow file-read* (subpath "/etc/ssl"))
+(allow file-read* (subpath "/private/etc/ssl"))
+(allow file-read* (literal "/etc/hosts"))
+(allow file-read* (literal "/private/etc/hosts"))
+(allow file-read* (subpath "/etc/pki"))
+(allow file-read* (subpath "/private/etc/pki"))
 
 ;; Temp and cache directories
 (allow file-read* (subpath "/tmp"))
 (allow file-read* (subpath "/private/tmp"))
-(allow file-read* (regex #"^/private/var/folders/"))
-(allow file-read* (regex #"^/var/folders/"))
+', if (!is.null(user_var_folder)) {
+    paste0(
+      '(allow file-read* (subpath "', user_var_folder, '"))\n',
+      '(allow file-read* (subpath "',
+      sub("^/private", "", user_var_folder), '"))'
+    )
+  } else {
+    paste0(
+      '(allow file-read* (regex #"^/private/var/folders/"))\n',
+      '(allow file-read* (regex #"^/var/folders/"))'
+    )
+  }, '
 
 ;; Seatbelt profile itself (sandbox-exec needs to read it)
 (allow file-read* (subpath "', tmp_dir, '"))
@@ -89,8 +122,18 @@ generate_seatbelt_profile <- function(socket_path, r_home,
 ;; Allow writes ONLY to the session-specific socket directory and R temp
 ;; directories.  Blocks writes to other sessions or other apps in /tmp.
 (allow file-write* (subpath "', tmp_dir, '"))
-(allow file-write* (regex #"^/private/var/folders/"))
-(allow file-write* (regex #"^/var/folders/"))
+', if (!is.null(user_var_folder)) {
+    paste0(
+      '(allow file-write* (subpath "', user_var_folder, '"))\n',
+      '(allow file-write* (subpath "',
+      sub("^/private", "", user_var_folder), '"))'
+    )
+  } else {
+    paste0(
+      '(allow file-write* (regex #"^/private/var/folders/"))\n',
+      '(allow file-write* (regex #"^/var/folders/"))'
+    )
+  }, '
 (allow file-write* (literal "/dev/null"))
 (allow file-write* (literal "/dev/tty"))
 (allow file-write* (literal "/dev/random"))

@@ -38,14 +38,20 @@ SecureSession <- R6::R6Class("SecureSession",
     #'   On macOS this uses `sandbox-exec` with a Seatbelt profile that
     #'   denies network access and restricts file writes to temp
     #'   directories.  On Linux this uses bubblewrap (`bwrap`) with full
-    #'   namespace isolation.  On Windows only environment variable
-    #'   isolation is applied (a warning is issued).  On other platforms
-    #'   the session runs without sandboxing.
+    #'   namespace isolation.  On Windows, `sandbox = TRUE` raises an
+    #'   error because OS-level isolation is not available; use
+    #'   `sandbox = FALSE` with explicit limits, or run inside a
+    #'   container.  On other platforms the session runs without
+    #'   sandboxing.
     #' @param limits An optional named list of resource limits to apply to the
     #'   child process via `ulimit`.  Supported names: `cpu` (seconds),
     #'   `memory` (bytes, virtual address space), `fsize` (bytes, max file
     #'   size), `nproc` (max processes), `nofile` (max open files),
-    #'   `stack` (bytes, stack size).  `NULL` (the default) means no limits.
+    #'   `stack` (bytes, stack size).  When `sandbox = TRUE` and `limits`
+    #'   is `NULL` (the default), sensible defaults are applied automatically
+    #'   (see [default_limits()]).  Pass `limits = list()` to explicitly
+    #'   disable resource limits.  When `sandbox = FALSE`, `NULL` means
+    #'   no limits.
     #' @param verbose Logical, whether to emit diagnostic messages via
     #'   `message()`.  Useful for debugging.  Users can suppress with
     #'   `suppressMessages()`.
@@ -60,6 +66,12 @@ SecureSession <- R6::R6Class("SecureSession",
       private$tool_fns <- validated$fns
       private$tool_arg_meta <- validated$arg_meta
       private$sandbox_enabled <- sandbox
+      # Apply default resource limits when sandboxing is enabled and
+      # no explicit limits were provided.  Users can pass limits = list()
+      # (empty list) to explicitly disable defaults.
+      if (sandbox && is.null(limits)) {
+        limits <- default_limits()
+      }
       private$limits <- limits
       private$verbose <- verbose
       private$session_id <- basename(tempfile("sess_"))
@@ -169,6 +181,25 @@ SecureSession <- R6::R6Class("SecureSession",
     session_id = NULL,
     audit = NULL,
 
+    # Build a sanitized environment for the child process.
+    # Uses an allowlist: only safe vars are inherited; all others are set
+    # to NA (which callr interprets as "remove from child").
+    build_child_env = function() {
+      safe_vars <- c(
+        "PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "LC_CTYPE",
+        "LC_MESSAGES", "LC_COLLATE", "LC_MONETARY", "LC_NUMERIC", "LC_TIME",
+        "SHELL", "TMPDIR", "TZ", "TERM",
+        "R_HOME", "R_LIBS", "R_LIBS_SITE", "R_LIBS_USER",
+        "R_PLATFORM", "R_ARCH"
+      )
+      parent_env <- Sys.getenv()
+      unsafe_names <- setdiff(names(parent_env), safe_vars)
+      clear_env <- setNames(rep(NA_character_, length(unsafe_names)), unsafe_names)
+      c(clear_env,
+        SECURER_SOCKET = private$socket_path,
+        SECURER_TOKEN = private$ipc_token)
+    },
+
     finalize = function() {
       self$close()
     },
@@ -208,10 +239,7 @@ SecureSession <- R6::R6Class("SecureSession",
       # Pipe stdout/stderr so output can be read incrementally during
       # the event loop (enables streaming output capture).
       session_opts <- callr::r_session_options(
-        env = c(
-          SECURER_SOCKET = private$socket_path,
-          SECURER_TOKEN = private$ipc_token
-        ),
+        env = private$build_child_env(),
         stdout = "|",
         stderr = "|"
       )

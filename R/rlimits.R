@@ -1,3 +1,21 @@
+#' Default resource limits for sandboxed sessions
+#'
+#' Returns sensible defaults applied automatically when `sandbox = TRUE`
+#' and no explicit `limits` are provided.  Users can override with
+#' `limits = list()` (empty list) to explicitly disable limits.
+#'
+#' @return A named list of resource limits.
+#' @keywords internal
+default_limits <- function() {
+  list(
+    cpu    = 60,                    # 60 seconds CPU time
+    memory = 512 * 1024 * 1024,    # 512 MB virtual memory
+    fsize  = 50 * 1024 * 1024,     # 50 MB max file size
+    nproc  = 50,                   # 50 child processes max
+    nofile = 256                   # 256 open file descriptors
+  )
+}
+
 #' Generate ulimit shell commands from a limits list
 #'
 #' Translates a user-facing limits list into shell `ulimit` commands that

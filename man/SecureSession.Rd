@@ -69,15 +69,21 @@ functions (legacy format for backward compatibility)}
 On macOS this uses \code{sandbox-exec} with a Seatbelt profile that
 denies network access and restricts file writes to temp
 directories.  On Linux this uses bubblewrap (\code{bwrap}) with full
-namespace isolation.  On Windows only environment variable
-isolation is applied (a warning is issued).  On other platforms
-the session runs without sandboxing.}
+namespace isolation.  On Windows, \code{sandbox = TRUE} raises an
+error because OS-level isolation is not available; use
+\code{sandbox = FALSE} with explicit limits, or run inside a
+container.  On other platforms the session runs without
+sandboxing.}
 
 \item{\code{limits}}{An optional named list of resource limits to apply to the
 child process via \code{ulimit}.  Supported names: \code{cpu} (seconds),
 \code{memory} (bytes, virtual address space), \code{fsize} (bytes, max file
 size), \code{nproc} (max processes), \code{nofile} (max open files),
-\code{stack} (bytes, stack size).  \code{NULL} (the default) means no limits.}
+\code{stack} (bytes, stack size).  When \code{sandbox = TRUE} and \code{limits}
+is \code{NULL} (the default), sensible defaults are applied automatically
+(see \code{\link[=default_limits]{default_limits()}}).  Pass \code{limits = list()} to explicitly
+disable resource limits.  When \code{sandbox = FALSE}, \code{NULL} means
+no limits.}
 
 \item{\code{verbose}}{Logical, whether to emit diagnostic messages via
 \code{message()}.  Useful for debugging.  Users can suppress with

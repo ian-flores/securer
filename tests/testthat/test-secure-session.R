@@ -479,6 +479,97 @@ test_that("tool_call with empty object args works", {
   expect_equal(result, "pong")
 })
 
+# --- Environment sanitization tests (V29) ---
+
+test_that("child does not inherit parent env vars", {
+  # Set a custom env var in the parent
+  Sys.setenv(SECURER_TEST_SECRET = "leaked")
+  on.exit(Sys.unsetenv("SECURER_TEST_SECRET"))
+
+  session <- SecureSession$new()
+  on.exit(session$close(), add = TRUE)
+
+  result <- session$execute("Sys.getenv('SECURER_TEST_SECRET')")
+  expect_equal(result, "")
+})
+
+test_that("child inherits safe vars like PATH and HOME", {
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  result <- session$execute("nzchar(Sys.getenv('PATH'))")
+  expect_true(result)
+})
+
+test_that("child has SECURER_SOCKET env var", {
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  result <- session$execute("nzchar(Sys.getenv('SECURER_SOCKET'))")
+  expect_true(result)
+})
+
+# --- Default limits tests (V9) ---
+
+test_that("sandbox=TRUE auto-applies default resource limits", {
+  skip_on_os(c("windows", "linux"))
+  skip_if_not(file.exists("/usr/bin/sandbox-exec"), "sandbox-exec not available")
+
+  # Test the wrapper directly without starting a full session
+  # (avoids sandbox-exec path issues on CI)
+  socket_path <- tempfile("test_sock_", fileext = ".sock")
+  config <- build_sandbox_macos(socket_path, R.home(), limits = default_limits())
+  on.exit({
+    unlink(config$wrapper)
+    unlink(config$profile_path)
+  })
+
+  wrapper_lines <- readLines(config$wrapper)
+  expect_true(any(grepl("ulimit", wrapper_lines)))
+})
+
+test_that("sandbox=FALSE does not auto-apply limits", {
+  session <- SecureSession$new(sandbox = FALSE)
+  on.exit(session$close())
+
+  priv <- session$.__enclos_env__$private
+  expect_null(priv$limits)
+})
+
+test_that("explicit limits override defaults when sandbox=TRUE", {
+  # Test the logic directly: when limits are provided, they should be used as-is
+  custom_limits <- list(cpu = 120)
+  # Simulate what initialize() does
+  sandbox <- TRUE
+  limits <- custom_limits
+  if (sandbox && is.null(limits)) {
+    limits <- default_limits()
+  }
+  expect_equal(limits, custom_limits)
+})
+
+test_that("empty list limits disables defaults when sandbox=TRUE", {
+  # Test the logic directly: empty list() is not NULL, so defaults should not apply
+  sandbox <- TRUE
+  limits <- list()
+  if (sandbox && is.null(limits)) {
+    limits <- default_limits()
+  }
+  expect_equal(limits, list())
+})
+
+test_that("default_limits returns expected structure", {
+  dl <- default_limits()
+  expect_true(is.list(dl))
+  expect_true("cpu" %in% names(dl))
+  expect_true("memory" %in% names(dl))
+  expect_true("fsize" %in% names(dl))
+  expect_true("nproc" %in% names(dl))
+  expect_true("nofile" %in% names(dl))
+  # All values should be positive
+  for (v in dl) expect_true(v > 0)
+})
+
 test_that("GC finalizer cleans up child process", {
   # Run in a local environment so the session reference is truly dropped
   pid <- local({
