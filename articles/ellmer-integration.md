@@ -301,19 +301,26 @@ For applications that handle multiple concurrent users, combine session
 pooling with ellmer:
 
 ``` r
+# For raw code execution across concurrent users, use the pool directly.
+# pool$execute() handles session acquisition and release internally.
 pool <- SecureSessionPool$new(size = 4, tools = tools, sandbox = TRUE)
 
-# Each user gets a session from the pool
-handle_user_request <- function(user_message) {
-  chat <- chat_openai()
-  # Acquire a session from the pool for this request
-  session <- pool$acquire()
-  on.exit(pool$release(session))
+handle_user_code <- function(code) {
+  pool$execute(code, timeout = 30)
+}
 
-  chat$register_tool(securer_as_ellmer_tool(session = session))
+# For ellmer integration with concurrent users, create a separate
+# SecureSession per request. Each session is cleaned up on GC.
+handle_user_chat <- function(user_message) {
+  chat <- chat_openai()
+  tool <- securer_as_ellmer_tool(tools = tools, sandbox = TRUE, timeout = 30)
+  chat$register_tool(tool)
   chat$chat(user_message)
 }
 ```
 
-The pool pre-warms sessions so users don’t wait for R child processes to
-start. Dead sessions are automatically restarted on acquire.
+The pool pre-warms sessions for low-latency raw code execution via
+`pool$execute()`. For ellmer chat integration,
+[`securer_as_ellmer_tool()`](https://ian-flores.github.io/securer/reference/securer_as_ellmer_tool.md)
+creates and manages its own session (cleaned up automatically when
+garbage collected).

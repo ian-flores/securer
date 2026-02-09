@@ -51,8 +51,10 @@ Create a new SecureSession
 
   Logical, whether to enable the OS-level sandbox. On macOS this uses
   `sandbox-exec` with a Seatbelt profile that denies network access and
-  restricts file writes to temp directories. On other platforms a
-  warning is issued and the session runs without sandboxing.
+  restricts file writes to temp directories. On Linux this uses
+  bubblewrap (`bwrap`) with full namespace isolation. On Windows only
+  environment variable isolation is applied (a warning is issued). On
+  other platforms the session runs without sandboxing.
 
 - `limits`:
 

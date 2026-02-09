@@ -421,20 +421,26 @@ tool use will see <code>execute_r_code</code> and can call it.</p>
 <p>For applications that handle multiple concurrent users, combine
 session pooling with ellmer:</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">pool</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSessionPool.html">SecureSessionPool</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>size <span class="op">=</span> <span class="fl">4</span>, tools <span class="op">=</span> <span class="va">tools</span>, sandbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="co"># For raw code execution across concurrent users, use the pool directly.</span></span>
+<span><span class="co"># pool$execute() handles session acquisition and release internally.</span></span>
+<span><span class="va">pool</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSessionPool.html">SecureSessionPool</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>size <span class="op">=</span> <span class="fl">4</span>, tools <span class="op">=</span> <span class="va">tools</span>, sandbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Each user gets a session from the pool</span></span>
-<span><span class="va">handle_user_request</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">user_message</span><span class="op">)</span> <span class="op">{</span></span>
+<span><span class="va">handle_user_code</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">code</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="va">pool</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="va">code</span>, timeout <span class="op">=</span> <span class="fl">30</span><span class="op">)</span></span>
+<span><span class="op">}</span></span>
+<span></span>
+<span><span class="co"># For ellmer integration with concurrent users, create a separate</span></span>
+<span><span class="co"># SecureSession per request. Each session is cleaned up on GC.</span></span>
+<span><span class="va">handle_user_chat</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">user_message</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span><span class="op">)</span></span>
-<span>  <span class="co"># Acquire a session from the pool for this request</span></span>
-<span>  <span class="va">session</span> <span class="op">&lt;-</span> <span class="va">pool</span><span class="op">$</span><span class="fu">acquire</span><span class="op">(</span><span class="op">)</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/on.exit.html" class="external-link">on.exit</a></span><span class="op">(</span><span class="va">pool</span><span class="op">$</span><span class="fu">release</span><span class="op">(</span><span class="va">session</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span>  <span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="fu"><a href="../reference/securer_as_ellmer_tool.html">securer_as_ellmer_tool</a></span><span class="op">(</span>session <span class="op">=</span> <span class="va">session</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="va">tool</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/securer_as_ellmer_tool.html">securer_as_ellmer_tool</a></span><span class="op">(</span>tools <span class="op">=</span> <span class="va">tools</span>, sandbox <span class="op">=</span> <span class="cn">TRUE</span>, timeout <span class="op">=</span> <span class="fl">30</span><span class="op">)</span></span>
+<span>  <span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="va">tool</span><span class="op">)</span></span>
 <span>  <span class="va">chat</span><span class="op">$</span><span class="fu">chat</span><span class="op">(</span><span class="va">user_message</span><span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
-<p>The pool pre-warms sessions so users don’t wait for R child processes
-to start. Dead sessions are automatically restarted on acquire.</p>
+<p>The pool pre-warms sessions for low-latency raw code execution via
+<code>pool$execute()</code>. For ellmer chat integration,
+<code><a href="../reference/securer_as_ellmer_tool.html">securer_as_ellmer_tool()</a></code> creates and manages its own
+session (cleaned up automatically when garbage collected).</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>
