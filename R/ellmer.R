@@ -67,6 +67,11 @@ securer_as_ellmer_tool <- function(session = NULL,
       sandbox = sandbox,
       limits = limits
     )
+    # Ensure the session is cleaned up when the enclosing environment
+    # (and thus the tool closure) is garbage collected.
+    reg.finalizer(session$.__enclos_env__, function(e) {
+      try(e$self$close(), silent = TRUE)
+    }, onexit = TRUE)
   }
 
   # Build the executor function.

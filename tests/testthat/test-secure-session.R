@@ -478,3 +478,20 @@ test_that("tool_call with empty object args works", {
   ')
   expect_equal(result, "pong")
 })
+
+test_that("GC finalizer cleans up child process", {
+  # Run in a local environment so the session reference is truly dropped
+  pid <- local({
+    s <- SecureSession$new()
+    p <- s$.__enclos_env__$private$session$get_pid()
+    expect_true(s$is_alive())
+    p
+  })
+
+  # Force garbage collection (may take multiple passes for R6 finalizer)
+  for (i in seq_len(10)) invisible(gc(full = TRUE))
+  Sys.sleep(1)
+
+  # tools::pskill(signal=0) returns TRUE if process exists, FALSE if not
+  expect_false(tools::pskill(pid, signal = 0))
+})

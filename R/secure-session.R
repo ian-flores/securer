@@ -37,8 +37,10 @@ SecureSession <- R6::R6Class("SecureSession",
     #' @param sandbox Logical, whether to enable the OS-level sandbox.
     #'   On macOS this uses `sandbox-exec` with a Seatbelt profile that
     #'   denies network access and restricts file writes to temp
-    #'   directories.  On other platforms a warning is issued and the
-    #'   session runs without sandboxing.
+    #'   directories.  On Linux this uses bubblewrap (`bwrap`) with full
+    #'   namespace isolation.  On Windows only environment variable
+    #'   isolation is applied (a warning is issued).  On other platforms
+    #'   the session runs without sandboxing.
     #' @param limits An optional named list of resource limits to apply to the
     #'   child process via `ulimit`.  Supported names: `cpu` (seconds),
     #'   `memory` (bytes, virtual address space), `fsize` (bytes, max file
@@ -166,6 +168,10 @@ SecureSession <- R6::R6Class("SecureSession",
     verbose = FALSE,
     session_id = NULL,
     audit = NULL,
+
+    finalize = function() {
+      self$close()
+    },
 
     audit_log = function(event, ...) {
       if (!is.null(private$audit)) private$audit$log(event, ...)
@@ -576,6 +582,21 @@ SecureSession <- R6::R6Class("SecureSession",
       if (!is.null(private$socket_dir) && dir.exists(private$socket_dir)) {
         unlink(private$socket_dir, recursive = TRUE)
         private$socket_dir <- NULL
+      }
+
+      # Clean up old sandbox temp files before restarting
+      if (!is.null(private$sandbox_config)) {
+        if (!is.null(private$sandbox_config$wrapper)) {
+          try(unlink(private$sandbox_config$wrapper), silent = TRUE)
+        }
+        if (!is.null(private$sandbox_config$profile_path)) {
+          try(unlink(private$sandbox_config$profile_path), silent = TRUE)
+        }
+        if (!is.null(private$sandbox_config$sandbox_tmp)) {
+          try(unlink(private$sandbox_config$sandbox_tmp, recursive = TRUE),
+              silent = TRUE)
+        }
+        private$sandbox_config <- NULL
       }
 
       # Restart the session so it's usable for future execute() calls

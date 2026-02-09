@@ -68,8 +68,10 @@ functions (legacy format for backward compatibility)}
 \item{\code{sandbox}}{Logical, whether to enable the OS-level sandbox.
 On macOS this uses \code{sandbox-exec} with a Seatbelt profile that
 denies network access and restricts file writes to temp
-directories.  On other platforms a warning is issued and the
-session runs without sandboxing.}
+directories.  On Linux this uses bubblewrap (\code{bwrap}) with full
+namespace isolation.  On Windows only environment variable
+isolation is applied (a warning is issued).  On other platforms
+the session runs without sandboxing.}
 
 \item{\code{limits}}{An optional named list of resource limits to apply to the
 child process via \code{ulimit}.  Supported names: \code{cpu} (seconds),
