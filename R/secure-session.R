@@ -129,6 +129,7 @@ SecureSession <- R6::R6Class("SecureSession",
         try(private$session$close(), silent = TRUE)
         private$session <- NULL
       }
+      private$child_pid <- NULL
       if (!is.null(private$ipc_conn)) {
         try(close(private$ipc_conn), silent = TRUE)
         private$ipc_conn <- NULL
@@ -179,6 +180,7 @@ SecureSession <- R6::R6Class("SecureSession",
     limits = NULL,
     verbose = FALSE,
     session_id = NULL,
+    child_pid = NULL,
     audit = NULL,
 
     # Build a sanitized environment for the child process.
@@ -201,7 +203,16 @@ SecureSession <- R6::R6Class("SecureSession",
     },
 
     finalize = function() {
-      self$close()
+      # During GC, R6 private fields (character strings, external
+      # pointers, nested R6 objects) may already be freed, so accessing
+      # them segfaults.  Use only the child PID (a plain integer, safe
+      # during GC) to kill the child process.  All other cleanup (temp
+      # files, connections) is skipped — temp files in /tmp are cleaned
+      # by the OS, and the connections are invalidated when the child
+      # process dies.
+      if (!is.null(private$child_pid)) {
+        try(tools::pskill(private$child_pid, tools::SIGKILL), silent = TRUE)
+      }
     },
 
     audit_log = function(event, ...) {
@@ -275,6 +286,9 @@ SecureSession <- R6::R6Class("SecureSession",
         options = session_opts,
         wait = TRUE
       )
+      # Store the child PID as a plain integer for the GC finalizer
+      # (R6 objects and external pointers are unsafe to access during GC).
+      private$child_pid <- private$session$get_pid()
 
       # Inject runtime into child
       runtime_code <- child_runtime_code()
