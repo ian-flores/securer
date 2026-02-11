@@ -1,33 +1,3 @@
-#' @title SecureSession
-#' @description R6 class for secure code execution with tool-call IPC.
-#'
-#' Wraps a `callr::r_session` with a bidirectional Unix domain socket protocol
-#' that allows code running in the child process to pause, call tools on the
-#' parent side, and resume with the result.
-#'
-#' @examples
-#' \dontrun{
-#' # Basic usage
-#' session <- SecureSession$new()
-#' session$execute("1 + 1")
-#' session$close()
-#'
-#' # With tools
-#' tools <- list(
-#'   securer_tool("add", "Add numbers",
-#'     fn = function(a, b) a + b,
-#'     args = list(a = "numeric", b = "numeric"))
-#' )
-#' session <- SecureSession$new(tools = tools)
-#' session$execute("add(2, 3)")
-#' session$close()
-#'
-#' # With macOS sandbox
-#' session <- SecureSession$new(sandbox = TRUE)
-#' session$execute("1 + 1")
-#' session$close()
-#' }
-#'
 # Module-level list that holds closed callr/processx objects to prevent
 # heap corruption.  Explicitly closing processx connections (via close() or
 # callr::r_session$close()) then letting GC finalize the same objects
@@ -45,6 +15,39 @@
   .securer_closed_sessions$refs <- c(.securer_closed_sessions$refs, list(obj))
 }
 
+#' @title SecureSession
+#' @description R6 class for secure code execution with tool-call IPC.
+#'
+#' Wraps a `callr::r_session` with a bidirectional Unix domain socket protocol
+#' that allows code running in the child process to pause, call tools on the
+#' parent side, and resume with the result.
+#'
+#' @examples
+#' \donttest{
+#' # Basic usage
+#' session <- SecureSession$new()
+#' session$execute("1 + 1")
+#' session$close()
+#'
+#' # With tools
+#' tools <- list(
+#'   securer_tool("add", "Add numbers",
+#'     fn = function(a, b) a + b,
+#'     args = list(a = "numeric", b = "numeric"))
+#' )
+#' session <- SecureSession$new(tools = tools)
+#' session$execute("add(2, 3)")
+#' session$close()
+#' }
+#' \dontrun{
+#' # With sandbox (requires platform-specific tools)
+#' session <- SecureSession$new(sandbox = TRUE)
+#' session$execute("1 + 1")
+#' session$close()
+#' }
+#'
+#' @return An R6 object of class \code{SecureSession}.
+#'
 #' @export
 SecureSession <- R6::R6Class("SecureSession",
   public = list(
@@ -55,11 +58,10 @@ SecureSession <- R6::R6Class("SecureSession",
     #'   On macOS this uses `sandbox-exec` with a Seatbelt profile that
     #'   denies network access and restricts file writes to temp
     #'   directories.  On Linux this uses bubblewrap (`bwrap`) with full
-    #'   namespace isolation.  On Windows, `sandbox = TRUE` raises an
-    #'   error because OS-level isolation is not available; use
-    #'   `sandbox = FALSE` with explicit limits, or run inside a
-    #'   container.  On other platforms the session runs without
-    #'   sandboxing.
+    #'   namespace isolation.  On Windows this provides environment
+    #'   isolation (clean HOME/TMPDIR, empty R_LIBS_USER) and resource
+    #'   limits (memory, CPU time, process count) via Job Objects.
+    #'   On other platforms the session runs without sandboxing.
     #' @param limits An optional named list of resource limits to apply to the
     #'   child process via `ulimit`.  Supported names: `cpu` (seconds),
     #'   `memory` (bytes, virtual address space), `fsize` (bytes, max file
@@ -261,8 +263,14 @@ SecureSession <- R6::R6Class("SecureSession",
       # permissions (0700) to prevent TOCTOU races and unauthorized
       # connections.  Unix domain sockets are limited to ~104 chars on
       # macOS, so we use /tmp directly (not tempdir() which can be
-      # deeply nested during R CMD check).
-      private$socket_dir <- tempfile("securer_", tmpdir = "/tmp")
+      # deeply nested during R CMD check).  On Windows, /tmp does not
+      # exist so we use TEMP/TMP or fall back to tempdir().
+      tmpdir_base <- if (.Platform$OS.type == "windows") {
+        Sys.getenv("TEMP", Sys.getenv("TMP", tempdir()))
+      } else {
+        "/tmp"
+      }
+      private$socket_dir <- tempfile("securer_", tmpdir = tmpdir_base)
       dir.create(private$socket_dir, mode = "0700")
       private$socket_path <- file.path(private$socket_dir, "ipc.sock")
 
@@ -322,6 +330,11 @@ SecureSession <- R6::R6Class("SecureSession",
       # Store the child PID as a plain integer for the GC finalizer
       # (R6 objects and external pointers are unsafe to access during GC).
       private$child_pid <- private$session$get_pid()
+
+      # Apply post-start limits (Windows Job Objects)
+      if (!is.null(private$sandbox_config$apply_limits)) {
+        private$sandbox_config$apply_limits(private$child_pid)
+      }
 
       # Register a standalone GC finalizer using a plain environment
       # that holds only the child PID (an integer, safe during GC).

@@ -127,3 +127,12 @@ build_limits_only_wrapper <- function(limits) {
     profile_path = NULL
   )
 }
+
+#' Windows-supported resource limit names
+#'
+#' Returns the limit names that can be enforced on Windows via Job Objects.
+#' @return A character vector of supported limit names.
+#' @keywords internal
+windows_supported_limits <- function() {
+  c("cpu", "memory", "nproc")
+}

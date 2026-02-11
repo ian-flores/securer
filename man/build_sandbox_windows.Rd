@@ -4,21 +4,39 @@
 \alias{build_sandbox_windows}
 \title{Build Windows sandbox configuration}
 \usage{
-build_sandbox_windows(socket_path, r_home)
+build_sandbox_windows(socket_path, r_home, limits = NULL)
 }
 \arguments{
 \item{socket_path}{Path to the UDS socket}
 
 \item{r_home}{Path to the R installation}
+
+\item{limits}{Optional named list of resource limits.  Supported on
+Windows via Job Objects: \code{cpu}, \code{memory}, \code{nproc}.  Unsupported (will
+warn): \code{fsize}, \code{nofile}, \code{stack}.}
 }
 \value{
-Never returns; always raises an error.
+A list with elements:
+\describe{
+\item{wrapper}{Always \code{NULL} on Windows (no wrapper script)}
+\item{profile_path}{Always \code{NULL} on Windows}
+\item{env}{A named character vector of sanitized environment variables}
+\item{sandbox_tmp}{Path to the private temp directory}
+\item{apply_limits}{A function taking a PID to apply Job Object limits,
+or \code{NULL} if no supported limits were requested}
+}
 }
 \description{
-True OS-level sandboxing is not available on Windows without admin
-privileges (would require Windows Job Objects / AppContainers).
-This function raises an error when called, directing users to either
-use \code{sandbox = FALSE} with explicit resource limits, or run inside
-a container for real isolation.
+Provides environment isolation and optional resource limits via Windows
+Job Objects.  Environment isolation creates a sanitized set of environment
+variables with clean HOME, TMPDIR, TMP, TEMP pointing to a private temp
+directory, and an empty R_LIBS_USER.
+}
+\details{
+When resource limits are provided (cpu, memory, nproc), a PowerShell
+script using C# P/Invoke is generated to create a Job Object with the
+specified constraints and assign the child process to it.  Limits that
+have no Job Object equivalent (fsize, nofile, stack) emit a warning and
+are skipped.
 }
 \keyword{internal}

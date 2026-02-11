@@ -20,7 +20,7 @@ build_sandbox_config <- function(socket_path, r_home = R.home(),
   switch(os,
     darwin  = build_sandbox_macos(socket_path, r_home, limits = limits),
     linux   = build_sandbox_linux(socket_path, r_home, limits = limits),
-    windows = build_sandbox_windows(socket_path, r_home),
+    windows = build_sandbox_windows(socket_path, r_home, limits = limits),
     build_sandbox_fallback(socket_path, r_home)
   )
 }

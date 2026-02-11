@@ -3,6 +3,9 @@
 \name{SecureSession}
 \alias{SecureSession}
 \title{SecureSession}
+\value{
+An R6 object of class \code{SecureSession}.
+}
 \description{
 R6 class for secure code execution with tool-call IPC.
 
@@ -11,7 +14,7 @@ that allows code running in the child process to pause, call tools on the
 parent side, and resume with the result.
 }
 \examples{
-\dontrun{
+\donttest{
 # Basic usage
 session <- SecureSession$new()
 session$execute("1 + 1")
@@ -26,8 +29,9 @@ tools <- list(
 session <- SecureSession$new(tools = tools)
 session$execute("add(2, 3)")
 session$close()
-
-# With macOS sandbox
+}
+\dontrun{
+# With sandbox (requires platform-specific tools)
 session <- SecureSession$new(sandbox = TRUE)
 session$execute("1 + 1")
 session$close()
@@ -69,11 +73,10 @@ functions (legacy format for backward compatibility)}
 On macOS this uses \code{sandbox-exec} with a Seatbelt profile that
 denies network access and restricts file writes to temp
 directories.  On Linux this uses bubblewrap (\code{bwrap}) with full
-namespace isolation.  On Windows, \code{sandbox = TRUE} raises an
-error because OS-level isolation is not available; use
-\code{sandbox = FALSE} with explicit limits, or run inside a
-container.  On other platforms the session runs without
-sandboxing.}
+namespace isolation.  On Windows this provides environment
+isolation (clean HOME/TMPDIR, empty R_LIBS_USER) and resource
+limits (memory, CPU time, process count) via Job Objects.
+On other platforms the session runs without sandboxing.}
 
 \item{\code{limits}}{An optional named list of resource limits to apply to the
 child process via \code{ulimit}.  Supported names: \code{cpu} (seconds),

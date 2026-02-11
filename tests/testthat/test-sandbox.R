@@ -562,26 +562,102 @@ test_that("bwrap sandbox cleans up wrapper on close", {
 
 # ── Windows sandbox unit tests ─────────────────────────────────────────
 
-test_that("build_sandbox_windows errors on sandbox=TRUE", {
-  # This test can run on any platform since it tests the function directly
-  expect_error(
-    build_sandbox_windows("/tmp/test.sock", R.home()),
-    "not available on Windows"
-  )
+test_that("build_sandbox_windows returns correct structure", {
+  config <- build_sandbox_windows("/tmp/test.sock", R.home())
+  expect_null(config$wrapper)
+  expect_null(config$profile_path)
+  expect_type(config$env, "character")
+  expect_true("HOME" %in% names(config$env))
+  expect_true("TMPDIR" %in% names(config$env))
+  expect_true("TMP" %in% names(config$env))
+  expect_true("TEMP" %in% names(config$env))
+  expect_equal(config$env[["R_LIBS_USER"]], "")
+  expect_true(dir.exists(config$sandbox_tmp))
+  # Clean up
+  unlink(config$sandbox_tmp, recursive = TRUE)
 })
 
-test_that("build_sandbox_windows error mentions Docker alternative", {
-  expect_error(
-    build_sandbox_windows("/tmp/test.sock", R.home()),
-    "Docker container"
-  )
+test_that("build_sandbox_windows returns NULL apply_limits when no limits given", {
+  config <- build_sandbox_windows("/tmp/test.sock", R.home())
+  expect_null(config$apply_limits)
+  unlink(config$sandbox_tmp, recursive = TRUE)
 })
 
-test_that("build_sandbox_windows error mentions sandbox = FALSE", {
-  expect_error(
-    build_sandbox_windows("/tmp/test.sock", R.home()),
-    "sandbox = FALSE"
+test_that("build_sandbox_windows returns NULL apply_limits for empty limits", {
+  config <- build_sandbox_windows("/tmp/test.sock", R.home(), limits = list())
+  expect_null(config$apply_limits)
+  unlink(config$sandbox_tmp, recursive = TRUE)
+})
+
+test_that("build_sandbox_windows returns function apply_limits when supported limits given", {
+  config <- build_sandbox_windows("/tmp/test.sock", R.home(),
+    limits = list(memory = 512 * 1024 * 1024))
+  expect_type(config$apply_limits, "closure")
+  unlink(config$sandbox_tmp, recursive = TRUE)
+})
+
+test_that("build_sandbox_windows returns function apply_limits for cpu and nproc", {
+  config <- build_sandbox_windows("/tmp/test.sock", R.home(),
+    limits = list(cpu = 60, nproc = 50))
+  expect_type(config$apply_limits, "closure")
+  unlink(config$sandbox_tmp, recursive = TRUE)
+})
+
+test_that("build_sandbox_windows warns for unsupported limits", {
+  expect_warning(
+    config <- build_sandbox_windows("/tmp/test.sock", R.home(),
+      limits = list(fsize = 1024)),
+    "fsize.*not supported on Windows"
   )
+  expect_null(config$apply_limits)
+  unlink(config$sandbox_tmp, recursive = TRUE)
+})
+
+test_that("build_sandbox_windows warns for multiple unsupported limits", {
+  expect_warning(
+    expect_warning(
+      expect_warning(
+        config <- build_sandbox_windows("/tmp/test.sock", R.home(),
+          limits = list(fsize = 1024, nofile = 256, stack = 1024)),
+        "not supported on Windows"
+      ),
+      "not supported on Windows"
+    ),
+    "not supported on Windows"
+  )
+  expect_null(config$apply_limits)
+  unlink(config$sandbox_tmp, recursive = TRUE)
+})
+
+test_that("build_sandbox_windows creates apply_limits for supported limits alongside unsupported", {
+  expect_warning(
+    config <- build_sandbox_windows("/tmp/test.sock", R.home(),
+      limits = list(memory = 512 * 1024 * 1024, fsize = 1024)),
+    "fsize.*not supported on Windows"
+  )
+  expect_type(config$apply_limits, "closure")
+  unlink(config$sandbox_tmp, recursive = TRUE)
+})
+
+test_that("windows_supported_limits returns expected names", {
+  supported <- windows_supported_limits()
+  expect_equal(supported, c("cpu", "memory", "nproc"))
+})
+
+test_that("build_sandbox_windows integration: session executes code with sandbox", {
+  skip_on_os(c("mac", "linux"))
+  session <- SecureSession$new(sandbox = TRUE)
+  on.exit(session$close())
+  result <- session$execute("1 + 1")
+  expect_equal(result, 2)
+})
+
+test_that("build_sandbox_windows integration: env isolation works", {
+  skip_on_os(c("mac", "linux"))
+  session <- SecureSession$new(sandbox = TRUE)
+  on.exit(session$close())
+  result <- session$execute("Sys.getenv('R_LIBS_USER')")
+  expect_equal(result, "")
 })
 
 # ── Resource limits (rlimits) unit tests ──────────────────────────────
