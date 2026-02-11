@@ -3,6 +3,9 @@
 \name{SecureSessionPool}
 \alias{SecureSessionPool}
 \title{SecureSessionPool}
+\value{
+An R6 object of class \code{SecureSessionPool}.
+}
 \description{
 R6 class for a pool of pre-warmed \link{SecureSession} instances.
 
@@ -11,8 +14,8 @@ can run immediately on an idle session without waiting for process startup.
 Sessions are returned to the pool after each execution completes (or errors).
 }
 \examples{
-\dontrun{
-pool <- SecureSessionPool$new(size = 4)
+\donttest{
+pool <- SecureSessionPool$new(size = 2, sandbox = FALSE)
 pool$execute("1 + 1")
 pool$execute("2 + 2")
 pool$close()

@@ -6,12 +6,14 @@
 #' Sessions are returned to the pool after each execution completes (or errors).
 #'
 #' @examples
-#' \dontrun{
-#' pool <- SecureSessionPool$new(size = 4)
+#' \donttest{
+#' pool <- SecureSessionPool$new(size = 2, sandbox = FALSE)
 #' pool$execute("1 + 1")
 #' pool$execute("2 + 2")
 #' pool$close()
 #' }
+#'
+#' @return An R6 object of class \code{SecureSessionPool}.
 #'
 #' @export
 SecureSessionPool <- R6::R6Class("SecureSessionPool",
