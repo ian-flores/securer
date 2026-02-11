@@ -71,9 +71,10 @@ The result of evaluating `code` in the secure session.
 ## Examples
 
 ``` r
-if (FALSE) { # \dontrun{
+# \donttest{
 # Simple computation
-execute_r("1 + 1")
+execute_r("1 + 1", sandbox = FALSE)
+#> [1] 2
 
 # With tools
 result <- execute_r(
@@ -82,10 +83,12 @@ result <- execute_r(
     securer_tool("add", "Add two numbers",
       fn = function(a, b) a + b,
       args = list(a = "numeric", b = "numeric"))
-  )
+  ),
+  sandbox = FALSE
 )
-
-# With resource limits
+# }
+if (FALSE) { # \dontrun{
+# With resource limits (Unix only)
 execute_r("1 + 1", limits = list(cpu = 10, memory = 256 * 1024 * 1024))
 } # }
 ```

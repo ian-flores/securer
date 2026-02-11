@@ -10,6 +10,7 @@
 <url><loc>https://ian-flores.github.io/securer/index.html</loc></url>
 <url><loc>https://ian-flores.github.io/securer/reference/SecureSession.html</loc></url>
 <url><loc>https://ian-flores.github.io/securer/reference/SecureSessionPool.html</loc></url>
+<url><loc>https://ian-flores.github.io/securer/reference/apply_windows_job_object.html</loc></url>
 <url><loc>https://ian-flores.github.io/securer/reference/build_limits_only_wrapper.html</loc></url>
 <url><loc>https://ian-flores.github.io/securer/reference/build_sandbox_config.html</loc></url>
 <url><loc>https://ian-flores.github.io/securer/reference/build_sandbox_fallback.html</loc></url>
@@ -37,5 +38,6 @@
 <url><loc>https://ian-flores.github.io/securer/reference/validate_code.html</loc></url>
 <url><loc>https://ian-flores.github.io/securer/reference/validate_limits.html</loc></url>
 <url><loc>https://ian-flores.github.io/securer/reference/validate_tools.html</loc></url>
+<url><loc>https://ian-flores.github.io/securer/reference/windows_supported_limits.html</loc></url>
 </urlset>
 

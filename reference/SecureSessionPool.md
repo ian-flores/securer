@@ -9,6 +9,10 @@ calls can run immediately on an idle session without waiting for process
 startup. Sessions are returned to the pool after each execution
 completes (or errors).
 
+## Value
+
+An R6 object of class `SecureSessionPool`.
+
 ## Methods
 
 ### Public methods
@@ -150,10 +154,12 @@ The objects of this class are cloneable with this method.
 ## Examples
 
 ``` r
-if (FALSE) { # \dontrun{
-pool <- SecureSessionPool$new(size = 4)
+# \donttest{
+pool <- SecureSessionPool$new(size = 2, sandbox = FALSE)
 pool$execute("1 + 1")
+#> [1] 2
 pool$execute("2 + 2")
+#> [1] 4
 pool$close()
-} # }
+# }
 ```

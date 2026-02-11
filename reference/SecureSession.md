@@ -8,6 +8,10 @@ with a bidirectional Unix domain socket protocol that allows code
 running in the child process to pause, call tools on the parent side,
 and resume with the result.
 
+## Value
+
+An R6 object of class `SecureSession`.
+
 ## Methods
 
 ### Public methods
@@ -52,10 +56,10 @@ Create a new SecureSession
   Logical, whether to enable the OS-level sandbox. On macOS this uses
   `sandbox-exec` with a Seatbelt profile that denies network access and
   restricts file writes to temp directories. On Linux this uses
-  bubblewrap (`bwrap`) with full namespace isolation. On Windows,
-  `sandbox = TRUE` raises an error because OS-level isolation is not
-  available; use `sandbox = FALSE` with explicit limits, or run inside a
-  container. On other platforms the session runs without sandboxing.
+  bubblewrap (`bwrap`) with full namespace isolation. On Windows this
+  provides environment isolation (clean HOME/TMPDIR, empty R_LIBS_USER)
+  and resource limits (memory, CPU time, process count) via Job Objects.
+  On other platforms the session runs without sandboxing.
 
 - `limits`:
 
@@ -177,10 +181,11 @@ The objects of this class are cloneable with this method.
 ## Examples
 
 ``` r
-if (FALSE) { # \dontrun{
+# \donttest{
 # Basic usage
 session <- SecureSession$new()
 session$execute("1 + 1")
+#> [1] 2
 session$close()
 
 # With tools
@@ -191,9 +196,11 @@ tools <- list(
 )
 session <- SecureSession$new(tools = tools)
 session$execute("add(2, 3)")
+#> [1] 5
 session$close()
-
-# With macOS sandbox
+# }
+if (FALSE) { # \dontrun{
+# With sandbox (requires platform-specific tools)
 session <- SecureSession$new(sandbox = TRUE)
 session$execute("1 + 1")
 session$close()

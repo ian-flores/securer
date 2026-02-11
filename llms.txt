@@ -1,8 +1,8 @@
 # securer
 
-> \[!WARNING\] **This package is fully experimental.** The API is
-> unstable and may change without notice. Use at your own risk — not
-> recommended for production workloads.
+> \[!NOTE\] **Beta release (0.1.0).** The core API is stabilizing but
+> may still change. Feedback and bug reports welcome at [GitHub
+> Issues](https://github.com/ian-flores/securer/issues).
 
 **Let LLMs write R code that calls your functions — safely.**
 

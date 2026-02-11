@@ -13,7 +13,7 @@ parent side, and resume with the result."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">securer</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -52,6 +52,10 @@ parent side, and resume with the result.</p>
 
 
     <div class="section level2">
+    <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
+    <p>An R6 object of class <code>SecureSession</code>.</p>
+    </div>
+    <div class="section level2">
     <h2 id="methods">Methods<a class="anchor" aria-label="anchor" href="#methods"></a></h2>
 
 <div class="section">
@@ -87,11 +91,10 @@ functions (legacy format for backward compatibility)</p></dd>
 On macOS this uses <code>sandbox-exec</code> with a Seatbelt profile that
 denies network access and restricts file writes to temp
 directories.  On Linux this uses bubblewrap (<code>bwrap</code>) with full
-namespace isolation.  On Windows, <code>sandbox = TRUE</code> raises an
-error because OS-level isolation is not available; use
-<code>sandbox = FALSE</code> with explicit limits, or run inside a
-container.  On other platforms the session runs without
-sandboxing.</p></dd>
+namespace isolation.  On Windows this provides environment
+isolation (clean HOME/TMPDIR, empty R_LIBS_USER) and resource
+limits (memory, CPU time, process count) via Job Objects.
+On other platforms the session runs without sandboxing.</p></dd>
 
 
 <dt><code>limits</code></dt>
@@ -216,10 +219,11 @@ containing all captured stdout/stderr as a character vector.</p>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># \dontrun{</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
 <span class="r-in"><span><span class="co"># Basic usage</span></span></span>
 <span class="r-in"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va">SecureSession</span><span class="op">$</span><span class="fu">new</span><span class="op">(</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">"1 + 1"</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 2</span>
 <span class="r-in"><span><span class="va">session</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># With tools</span></span></span>
@@ -230,9 +234,11 @@ containing all captured stdout/stderr as a character vector.</p>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va">SecureSession</span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>tools <span class="op">=</span> <span class="va">tools</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">"add(2, 3)"</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 5</span>
 <span class="r-in"><span><span class="va">session</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># With macOS sandbox</span></span></span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
+<span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># \dontrun{</span></span></span>
+<span class="r-in"><span><span class="co"># With sandbox (requires platform-specific tools)</span></span></span>
 <span class="r-in"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va">SecureSession</span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>sandbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">"1 + 1"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">session</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span></span>
