@@ -6,3 +6,6 @@
 ^_pkgdown\.yml$
 ^docs$
 ^pkgdown$
+^\.gitignore$
+^codecov\.yml$
+^cran-comments\.md$

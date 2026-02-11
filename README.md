@@ -2,12 +2,14 @@
 
 <!-- badges: start -->
 [![R-CMD-check](https://github.com/ian-flores/securer/actions/workflows/check.yml/badge.svg)](https://github.com/ian-flores/securer/actions/workflows/check.yml)
+[![Codecov test coverage](https://codecov.io/gh/ian-flores/securer/graph/badge.svg)](https://codecov.io/gh/ian-flores/securer)
 [![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
+[![Version: 0.1.0](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/ian-flores/securer/releases)
 [![pkgdown](https://github.com/ian-flores/securer/actions/workflows/pkgdown.yml/badge.svg)](https://ian-flores.github.io/securer/)
 <!-- badges: end -->
 
-> [!WARNING]
-> **This package is fully experimental.** The API is unstable and may change without notice. Use at your own risk — not recommended for production workloads.
+> [!NOTE]
+> **Beta release (0.1.0).** The core API is stabilizing but may still change. Feedback and bug reports welcome at [GitHub Issues](https://github.com/ian-flores/securer/issues).
 
 **Let LLMs write R code that calls your functions — safely.**
 
