@@ -47,7 +47,7 @@ pak::pak("ian-flores/securer")
 | LLM code could make network requests       | Network access blocked via namespace isolation (Linux) or Seatbelt (macOS) |
 | LLM code needs to call your APIs/databases | Register tool functions that execute on the host side, outside the sandbox |
 | LLM code could run forever                 | Execution timeouts with automatic session recovery                         |
-| LLM code could consume all memory          | Resource limits (CPU, memory, file size, processes) via ulimit             |
+| LLM code could consume all memory          | Resource limits via ulimit (Linux/macOS) and Job Objects (Windows)         |
 | LLM code has syntax errors                 | Pre-validation catches parse errors before execution                       |
 
 ## How It Works
@@ -99,7 +99,8 @@ pool$close()
 
 ### Resource Limits
 
-Constrain CPU, memory, and file size regardless of sandbox mode:
+Constrain CPU, memory, file size, and more. Works with or without
+sandbox mode on all platforms:
 
 ``` r
 result <- execute_r("1 + 1",
@@ -162,20 +163,35 @@ session <- SecureSession$new(verbose = TRUE)
 
 ## Platform Support
 
-| Platform    | Sandbox                   | Network blocked           | Filesystem restricted     |
-|-------------|---------------------------|---------------------------|---------------------------|
-| **Linux**   | bubblewrap (`bwrap`)      | Yes (namespace isolation) | Yes (read-only mounts)    |
-| **macOS**   | Seatbelt (`sandbox-exec`) | Yes (IP denied)           | Yes (writes to /tmp only) |
-| **Windows** | Environment isolation     | No                        | No                        |
+| Platform    | Sandbox                     | Network blocked | Filesystem restricted | Resource limits                  |
+|-------------|-----------------------------|-----------------|-----------------------|----------------------------------|
+| **Linux**   | bubblewrap (`bwrap`)        | Yes             | Yes                   | Yes (ulimit)                     |
+| **macOS**   | Seatbelt (`sandbox-exec`)   | Yes             | Yes                   | Yes (ulimit)                     |
+| **Windows** | Job Objects + env isolation | No              | No                    | Yes (memory, CPU, process count) |
 
-Linux and macOS provide full OS-level sandboxing. Windows provides
-environment variable isolation only (clean HOME, empty R_LIBS_USER). All
-platforms support resource limits and tool call IPC.
+Linux and macOS provide full OS-level sandboxing including network and
+filesystem restrictions. Windows provides environment isolation and
+resource limits via Job Objects (memory, CPU time, active process
+count). All platforms support tool call IPC, execution timeouts, and
+code pre-validation.
+
+## Security
+
+securer implements defense-in-depth with multiple layers: OS-level
+sandboxing, authenticated IPC, resource limits, environment
+sanitization, and input validation. For a detailed threat model and
+security architecture, see
+[`vignette("security-model", package = "securer")`](https://ian-flores.github.io/securer/articles/security-model.md).
+
+To report security vulnerabilities, please email the maintainer directly
+rather than filing a public issue.
 
 ## Documentation
 
 - [`vignette("getting-started", package = "securer")`](https://ian-flores.github.io/securer/articles/getting-started.md)
   — full walkthrough
+- [`vignette("security-model", package = "securer")`](https://ian-flores.github.io/securer/articles/security-model.md)
+  — security architecture and threat model
 - [pkgdown site](https://ian-flores.github.io/securer/) — API reference
 
 ## License
@@ -274,3 +290,5 @@ Low-level IPC and child runtime
   ellmer](https://ian-flores.github.io/securer/articles/ellmer-integration.md):
 - [Getting Started with
   securer](https://ian-flores.github.io/securer/articles/getting-started.md):
+- [Security
+  Model](https://ian-flores.github.io/securer/articles/security-model.md):
