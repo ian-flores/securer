@@ -103,7 +103,7 @@ apply_windows_job_object <- function(pid, limits) {
     cpu_100ns <- as.numeric(limits$cpu) * 10000000
     limit_assignments <- c(
       limit_assignments,
-      sprintf("extInfo.BasicLimitInformation_PerProcessUserTimeLimit = %s;",
+      sprintf("extInfo.BasicLimitInformation.PerProcessUserTimeLimit = %s;",
               format(cpu_100ns, scientific = FALSE))
     )
   }
@@ -113,7 +113,7 @@ apply_windows_job_object <- function(pid, limits) {
     # JOB_OBJECT_LIMIT_ACTIVE_PROCESS
     limit_assignments <- c(
       limit_assignments,
-      sprintf("extInfo.BasicLimitInformation_ActiveProcessLimit = %d;",
+      sprintf("extInfo.BasicLimitInformation.ActiveProcessLimit = %d;",
               as.integer(limits$nproc))
     )
   }
@@ -143,20 +143,32 @@ public class JobObjectHelper {
     public static extern bool CloseHandle(IntPtr hObject);
 
     [StructLayout(LayoutKind.Sequential)]
+    public struct JOBOBJECT_BASIC_LIMIT_INFORMATION {
+        public long PerProcessUserTimeLimit;
+        public long PerJobUserTimeLimit;
+        public uint LimitFlags;
+        public UIntPtr MinimumWorkingSetSize;
+        public UIntPtr MaximumWorkingSetSize;
+        public uint ActiveProcessLimit;
+        public UIntPtr Affinity;
+        public uint PriorityClass;
+        public uint SchedulingClass;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct IO_COUNTERS {
+        public ulong ReadOperationCount;
+        public ulong WriteOperationCount;
+        public ulong OtherOperationCount;
+        public ulong ReadTransferCount;
+        public ulong WriteTransferCount;
+        public ulong OtherTransferCount;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
     public struct JOBOBJECT_EXTENDED_LIMIT_INFORMATION {
-        public long BasicLimitInformation_PerProcessUserTimeLimit;
-        public long BasicLimitInformation_PerJobUserTimeLimit;
-        public uint BasicLimitInformation_LimitFlags;
-        public UIntPtr BasicLimitInformation_MinimumWorkingSetSize;
-        public UIntPtr BasicLimitInformation_MaximumWorkingSetSize;
-        public uint BasicLimitInformation_ActiveProcessLimit;
-        public UIntPtr BasicLimitInformation_Affinity;
-        public uint BasicLimitInformation_PriorityClass;
-        public uint BasicLimitInformation_SchedulingClass;
-        public ulong IoReadBytesLimit;
-        public ulong IoWriteBytesLimit;
-        public ulong IoReadOperationsLimit;
-        public ulong IoWriteOperationsLimit;
+        public JOBOBJECT_BASIC_LIMIT_INFORMATION BasicLimitInformation;
+        public IO_COUNTERS IoInfo;
         public UIntPtr ProcessMemoryLimit;
         public UIntPtr JobMemoryLimit;
         public UIntPtr PeakProcessMemoryUsed;
@@ -168,7 +180,7 @@ public class JobObjectHelper {
         if (hJob == IntPtr.Zero) return 1;
 
         var extInfo = new JOBOBJECT_EXTENDED_LIMIT_INFORMATION();
-        extInfo.BasicLimitInformation_LimitFlags = %s;
+        extInfo.BasicLimitInformation.LimitFlags = %s;
                 %s
 
         int size = Marshal.SizeOf(typeof(JOBOBJECT_EXTENDED_LIMIT_INFORMATION));

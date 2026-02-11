@@ -99,14 +99,21 @@ test_that("socket lives in a private directory with 0700 permissions", {
   expect_true(dir.exists(socket_dir))
 
   # Socket path is inside the private directory
-  expect_equal(dirname(socket_path), socket_dir)
+  # Use normalizePath to handle Windows backslash vs forward slash
+  expect_equal(
+    normalizePath(dirname(socket_path), mustWork = FALSE),
+    normalizePath(socket_dir, mustWork = FALSE)
+  )
   expect_equal(basename(socket_path), "ipc.sock")
 
   # Directory permissions are 0700 (owner only)
-  info <- file.info(socket_dir)
-  mode <- as.integer(info$mode)
-  # 0700 in octal = 448 in decimal
-  expect_equal(bitwAnd(mode, 511L), 448L)
+  # Windows does not support Unix file permissions; skip the check there
+  if (.Platform$OS.type != "windows") {
+    info <- file.info(socket_dir)
+    mode <- as.integer(info$mode)
+    # 0700 in octal = 448 in decimal
+    expect_equal(bitwAnd(mode, 511L), 448L)
+  }
 })
 
 test_that("socket directory is cleaned up on close", {
