@@ -131,16 +131,18 @@ generate_tool_wrappers <- function(tools) {
       validation_code <- generate_type_checks(tool$name, tool$args)
     }
     if (nzchar(validation_code)) {
-      sprintf(
+      fn_code <- sprintf(
         '%s <- function(%s) {\n%s\n  .securer_call_tool("%s"%s)\n}',
         tool$name, formals_str, validation_code, tool$name, call_args
       )
     } else {
-      sprintf(
+      fn_code <- sprintf(
         '%s <- function(%s) .securer_call_tool("%s"%s)',
         tool$name, formals_str, tool$name, call_args
       )
     }
+    # Lock the binding so child code cannot overwrite the tool wrapper
+    paste0(fn_code, "\n", sprintf('lockBinding("%s", globalenv())', tool$name))
   }, character(1))
 
   paste(code_parts, collapse = "\n")

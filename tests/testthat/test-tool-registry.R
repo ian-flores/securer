@@ -308,6 +308,32 @@ test_that("Type checking validates multiple args independently", {
   )
 })
 
+test_that("Tool wrapper functions are locked in child", {
+  add_fn <- function(a, b) a + b
+  session <- SecureSession$new(tools = list(
+    securer_tool("add", "Add two numbers", add_fn,
+                 args = list(a = "numeric", b = "numeric"))
+  ))
+  on.exit(session$close())
+
+  expect_error(
+    session$execute("add <- function(...) 'hijacked'"),
+    "cannot change value of locked binding"
+  )
+})
+
+test_that("generate_tool_wrappers() includes lockBinding calls", {
+  tools <- list(
+    securer_tool(
+      "get_weather", "Get weather",
+      function(city) list(temp = 72),
+      args = list(city = "character")
+    )
+  )
+  code <- generate_tool_wrappers(tools)
+  expect_true(grepl('lockBinding("get_weather", globalenv())', code, fixed = TRUE))
+})
+
 test_that("Type checking skips unannotated args end-to-end", {
   tools <- list(
     securer_tool(
