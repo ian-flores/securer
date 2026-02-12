@@ -2,6 +2,7 @@
 
 export(SecureSession)
 export(SecureSessionPool)
+export(default_limits)
 export(execute_r)
 export(securer_as_ellmer_tool)
 export(securer_tool)

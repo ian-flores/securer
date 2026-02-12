@@ -10,8 +10,31 @@ default_limits()
 A named list of resource limits.
 }
 \description{
-Returns sensible defaults applied automatically when \code{sandbox = TRUE}
-and no explicit \code{limits} are provided.  Users can override with
-\code{limits = list()} (empty list) to explicitly disable limits.
+Returns the default resource limits that are applied automatically when
+\code{sandbox = TRUE} and no explicit \code{limits} are provided to
+\link{SecureSession} or \code{\link[=execute_r]{execute_r()}}.  Useful for inspecting the defaults
+and creating custom limits based on them.
 }
-\keyword{internal}
+\details{
+The returned list contains:
+\describe{
+\item{cpu}{CPU time limit in seconds (default: 60).}
+\item{memory}{Virtual memory limit in bytes (default: 512 MB).}
+\item{fsize}{Maximum file size in bytes (default: 50 MB).}
+\item{nproc}{Maximum number of child processes (default: 50).}
+\item{nofile}{Maximum number of open file descriptors (default: 256).}
+}
+
+You can pass a modified copy to \code{SecureSession$new(limits = ...)} or
+\code{execute_r(limits = ...)}.  Pass \code{limits = list()} to explicitly
+disable all resource limits.
+}
+\examples{
+# Inspect defaults
+default_limits()
+
+# Double the memory limit
+my_limits <- default_limits()
+my_limits$memory <- 1024 * 1024 * 1024  # 1 GB
+
+}
