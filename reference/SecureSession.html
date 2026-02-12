@@ -66,6 +66,10 @@ parent side, and resume with the result.</p>
 <li><p><a href="#method-SecureSession-execute"><code>SecureSession$execute()</code></a></p></li>
 <li><p><a href="#method-SecureSession-close"><code>SecureSession$close()</code></a></p></li>
 <li><p><a href="#method-SecureSession-is_alive"><code>SecureSession$is_alive()</code></a></p></li>
+<li><p><a href="#method-SecureSession-format"><code>SecureSession$format()</code></a></p></li>
+<li><p><a href="#method-SecureSession-print"><code>SecureSession$print()</code></a></p></li>
+<li><p><a href="#method-SecureSession-tools"><code>SecureSession$tools()</code></a></p></li>
+<li><p><a href="#method-SecureSession-restart"><code>SecureSession$restart()</code></a></p></li>
 <li><p><a href="#method-SecureSession-clone"><code>SecureSession$clone()</code></a></p></li>
 </ul></div><p></p><hr><a id="method-SecureSession-new"></a><div class="section">
 <h3 id="method-new-">Method <code>new()</code><a class="anchor" aria-label="anchor" href="#method-new-"></a></h3>
@@ -76,6 +80,7 @@ parent side, and resume with the result.</p>
 <span>  sandbox <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  limits <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  verbose <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  sandbox_strict <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  audit_log <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
@@ -114,6 +119,15 @@ no limits.</p></dd>
 <dd><p>Logical, whether to emit diagnostic messages via
 <code><a href="https://rdrr.io/r/base/message.html" class="external-link">message()</a></code>.  Useful for debugging.  Users can suppress with
 <code><a href="https://rdrr.io/r/base/message.html" class="external-link">suppressMessages()</a></code>.</p></dd>
+
+
+<dt><code>sandbox_strict</code></dt>
+<dd><p>Logical, whether to error if sandbox tools are
+not available on the current platform (default <code>FALSE</code>).  When
+<code>TRUE</code> and <code>sandbox = TRUE</code>, the session will stop with an
+informative error if the OS-level sandbox cannot be set up.
+When <code>FALSE</code> (default), the existing behavior is preserved:
+a warning is emitted and the session continues without sandboxing.</p></dd>
 
 
 <dt><code>audit_log</code></dt>
@@ -198,15 +212,84 @@ containing all captured stdout/stderr as a character vector.</p>
 <p>Logical</p>
 </div>
 
-</div><p></p><hr><a id="method-SecureSession-clone"></a><div class="section">
-<h3 id="method-clone-">Method <code>clone()</code><a class="anchor" aria-label="anchor" href="#method-clone-"></a></h3>
-<p>The objects of this class are cloneable with this method.</p><div class="section">
+</div><p></p><hr><a id="method-SecureSession-format"></a><div class="section">
+<h3 id="method-format-">Method <code><a href="https://rdrr.io/r/base/format.html" class="external-link">format()</a></code><a class="anchor" aria-label="anchor" href="#method-format-"></a></h3>
+<p>Format method for display</p><div class="section">
 <h4 id="usage-4">Usage<a class="anchor" aria-label="anchor" href="#usage-4"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">SecureSession</span><span class="op">$</span><span class="fu">clone</span><span class="op">(</span>deep <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">SecureSession</span><span class="op">$</span><span class="fu">format</span><span class="op">(</span><span class="va">...</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
 <div class="section">
 <h4 id="arguments-2">Arguments<a class="anchor" aria-label="anchor" href="#arguments-2"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>...</code></dt>
+<dd><p>Ignored.</p></dd>
+
+
+</dl><p></p></div>
+</div>
+<div class="section">
+<h4 id="returns-3">Returns<a class="anchor" aria-label="anchor" href="#returns-3"></a></h4>
+<p>A character string describing the session.</p>
+</div>
+
+</div><p></p><hr><a id="method-SecureSession-print"></a><div class="section">
+<h3 id="method-print-">Method <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code><a class="anchor" aria-label="anchor" href="#method-print-"></a></h3>
+<p>Print method</p><div class="section">
+<h4 id="usage-5">Usage<a class="anchor" aria-label="anchor" href="#usage-5"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">SecureSession</span><span class="op">$</span><span class="fu">print</span><span class="op">(</span><span class="va">...</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div>
+
+<div class="section">
+<h4 id="arguments-3">Arguments<a class="anchor" aria-label="anchor" href="#arguments-3"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>...</code></dt>
+<dd><p>Ignored.</p></dd>
+
+
+</dl><p></p></div>
+</div>
+<div class="section">
+<h4 id="returns-4">Returns<a class="anchor" aria-label="anchor" href="#returns-4"></a></h4>
+<p>Invisible self.</p>
+</div>
+
+</div><p></p><hr><a id="method-SecureSession-tools"></a><div class="section">
+<h3 id="method-tools-">Method <code>tools()</code><a class="anchor" aria-label="anchor" href="#method-tools-"></a></h3>
+<p>List registered tools and their argument specs</p><div class="section">
+<h4 id="usage-6">Usage<a class="anchor" aria-label="anchor" href="#usage-6"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">SecureSession</span><span class="op">$</span><span class="fu">tools</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div>
+
+<div class="section">
+<h4 id="returns-5">Returns<a class="anchor" aria-label="anchor" href="#returns-5"></a></h4>
+<p>A named list of tool information. Each element contains
+<code>name</code> and <code>args</code> fields. Returns an empty list if no tools are
+registered.</p>
+</div>
+
+</div><p></p><hr><a id="method-SecureSession-restart"></a><div class="section">
+<h3 id="method-restart-">Method <code>restart()</code><a class="anchor" aria-label="anchor" href="#method-restart-"></a></h3>
+<p>Restart the child R process</p>
+<p>Kills the current child process, cleans up the socket, and starts
+a fresh child with the runtime and tool wrappers re-injected.
+The session remains usable for subsequent <code>$execute()</code> calls.</p><div class="section">
+<h4 id="usage-7">Usage<a class="anchor" aria-label="anchor" href="#usage-7"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">SecureSession</span><span class="op">$</span><span class="fu">restart</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div>
+
+<div class="section">
+<h4 id="returns-6">Returns<a class="anchor" aria-label="anchor" href="#returns-6"></a></h4>
+<p>Invisible self.</p>
+</div>
+
+</div><p></p><hr><a id="method-SecureSession-clone"></a><div class="section">
+<h3 id="method-clone-">Method <code>clone()</code><a class="anchor" aria-label="anchor" href="#method-clone-"></a></h3>
+<p>The objects of this class are cloneable with this method.</p><div class="section">
+<h4 id="usage-8">Usage<a class="anchor" aria-label="anchor" href="#usage-8"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">SecureSession</span><span class="op">$</span><span class="fu">clone</span><span class="op">(</span>deep <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div>
+
+<div class="section">
+<h4 id="arguments-4">Arguments<a class="anchor" aria-label="anchor" href="#arguments-4"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>deep</code></dt>
 <dd><p>Whether to make a deep clone.</p></dd>
 

@@ -25,6 +25,10 @@ An R6 object of class `SecureSessionPool`.
 
 - [`SecureSessionPool$available()`](#method-SecureSessionPool-available)
 
+- [`SecureSessionPool$format()`](#method-SecureSessionPool-format)
+
+- [`SecureSessionPool$print()`](#method-SecureSessionPool-print)
+
 - [`SecureSessionPool$close()`](#method-SecureSessionPool-close)
 
 - [`SecureSessionPool$clone()`](#method-SecureSessionPool-clone)
@@ -120,6 +124,46 @@ Number of idle (non-busy) sessions
 #### Returns
 
 Integer
+
+------------------------------------------------------------------------
+
+### Method [`format()`](https://rdrr.io/r/base/format.html)
+
+Format method for display
+
+#### Usage
+
+    SecureSessionPool$format(...)
+
+#### Arguments
+
+- `...`:
+
+  Ignored.
+
+#### Returns
+
+A character string describing the pool.
+
+------------------------------------------------------------------------
+
+### Method [`print()`](https://rdrr.io/r/base/print.html)
+
+Print method
+
+#### Usage
+
+    SecureSessionPool$print(...)
+
+#### Arguments
+
+- `...`:
+
+  Ignored.
+
+#### Returns
+
+Invisible self.
 
 ------------------------------------------------------------------------
 

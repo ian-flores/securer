@@ -55,6 +55,7 @@ returns the result. The session is automatically closed when done.</p>
 <span>  limits <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  verbose <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  validate <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  sandbox_strict <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  audit_log <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -95,6 +96,11 @@ timeout (default 30).</p></dd>
 <dt id="arg-validate">validate<a class="anchor" aria-label="anchor" href="#arg-validate"></a></dt>
 <dd><p>Logical, whether to pre-validate the code for syntax
 errors before sending it to the child process (default <code>TRUE</code>).</p></dd>
+
+
+<dt id="arg-sandbox-strict">sandbox_strict<a class="anchor" aria-label="anchor" href="#arg-sandbox-strict"></a></dt>
+<dd><p>Logical, whether to error if sandbox tools are
+not available (default <code>FALSE</code>).  See <a href="SecureSession.html">SecureSession</a> for details.</p></dd>
 
 
 <dt id="arg-audit-log">audit_log<a class="anchor" aria-label="anchor" href="#arg-audit-log"></a></dt>

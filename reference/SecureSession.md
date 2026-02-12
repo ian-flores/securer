@@ -24,6 +24,14 @@ An R6 object of class `SecureSession`.
 
 - [`SecureSession$is_alive()`](#method-SecureSession-is_alive)
 
+- [`SecureSession$format()`](#method-SecureSession-format)
+
+- [`SecureSession$print()`](#method-SecureSession-print)
+
+- [`SecureSession$tools()`](#method-SecureSession-tools)
+
+- [`SecureSession$restart()`](#method-SecureSession-restart)
+
 - [`SecureSession$clone()`](#method-SecureSession-clone)
 
 ------------------------------------------------------------------------
@@ -39,6 +47,7 @@ Create a new SecureSession
       sandbox = FALSE,
       limits = NULL,
       verbose = FALSE,
+      sandbox_strict = FALSE,
       audit_log = NULL
     )
 
@@ -79,6 +88,15 @@ Create a new SecureSession
   [`message()`](https://rdrr.io/r/base/message.html). Useful for
   debugging. Users can suppress with
   [`suppressMessages()`](https://rdrr.io/r/base/message.html).
+
+- `sandbox_strict`:
+
+  Logical, whether to error if sandbox tools are not available on the
+  current platform (default `FALSE`). When `TRUE` and `sandbox = TRUE`,
+  the session will stop with an informative error if the OS-level
+  sandbox cannot be set up. When `FALSE` (default), the existing
+  behavior is preserved: a warning is emitted and the session continues
+  without sandboxing.
 
 - `audit_log`:
 
@@ -161,6 +179,79 @@ Check if session is alive
 #### Returns
 
 Logical
+
+------------------------------------------------------------------------
+
+### Method [`format()`](https://rdrr.io/r/base/format.html)
+
+Format method for display
+
+#### Usage
+
+    SecureSession$format(...)
+
+#### Arguments
+
+- `...`:
+
+  Ignored.
+
+#### Returns
+
+A character string describing the session.
+
+------------------------------------------------------------------------
+
+### Method [`print()`](https://rdrr.io/r/base/print.html)
+
+Print method
+
+#### Usage
+
+    SecureSession$print(...)
+
+#### Arguments
+
+- `...`:
+
+  Ignored.
+
+#### Returns
+
+Invisible self.
+
+------------------------------------------------------------------------
+
+### Method `tools()`
+
+List registered tools and their argument specs
+
+#### Usage
+
+    SecureSession$tools()
+
+#### Returns
+
+A named list of tool information. Each element contains `name` and
+`args` fields. Returns an empty list if no tools are registered.
+
+------------------------------------------------------------------------
+
+### Method `restart()`
+
+Restart the child R process
+
+Kills the current child process, cleans up the socket, and starts a
+fresh child with the runtime and tool wrappers re-injected. The session
+remains usable for subsequent `$execute()` calls.
+
+#### Usage
+
+    SecureSession$restart()
+
+#### Returns
+
+Invisible self.
 
 ------------------------------------------------------------------------
 

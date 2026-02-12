@@ -16,6 +16,7 @@ execute_r(
   limits = NULL,
   verbose = FALSE,
   validate = TRUE,
+  sandbox_strict = FALSE,
   audit_log = NULL
 )
 ```
@@ -58,6 +59,13 @@ execute_r(
 
   Logical, whether to pre-validate the code for syntax errors before
   sending it to the child process (default `TRUE`).
+
+- sandbox_strict:
+
+  Logical, whether to error if sandbox tools are not available (default
+  `FALSE`). See
+  [SecureSession](https://ian-flores.github.io/securer/reference/SecureSession.md)
+  for details.
 
 - audit_log:
 

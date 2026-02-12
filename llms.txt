@@ -252,6 +252,8 @@ OS-level sandboxing backends
 
 Process resource restrictions
 
+- [`default_limits()`](https://ian-flores.github.io/securer/reference/default_limits.md)
+  : Default resource limits for sandboxed sessions
 - [`validate_limits()`](https://ian-flores.github.io/securer/reference/validate_limits.md)
   : Validate a limits list
 - [`generate_ulimit_commands()`](https://ian-flores.github.io/securer/reference/generate_ulimit_commands.md)
