@@ -339,17 +339,26 @@ SecureSession <- R6::R6Class("SecureSession",
     # Uses an allowlist: only safe vars are inherited; all others are set
     # to NA (which callr interprets as "remove from child").
     build_child_env = function() {
+      # Security note: R_LIBS and R_LIBS_USER are intentionally excluded
+      # from the allowlist. These variables can point to attacker-controlled
+      # directories, allowing malicious packages with .onLoad hooks to
+      # execute arbitrary code in the child process, bypassing sandbox
+      # restrictions. The child inherits only R_HOME and R_LIBS_SITE
+      # (system-level library paths controlled by the R installation).
+      # R_LIBS_USER is explicitly set to "" to prevent user-level library
+      # injection on all platforms.
       safe_vars <- c(
         "PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "LC_CTYPE",
         "LC_MESSAGES", "LC_COLLATE", "LC_MONETARY", "LC_NUMERIC", "LC_TIME",
         "SHELL", "TMPDIR", "TZ", "TERM",
-        "R_HOME", "R_LIBS", "R_LIBS_SITE", "R_LIBS_USER",
+        "R_HOME", "R_LIBS_SITE",
         "R_PLATFORM", "R_ARCH"
       )
       parent_env <- Sys.getenv()
       unsafe_names <- setdiff(names(parent_env), safe_vars)
       clear_env <- setNames(rep(NA_character_, length(unsafe_names)), unsafe_names)
       c(clear_env,
+        R_LIBS_USER = "",
         SECURER_SOCKET = private$socket_path,
         SECURER_TOKEN = private$ipc_token)
     },
@@ -540,6 +549,12 @@ SecureSession <- R6::R6Class("SecureSession",
       private$audit_log("execute_start", code = code)
       output_lines <- character()
       tool_call_count <- 0L
+      total_messages <- 0L
+      max_messages <- if (!is.null(max_tool_calls)) {
+        max_tool_calls * 10L
+      } else {
+        1000L
+      }
 
       # Helper: drain any available stdout/stderr from the child process
       drain_output <- function() {
@@ -602,6 +617,18 @@ SecureSession <- R6::R6Class("SecureSession",
 
             request <- jsonlite::fromJSON(line, simplifyVector = FALSE)
 
+            # --- Total message rate limiting (I4 fix) ---
+            total_messages <- total_messages + 1L
+            if (total_messages > max_messages) {
+              stop(
+                sprintf(
+                  "Maximum IPC messages (%d) exceeded; possible flood attack",
+                  max_messages
+                ),
+                call. = FALSE
+              )
+            }
+
             # --- JSON schema validation (Finding 10) ---
             if (!is.list(request)) {
               stop("Malformed IPC message: expected a JSON object",
@@ -653,10 +680,17 @@ SecureSession <- R6::R6Class("SecureSession",
 
               # If we have arg metadata for this tool, validate arg names
               expected_args <- private$tool_arg_meta[[tool_name]]
-              if (!is.null(expected_args) && length(expected_args) > 0 &&
+              if (!is.null(expected_args) &&
                   !is.null(tool_args) && length(tool_args) > 0) {
+                # When expected_args is empty (tool defined with args=list()),
+                # ALL provided arguments are unexpected (T4 fix).
+                # When expected_args is non-empty, only check for extras.
                 actual_names <- names(tool_args)
-                unexpected <- setdiff(actual_names, expected_args)
+                unexpected <- if (length(expected_args) == 0) {
+                  actual_names
+                } else {
+                  setdiff(actual_names, expected_args)
+                }
                 if (length(unexpected) > 0) {
                   # Send error back to child rather than crashing
                   response <- list(
@@ -738,6 +772,15 @@ SecureSession <- R6::R6Class("SecureSession",
               processx::conn_write(
                 private$ipc_conn,
                 paste0(response_json, "\n")
+              )
+            } else {
+              # --- Unknown message type warning (I4 fix) ---
+              warning(
+                sprintf(
+                  "Unknown IPC message type: %s",
+                  sQuote(request$type)
+                ),
+                call. = FALSE
               )
             }
           }

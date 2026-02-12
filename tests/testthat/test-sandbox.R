@@ -83,8 +83,8 @@ test_that("Seatbelt profile includes explicit read paths for R", {
   expect_true(grepl(r_home, profile, fixed = TRUE))
   # Must allow reading /usr (system libs, frameworks)
   expect_true(grepl("file-read.*subpath.*/usr", profile))
-  # Must allow reading /dev (devices R needs)
-  expect_true(grepl("file-read.*subpath.*/dev", profile))
+  # Must allow reading /dev device nodes R needs
+  expect_true(grepl("file-read.*literal.*/dev/null", profile))
   # Must allow reading /private/var/folders (macOS temp/cache)
   expect_true(grepl("file-read.*private/var/folders", profile))
   # Must allow reading /tmp
@@ -298,6 +298,52 @@ test_that("Wrapper script is executable and references sandbox-exec", {
   info <- file.info(config$wrapper)
   # Mode has execute bit (at least for user)
   expect_true(as.integer(info$mode) >= 448)  # 0700 in octal
+})
+
+# ── Security hardening tests ──────────────────────────────────────────
+
+test_that("Seatbelt profile does not allow /bin/bash execution", {
+  skip_on_os(c("windows", "linux"))
+  profile <- generate_seatbelt_profile("/tmp/test.sock", R.home())
+  expect_false(grepl('/bin/bash', profile, fixed = TRUE))
+  # But /bin/sh should still be allowed
+  expect_true(grepl('/bin/sh', profile, fixed = TRUE))
+})
+
+test_that("Seatbelt profile narrows /opt/homebrew access", {
+  skip_on_os(c("windows", "linux"))
+  profile <- generate_seatbelt_profile("/tmp/test.sock", R.home())
+  # Should NOT have broad /opt/homebrew subpath
+  expect_false(grepl('(subpath "/opt/homebrew")', profile, fixed = TRUE))
+  # Should have specific subdirectories
+  expect_true(grepl('/opt/homebrew/lib', profile, fixed = TRUE))
+})
+
+test_that("Seatbelt profile restricts /dev to specific devices", {
+  skip_on_os(c("windows", "linux"))
+  profile <- generate_seatbelt_profile("/tmp/test.sock", R.home())
+  # Should NOT have broad /dev subpath read
+  expect_false(grepl('(allow file-read* (subpath "/dev"))', profile, fixed = TRUE))
+  # Should have specific devices
+  expect_true(grepl('/dev/null', profile, fixed = TRUE))
+  expect_true(grepl('/dev/urandom', profile, fixed = TRUE))
+})
+
+test_that("Seatbelt profile scopes mach and iokit permissions", {
+  skip_on_os(c("windows", "linux"))
+  profile <- generate_seatbelt_profile("/tmp/test.sock", R.home())
+  # Should NOT have blanket mach* or iokit*
+  lines <- strsplit(profile, "\n")[[1]]
+  expect_false(any(grepl("^\\(allow mach\\*\\)$", trimws(lines))))
+  expect_false(any(grepl("^\\(allow iokit\\*\\)$", trimws(lines))))
+  # Should have scoped versions
+  expect_true(grepl("mach-lookup", profile))
+  expect_true(grepl("iokit-open", profile))
+  # signal should be scoped to self
+  expect_true(grepl("signal.*target self", profile))
+  # sysctl should be read-only
+  expect_true(grepl("sysctl-read", profile))
+  expect_false(any(grepl("^\\(allow sysctl\\*\\)$", trimws(lines))))
 })
 
 # ── Integration tests (require sandbox-exec) ─────────────────────────

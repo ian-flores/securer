@@ -1,7 +1,10 @@
 test_that("Tool call pause/resume works", {
   add_fn <- function(a, b) a + b
 
-  session <- SecureSession$new(tools = list(add = add_fn))
+  expect_warning(
+    session <- SecureSession$new(tools = list(add = add_fn)),
+    "deprecated"
+  )
   on.exit(session$close())
 
   result <- session$execute(".securer_call_tool('add', a = 2, b = 3)")
@@ -11,7 +14,10 @@ test_that("Tool call pause/resume works", {
 test_that("Multiple tool calls in sequence work", {
   add_fn <- function(a, b) a + b
 
-  session <- SecureSession$new(tools = list(add = add_fn))
+  expect_warning(
+    session <- SecureSession$new(tools = list(add = add_fn)),
+    "deprecated"
+  )
   on.exit(session$close())
 
   result <- session$execute("
@@ -35,7 +41,10 @@ test_that("Unknown tool call returns error", {
 test_that("Tool execution error is propagated", {
   bad_fn <- function() stop("tool failed")
 
-  session <- SecureSession$new(tools = list(bad = bad_fn))
+  expect_warning(
+    session <- SecureSession$new(tools = list(bad = bad_fn)),
+    "deprecated"
+  )
   on.exit(session$close())
 
   expect_error(
@@ -54,30 +63,49 @@ test_that("Overwriting .securer_call_tool in child is prevented", {
   )
 })
 
-test_that("Overwriting .securer_connect in child is prevented", {
+test_that("unlockBinding is shadowed in child", {
   session <- SecureSession$new()
   on.exit(session$close())
 
   expect_error(
-    session$execute(".securer_connect <- function() 'hijacked'"),
+    session$execute('unlockBinding(".securer_call_tool", globalenv())'),
+    "unlockBinding is not permitted in secure sessions"
+  )
+})
+
+test_that("Overwriting unlockBinding in child is prevented", {
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  expect_error(
+    session$execute("unlockBinding <- function(...) 'hijacked'"),
     "cannot change value of locked binding"
   )
 })
 
-test_that("Overwriting .securer_env in child is prevented", {
+test_that("SECURER_TOKEN env var is cleared in child after auth", {
   session <- SecureSession$new()
   on.exit(session$close())
 
-  expect_error(
-    session$execute(".securer_env <- new.env()"),
-    "cannot change value of locked binding"
-  )
+  result <- session$execute("Sys.getenv('SECURER_TOKEN')")
+  expect_equal(result, "")
+})
+
+test_that("SECURER_SOCKET env var is cleared in child after connect", {
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  result <- session$execute("Sys.getenv('SECURER_SOCKET')")
+  expect_equal(result, "")
 })
 
 test_that("Tool calls still work after bindings are locked", {
   add_fn <- function(a, b) a + b
 
-  session <- SecureSession$new(tools = list(add = add_fn))
+  expect_warning(
+    session <- SecureSession$new(tools = list(add = add_fn)),
+    "deprecated"
+  )
   on.exit(session$close())
 
   result <- session$execute(".securer_call_tool('add', a = 10, b = 20)")
@@ -164,16 +192,19 @@ test_that("session generates and stores an IPC token", {
   expect_true(grepl("^[A-Za-z0-9]+$", token))
 })
 
-test_that("child receives the token via env var", {
+test_that("child used the token for auth (env var is cleared after)", {
   session <- SecureSession$new()
   on.exit(session$close())
 
-  priv <- session$.__enclos_env__$private
-  expected_token <- priv$ipc_token
+  # The session is alive and functional, which means the token was
 
-  # Ask the child what token it received
+  # successfully sent to the parent during child startup.
+  # After auth, the env var is cleared for security.
   result <- session$execute("Sys.getenv('SECURER_TOKEN')")
-  expect_equal(result, expected_token)
+  expect_equal(result, "")
+
+  # Session still works, proving auth succeeded
+  expect_equal(session$execute("1 + 1"), 2)
 })
 
 # --- Low-level IPC helper timeout/error tests ---

@@ -81,11 +81,22 @@ generate_seatbelt_profile <- function(socket_path, r_home,
 (allow file-read* (subpath "/usr"))
 (allow file-read* (subpath "/Library/Frameworks"))
 (allow file-read* (subpath "/System/Library"))
-(allow file-read* (subpath "/opt/homebrew"))
+(allow file-read* (subpath "/opt/homebrew/lib"))
+(allow file-read* (subpath "/opt/homebrew/Cellar"))
+(allow file-read* (subpath "/opt/homebrew/opt"))
 (allow file-read* (subpath "/bin"))
 
-;; Device nodes R needs
-(allow file-read* (subpath "/dev"))
+;; Device nodes R needs (specific devices, not all of /dev)
+(allow file-read* (literal "/dev/null"))
+(allow file-read* (literal "/dev/random"))
+(allow file-read* (literal "/dev/urandom"))
+(allow file-read* (literal "/dev/tty"))
+(allow file-read* (literal "/dev/zero"))
+(allow file-read* (literal "/dev/stdin"))
+(allow file-read* (literal "/dev/stdout"))
+(allow file-read* (literal "/dev/stderr"))
+(allow file-read* (literal "/dev/fd"))
+(allow file-read* (subpath "/dev/fd"))
 
 ;; Selective /etc reads (only what R needs)
 (allow file-read* (literal "/etc/localtime"))
@@ -153,7 +164,6 @@ generate_seatbelt_profile <- function(socket_path, r_home,
 (allow process-fork)
 ', exec_rules, '
 (allow process-exec (literal "/bin/sh"))
-(allow process-exec (literal "/bin/bash"))
 (allow process-exec (literal "/bin/rm"))
 (allow process-exec (literal "/usr/bin/sed"))
 (allow process-exec (literal "/usr/bin/uname"))
@@ -163,11 +173,12 @@ generate_seatbelt_profile <- function(socket_path, r_home,
 
 ;; -- Mach / IPC -------------------------------------------------------
 ;; R needs mach lookups for system services, dyld, etc.
-(allow sysctl*)
-(allow mach*)
-(allow signal)
+(allow sysctl-read)
+(allow mach-lookup)
+(allow mach-priv-host-port)
+(allow signal (target self))
 (allow ipc-posix*)
-(allow iokit*)
+(allow iokit-open)
 
 ;; -- System -----------------------------------------------------------
 ;; Only allow specific system operations R needs, not blanket system*.

@@ -79,7 +79,10 @@ test_that("validate_tools() detects duplicates", {
 
 test_that("validate_tools() accepts legacy named function lists", {
   tools <- list(add = function(a, b) a + b)
-  result <- validate_tools(tools)
+  expect_warning(
+    result <- validate_tools(tools),
+    "deprecated"
+  )
   expect_true(is.function(result$fns$add))
   # Legacy tools have NULL arg metadata
   expect_null(result$arg_meta$add)
@@ -178,8 +181,11 @@ test_that("Tool wrappers compose with regular R code", {
 })
 
 test_that("Legacy tool format still works with SecureSession", {
-  # Backward compatibility: named list of functions
-  session <- SecureSession$new(tools = list(add = function(a, b) a + b))
+  # Backward compatibility: named list of functions (emits deprecation warning)
+  expect_warning(
+    session <- SecureSession$new(tools = list(add = function(a, b) a + b)),
+    "deprecated"
+  )
   on.exit(session$close())
 
   result <- session$execute(".securer_call_tool('add', a = 10, b = 5)")
@@ -348,4 +354,61 @@ test_that("Type checking skips unannotated args end-to-end", {
   # b has no type annotation so any type is accepted
   result <- session$execute('flexible("hello", 42)')
   expect_equal(result, "hello 42")
+})
+
+# --- T2 fix: Legacy tool format deprecation and name validation ---
+
+test_that("validate_tools() emits deprecation warning for legacy format", {
+  tools <- list(add = function(a, b) a + b)
+  expect_warning(
+    validate_tools(tools),
+    "deprecated"
+  )
+})
+
+test_that("validate_tools() rejects invalid legacy tool names", {
+  # Code injection via tool name
+  tools <- list()
+  tools[['x; system("id")']] <- identity
+  expect_warning(
+    expect_error(
+      validate_tools(tools),
+      "valid R identifier"
+    ),
+    "deprecated"
+  )
+})
+
+test_that("validate_tools() rejects legacy tool name with special chars", {
+  tools <- list()
+  tools[["../../etc"]] <- identity
+  expect_warning(
+    expect_error(
+      validate_tools(tools),
+      "valid R identifier"
+    ),
+    "deprecated"
+  )
+})
+
+test_that("validate_tools() rejects legacy tool name starting with digit", {
+  tools <- list()
+  tools[["1bad"]] <- identity
+  expect_warning(
+    expect_error(
+      validate_tools(tools),
+      "valid R identifier"
+    ),
+    "deprecated"
+  )
+})
+
+test_that("validate_tools() accepts valid legacy tool names with deprecation warning", {
+  tools <- list(my_tool = identity, another.tool = identity)
+  expect_warning(
+    result <- validate_tools(tools),
+    "deprecated"
+  )
+  expect_true(is.function(result$fns$my_tool))
+  expect_true(is.function(result$fns$another.tool))
 })

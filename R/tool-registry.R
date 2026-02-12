@@ -74,6 +74,23 @@ validate_tools <- function(tools) {
   # Accept named list of bare functions (legacy / backward compat)
   if (is.list(tools) && !is.null(names(tools)) &&
       all(vapply(tools, is.function, logical(1)))) {
+    # --- Deprecation warning (T2 fix) ---
+    .Deprecated(
+      msg = paste(
+        "Passing tools as a named list of functions is deprecated.",
+        "Use securer_tool() objects instead."
+      )
+    )
+    # --- Legacy tool name validation (T2 fix) ---
+    tool_names <- names(tools)
+    bad_names <- tool_names[!grepl("^[A-Za-z.][A-Za-z0-9_.]*$", tool_names)]
+    if (length(bad_names) > 0) {
+      stop(
+        "Legacy tool names must be valid R identifiers: ",
+        paste(sQuote(bad_names), collapse = ", "),
+        call. = FALSE
+      )
+    }
     # No arg metadata available for legacy tools
     arg_meta <- lapply(tools, function(f) NULL)
     return(list(fns = tools, arg_meta = arg_meta))
@@ -96,10 +113,16 @@ validate_tools <- function(tools) {
     )
   }
 
-  # Return named list of functions + arg metadata
+  # Return named list of functions + arg metadata.
+  # For tools with args = list() (explicitly no arguments),
+  # store character(0) — not NULL — so the parent can distinguish
+  # "no metadata" (legacy) from "zero args allowed" (T4 fix).
   fns <- lapply(tools, function(t) t$fn)
   names(fns) <- names_vec
-  arg_meta <- lapply(tools, function(t) names(t$args))
+  arg_meta <- lapply(tools, function(t) {
+    nm <- names(t$args)
+    if (is.null(nm)) character(0) else nm
+  })
   names(arg_meta) <- names_vec
   list(fns = fns, arg_meta = arg_meta)
 }
@@ -119,8 +142,11 @@ generate_tool_wrappers <- function(tools) {
   code_parts <- vapply(tools, function(tool) {
     arg_names <- names(tool$args)
     if (length(arg_names) == 0) {
-      formals_str <- "..."
-      call_args <- ", ..."
+      # No arguments: generate a zero-argument wrapper (T4 fix).
+      # Using function() instead of function(...) ensures the child
+      # rejects extra arguments at the R level as defense in depth.
+      formals_str <- ""
+      call_args <- ""
       validation_code <- ""
     } else {
       formals_str <- paste(arg_names, collapse = ", ")
