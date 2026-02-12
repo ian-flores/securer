@@ -184,6 +184,46 @@ test_that("build_sandbox_fallback returns NULLs with a warning", {
   expect_null(config$profile_path)
 })
 
+# --- sandbox_strict tests ---
+
+test_that("sandbox_strict parameter is accepted by SecureSession", {
+  # With sandbox = FALSE, sandbox_strict should not matter
+  session <- SecureSession$new(sandbox = FALSE, sandbox_strict = TRUE)
+  on.exit(session$close())
+  expect_true(session$is_alive())
+})
+
+test_that("sandbox_strict parameter is accepted by execute_r", {
+  # With sandbox = FALSE, sandbox_strict should not matter
+  result <- execute_r("1 + 1", sandbox = FALSE, sandbox_strict = TRUE)
+  expect_equal(result, 2)
+})
+
+test_that("sandbox_strict errors when sandbox tools unavailable on fallback", {
+  # build_sandbox_fallback returns NULL wrapper + NULL env, which is the
+
+  # signal that sandbox tools are missing.  We test the strict check by
+  # mocking a platform that falls through to the fallback.
+  skip_on_os(c("windows"))  # Windows has env-based sandbox
+
+  # On macOS, test only if sandbox-exec is NOT available (rare but possible)
+  # On Linux, test only if bwrap is NOT available
+  os <- tolower(Sys.info()[["sysname"]])
+  if (os == "darwin" && file.exists("/usr/bin/sandbox-exec")) {
+    skip("sandbox-exec is available; strict mode would succeed")
+  }
+  if (os == "linux" && nzchar(Sys.which("bwrap"))) {
+    skip("bwrap is available; strict mode would succeed")
+  }
+
+  expect_error(
+    suppressWarnings(
+      SecureSession$new(sandbox = TRUE, sandbox_strict = TRUE)
+    ),
+    "sandbox_strict is TRUE"
+  )
+})
+
 test_that("build_sandbox_linux falls back when bwrap not found", {
   skip_on_os(c("windows", "mac"))
 

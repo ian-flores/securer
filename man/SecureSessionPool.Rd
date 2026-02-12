@@ -29,6 +29,8 @@ pool$close()
 \item \href{#method-SecureSessionPool-execute}{\code{SecureSessionPool$execute()}}
 \item \href{#method-SecureSessionPool-size}{\code{SecureSessionPool$size()}}
 \item \href{#method-SecureSessionPool-available}{\code{SecureSessionPool$available()}}
+\item \href{#method-SecureSessionPool-format}{\code{SecureSessionPool$format()}}
+\item \href{#method-SecureSessionPool-print}{\code{SecureSessionPool$print()}}
 \item \href{#method-SecureSessionPool-close}{\code{SecureSessionPool$close()}}
 \item \href{#method-SecureSessionPool-clone}{\code{SecureSessionPool$clone()}}
 }
@@ -110,6 +112,46 @@ Number of idle (non-busy) sessions
 
 \subsection{Returns}{
 Integer
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-SecureSessionPool-format"></a>}}
+\if{latex}{\out{\hypertarget{method-SecureSessionPool-format}{}}}
+\subsection{Method \code{format()}}{
+Format method for display
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{SecureSessionPool$format(...)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{...}}{Ignored.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A character string describing the pool.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-SecureSessionPool-print"></a>}}
+\if{latex}{\out{\hypertarget{method-SecureSessionPool-print}{}}}
+\subsection{Method \code{print()}}{
+Print method
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{SecureSessionPool$print(...)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{...}}{Ignored.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Invisible self.
 }
 }
 \if{html}{\out{<hr>}}

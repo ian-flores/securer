@@ -586,3 +586,147 @@ test_that("GC finalizer cleans up child process", {
   # tools::pskill(signal=0) returns TRUE if process exists, FALSE if not
   expect_false(tools::pskill(pid, signal = 0))
 })
+
+# --- print/format method tests ---
+
+test_that("format() shows session info for running session", {
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  out <- format(session)
+  expect_match(out, "SecureSession")
+  expect_match(out, "running")
+  expect_match(out, "sandbox=disabled")
+  expect_match(out, "tools=0")
+})
+
+test_that("format() shows stopped after close", {
+  session <- SecureSession$new()
+  session$close()
+
+  out <- format(session)
+  expect_match(out, "stopped")
+  expect_match(out, "pid=NA")
+})
+
+test_that("format() shows tool count", {
+  tools <- list(
+    securer_tool("add", "Add", fn = function(a, b) a + b,
+      args = list(a = "numeric", b = "numeric"))
+  )
+  session <- SecureSession$new(tools = tools)
+  on.exit(session$close())
+
+  out <- format(session)
+  expect_match(out, "tools=1")
+})
+
+test_that("print() outputs format string", {
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  out <- capture.output(print(session))
+  expect_match(out, "SecureSession")
+})
+
+# --- $tools() accessor tests ---
+
+test_that("$tools() returns empty list when no tools registered", {
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  result <- session$tools()
+  expect_equal(result, list())
+})
+
+test_that("$tools() returns registered securer_tool info", {
+  tools <- list(
+    securer_tool("add", "Add numbers",
+      fn = function(a, b) a + b,
+      args = list(a = "numeric", b = "numeric")),
+    securer_tool("mul", "Multiply",
+      fn = function(x, y) x * y,
+      args = list(x = "numeric", y = "numeric"))
+  )
+  session <- SecureSession$new(tools = tools)
+  on.exit(session$close())
+
+  result <- session$tools()
+  expect_equal(length(result), 2)
+  expect_true("add" %in% names(result))
+  expect_true("mul" %in% names(result))
+  expect_equal(result$add$name, "add")
+  expect_equal(result$add$args, list(a = "numeric", b = "numeric"))
+})
+
+test_that("$tools() works with legacy tool format", {
+  tools <- list(add = function(a, b) a + b)
+  session <- SecureSession$new(tools = tools)
+  on.exit(session$close())
+
+  result <- session$tools()
+  expect_equal(length(result), 1)
+  expect_equal(result[[1]]$name, "add")
+  expect_null(result[[1]]$args)
+})
+
+# --- $restart() method tests ---
+
+test_that("$restart() creates a fresh session with new PID", {
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  old_pid <- session$execute("Sys.getpid()")
+  session$restart()
+  new_pid <- session$execute("Sys.getpid()")
+
+  expect_false(identical(old_pid, new_pid))
+  expect_true(session$is_alive())
+})
+
+test_that("$restart() re-registers tools", {
+  tools <- list(
+    securer_tool("add", "Add numbers",
+      fn = function(a, b) a + b,
+      args = list(a = "numeric", b = "numeric"))
+  )
+  session <- SecureSession$new(tools = tools)
+  on.exit(session$close())
+
+  result1 <- session$execute("add(2, 3)")
+  expect_equal(result1, 5)
+
+  session$restart()
+
+  result2 <- session$execute("add(10, 20)")
+  expect_equal(result2, 30)
+})
+
+test_that("$restart() works on a dead session", {
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  # Kill the session manually
+  session$.__enclos_env__$private$session$kill()
+  Sys.sleep(0.5)
+  expect_false(session$is_alive())
+
+  # restart should recover
+  session$restart()
+  expect_true(session$is_alive())
+  expect_equal(session$execute("1 + 1"), 2)
+})
+
+test_that("$restart() errors during active execution", {
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  # Simulate an active execution by setting the flag
+  env <- session$.__enclos_env__$private
+  env$executing <- TRUE
+
+  expect_error(session$restart(), "Cannot restart while an execution is in progress")
+
+  # Reset flag for cleanup
+  env$executing <- FALSE
+})

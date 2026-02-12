@@ -16,6 +16,8 @@
 #'   `suppressMessages()`.
 #' @param validate Logical, whether to pre-validate the code for syntax
 #'   errors before sending it to the child process (default `TRUE`).
+#' @param sandbox_strict Logical, whether to error if sandbox tools are
+#'   not available (default `FALSE`).  See [SecureSession] for details.
 #' @param audit_log Optional path to a JSONL file for persistent audit
 #'   logging (default `NULL`, no file logging).
 #'
@@ -45,9 +47,10 @@
 #' @export
 execute_r <- function(code, tools = list(), timeout = 30, sandbox = TRUE,
                       limits = NULL, verbose = FALSE, validate = TRUE,
-                      audit_log = NULL) {
+                      sandbox_strict = FALSE, audit_log = NULL) {
   session <- SecureSession$new(tools = tools, sandbox = sandbox,
                                limits = limits, verbose = verbose,
+                               sandbox_strict = sandbox_strict,
                                audit_log = audit_log)
   on.exit(session$close())
   session$execute(code, timeout = timeout, validate = validate)

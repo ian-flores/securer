@@ -45,6 +45,10 @@ session$close()
 \item \href{#method-SecureSession-execute}{\code{SecureSession$execute()}}
 \item \href{#method-SecureSession-close}{\code{SecureSession$close()}}
 \item \href{#method-SecureSession-is_alive}{\code{SecureSession$is_alive()}}
+\item \href{#method-SecureSession-format}{\code{SecureSession$format()}}
+\item \href{#method-SecureSession-print}{\code{SecureSession$print()}}
+\item \href{#method-SecureSession-tools}{\code{SecureSession$tools()}}
+\item \href{#method-SecureSession-restart}{\code{SecureSession$restart()}}
 \item \href{#method-SecureSession-clone}{\code{SecureSession$clone()}}
 }
 }
@@ -59,6 +63,7 @@ Create a new SecureSession
   sandbox = FALSE,
   limits = NULL,
   verbose = FALSE,
+  sandbox_strict = FALSE,
   audit_log = NULL
 )}\if{html}{\out{</div>}}
 }
@@ -91,6 +96,13 @@ no limits.}
 \item{\code{verbose}}{Logical, whether to emit diagnostic messages via
 \code{message()}.  Useful for debugging.  Users can suppress with
 \code{suppressMessages()}.}
+
+\item{\code{sandbox_strict}}{Logical, whether to error if sandbox tools are
+not available on the current platform (default \code{FALSE}).  When
+\code{TRUE} and \code{sandbox = TRUE}, the session will stop with an
+informative error if the OS-level sandbox cannot be set up.
+When \code{FALSE} (default), the existing behavior is preserved:
+a warning is emitted and the session continues without sandboxing.}
 
 \item{\code{audit_log}}{Optional path to a JSONL file for persistent audit
 logging.  If \code{NULL} (the default), no file logging is performed.
@@ -164,6 +176,78 @@ Check if session is alive
 
 \subsection{Returns}{
 Logical
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-SecureSession-format"></a>}}
+\if{latex}{\out{\hypertarget{method-SecureSession-format}{}}}
+\subsection{Method \code{format()}}{
+Format method for display
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{SecureSession$format(...)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{...}}{Ignored.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A character string describing the session.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-SecureSession-print"></a>}}
+\if{latex}{\out{\hypertarget{method-SecureSession-print}{}}}
+\subsection{Method \code{print()}}{
+Print method
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{SecureSession$print(...)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{...}}{Ignored.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Invisible self.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-SecureSession-tools"></a>}}
+\if{latex}{\out{\hypertarget{method-SecureSession-tools}{}}}
+\subsection{Method \code{tools()}}{
+List registered tools and their argument specs
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{SecureSession$tools()}\if{html}{\out{</div>}}
+}
+
+\subsection{Returns}{
+A named list of tool information. Each element contains
+\code{name} and \code{args} fields. Returns an empty list if no tools are
+registered.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-SecureSession-restart"></a>}}
+\if{latex}{\out{\hypertarget{method-SecureSession-restart}{}}}
+\subsection{Method \code{restart()}}{
+Restart the child R process
+
+Kills the current child process, cleans up the socket, and starts
+a fresh child with the runtime and tool wrappers re-injected.
+The session remains usable for subsequent \verb{$execute()} calls.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{SecureSession$restart()}\if{html}{\out{</div>}}
+}
+
+\subsection{Returns}{
+Invisible self.
 }
 }
 \if{html}{\out{<hr>}}

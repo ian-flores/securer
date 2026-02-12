@@ -74,17 +74,25 @@ SecureSession <- R6::R6Class("SecureSession",
     #' @param verbose Logical, whether to emit diagnostic messages via
     #'   `message()`.  Useful for debugging.  Users can suppress with
     #'   `suppressMessages()`.
+    #' @param sandbox_strict Logical, whether to error if sandbox tools are
+    #'   not available on the current platform (default `FALSE`).  When
+    #'   `TRUE` and `sandbox = TRUE`, the session will stop with an
+    #'   informative error if the OS-level sandbox cannot be set up.
+    #'   When `FALSE` (default), the existing behavior is preserved:
+    #'   a warning is emitted and the session continues without sandboxing.
     #' @param audit_log Optional path to a JSONL file for persistent audit
     #'   logging.  If `NULL` (the default), no file logging is performed.
     #'   When a path is provided, structured JSON entries are appended for
     #'   session lifecycle events, executions, and tool calls.
     initialize = function(tools = list(), sandbox = FALSE, limits = NULL,
-                          verbose = FALSE, audit_log = NULL) {
+                          verbose = FALSE, sandbox_strict = FALSE,
+                          audit_log = NULL) {
       private$raw_tools <- tools
       validated <- validate_tools(tools)
       private$tool_fns <- validated$fns
       private$tool_arg_meta <- validated$arg_meta
       private$sandbox_enabled <- sandbox
+      private$sandbox_strict <- sandbox_strict
       # Apply default resource limits when sandboxing is enabled and
       # no explicit limits were provided.  Users can pass limits = list()
       # (empty list) to explicitly disable defaults.
@@ -203,6 +211,107 @@ SecureSession <- R6::R6Class("SecureSession",
     #' @return Logical
     is_alive = function() {
       !is.null(private$session) && private$session$is_alive()
+    },
+
+    #' @description Format method for display
+    #' @param ... Ignored.
+    #' @return A character string describing the session.
+    format = function(...) {
+      status <- if (self$is_alive()) "running" else "stopped"
+      sandbox_str <- if (private$sandbox_enabled) "enabled" else "disabled"
+      n_tools <- length(private$tool_fns)
+      pid_str <- if (!is.null(private$child_pid)) {
+        as.character(private$child_pid)
+      } else {
+        "NA"
+      }
+      sprintf("<SecureSession> [%s] pid=%s sandbox=%s tools=%d",
+              status, pid_str, sandbox_str, n_tools)
+    },
+
+    #' @description Print method
+    #' @param ... Ignored.
+    #' @return Invisible self.
+    print = function(...) {
+      cat(self$format(), "\n")
+      invisible(self)
+    },
+
+    #' @description List registered tools and their argument specs
+    #' @return A named list of tool information. Each element contains
+    #'   `name` and `args` fields. Returns an empty list if no tools are
+    #'   registered.
+    tools = function() {
+      if (length(private$raw_tools) == 0) return(list())
+      # If tools are securer_tool objects, return structured info
+      if (inherits(private$raw_tools[[1]], "securer_tool")) {
+        result <- lapply(private$raw_tools, function(tool) {
+          list(name = tool$name, args = tool$args)
+        })
+        names(result) <- vapply(private$raw_tools, function(t) t$name,
+                                character(1))
+        return(result)
+      }
+      # Legacy format: named list of bare functions
+      lapply(names(private$raw_tools), function(nm) {
+        list(name = nm, args = NULL)
+      })
+    },
+
+    #' @description Restart the child R process
+    #'
+    #' Kills the current child process, cleans up the socket, and starts
+    #' a fresh child with the runtime and tool wrappers re-injected.
+    #' The session remains usable for subsequent `$execute()` calls.
+    #' @return Invisible self.
+    restart = function() {
+      if (private$executing) {
+        stop(
+          "Cannot restart while an execution is in progress",
+          call. = FALSE
+        )
+      }
+      private$log("Restarting session")
+      private$audit_log("session_restart")
+
+      # Kill the child process
+      if (!is.null(private$session)) {
+        try(private$session$kill(), silent = TRUE)
+        .securer_closed_sessions_add(private$session)
+        private$session <- NULL
+      }
+
+      # Clean up the old socket
+      if (!is.null(private$ipc_conn)) {
+        .securer_closed_sessions_add(private$ipc_conn)
+        private$ipc_conn <- NULL
+      }
+      if (!is.null(private$socket_path) && file.exists(private$socket_path)) {
+        unlink(private$socket_path)
+      }
+      if (!is.null(private$socket_dir) && dir.exists(private$socket_dir)) {
+        unlink(private$socket_dir, recursive = TRUE)
+        private$socket_dir <- NULL
+      }
+
+      # Clean up old sandbox temp files
+      if (!is.null(private$sandbox_config)) {
+        if (!is.null(private$sandbox_config$wrapper)) {
+          try(unlink(private$sandbox_config$wrapper), silent = TRUE)
+        }
+        if (!is.null(private$sandbox_config$profile_path)) {
+          try(unlink(private$sandbox_config$profile_path), silent = TRUE)
+        }
+        if (!is.null(private$sandbox_config$sandbox_tmp)) {
+          try(unlink(private$sandbox_config$sandbox_tmp, recursive = TRUE),
+              silent = TRUE)
+        }
+        private$sandbox_config <- NULL
+      }
+
+      # Start a fresh session (re-injects runtime + tool wrappers)
+      private$start_session()
+      invisible(self)
     }
   ),
 
@@ -217,6 +326,7 @@ SecureSession <- R6::R6Class("SecureSession",
     tool_arg_meta = list(),
     executing = FALSE,
     sandbox_enabled = FALSE,
+    sandbox_strict = FALSE,
     sandbox_config = NULL,
     limits = NULL,
     verbose = FALSE,
@@ -300,6 +410,18 @@ SecureSession <- R6::R6Class("SecureSession",
         private$sandbox_config <- build_sandbox_config(
           private$socket_path, R.home(), limits = private$limits
         )
+        # Strict mode: error if sandbox was requested but tools are unavailable
+        if (private$sandbox_strict &&
+            is.null(private$sandbox_config$wrapper) &&
+            is.null(private$sandbox_config$env)) {
+          stop(
+            "sandbox_strict is TRUE but OS-level sandbox tools are not ",
+            "available on this platform. Install the required tools ",
+            "(sandbox-exec on macOS, bwrap on Linux) or set ",
+            "sandbox_strict = FALSE to allow fallback.",
+            call. = FALSE
+          )
+        }
         if (!is.null(private$sandbox_config$wrapper)) {
           # Override the R binary with our sandbox wrapper script.
           # callr interprets `arch` values containing "/" as a direct

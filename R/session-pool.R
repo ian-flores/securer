@@ -83,6 +83,28 @@ SecureSessionPool <- R6::R6Class("SecureSessionPool",
       sum(!private$busy)
     },
 
+    #' @description Format method for display
+    #' @param ... Ignored.
+    #' @return A character string describing the pool.
+    format = function(...) {
+      if (private$closed) {
+        return("<SecureSessionPool> [closed]")
+      }
+      n_total <- length(private$sessions)
+      n_busy <- sum(private$busy)
+      n_idle <- n_total - n_busy
+      sprintf("<SecureSessionPool> size=%d idle=%d busy=%d",
+              n_total, n_idle, n_busy)
+    },
+
+    #' @description Print method
+    #' @param ... Ignored.
+    #' @return Invisible self.
+    print = function(...) {
+      cat(self$format(), "\n")
+      invisible(self)
+    },
+
     #' @description Close all sessions and shut down the pool
     #' @return Invisible self
     close = function() {

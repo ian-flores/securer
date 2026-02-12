@@ -12,6 +12,7 @@ execute_r(
   limits = NULL,
   verbose = FALSE,
   validate = TRUE,
+  sandbox_strict = FALSE,
   audit_log = NULL
 )
 }
@@ -35,6 +36,9 @@ timeout (default 30).}
 
 \item{validate}{Logical, whether to pre-validate the code for syntax
 errors before sending it to the child process (default \code{TRUE}).}
+
+\item{sandbox_strict}{Logical, whether to error if sandbox tools are
+not available (default \code{FALSE}).  See \link{SecureSession} for details.}
 
 \item{audit_log}{Optional path to a JSONL file for persistent audit
 logging (default \code{NULL}, no file logging).}

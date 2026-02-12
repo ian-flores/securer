@@ -138,3 +138,46 @@ test_that("execute errors when all sessions are busy", {
   # Reset the flag so cleanup can proceed normally
   priv$busy[[1]] <- FALSE
 })
+
+# --- print/format method tests ---
+
+test_that("pool format() shows size and idle/busy counts", {
+  pool <- SecureSessionPool$new(size = 2, sandbox = FALSE)
+  on.exit(pool$close())
+
+  out <- format(pool)
+  expect_match(out, "SecureSessionPool")
+  expect_match(out, "size=2")
+  expect_match(out, "idle=2")
+  expect_match(out, "busy=0")
+})
+
+test_that("pool format() shows closed state", {
+  pool <- SecureSessionPool$new(size = 1, sandbox = FALSE)
+  pool$close()
+
+  out <- format(pool)
+  expect_match(out, "closed")
+})
+
+test_that("pool format() reflects busy sessions", {
+  pool <- SecureSessionPool$new(size = 2, sandbox = FALSE)
+  on.exit(pool$close())
+
+  priv <- pool$.__enclos_env__$private
+  priv$busy[[1]] <- TRUE
+
+  out <- format(pool)
+  expect_match(out, "idle=1")
+  expect_match(out, "busy=1")
+
+  priv$busy[[1]] <- FALSE
+})
+
+test_that("pool print() outputs format string", {
+  pool <- SecureSessionPool$new(size = 2, sandbox = FALSE)
+  on.exit(pool$close())
+
+  out <- capture.output(print(pool))
+  expect_match(out, "SecureSessionPool")
+})
