@@ -46,6 +46,7 @@ reference:
   - title: Resource Limits
     desc: Process resource restrictions
     contents:
+      - default_limits
       - validate_limits
       - generate_ulimit_commands
       - build_limits_only_wrapper
