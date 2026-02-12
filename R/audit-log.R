@@ -55,6 +55,12 @@ new_audit_logger <- function(path, session_id, max_code_length = 10000L) {
   # Ensure the parent directory exists
   dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
 
+  # Ensure the file exists with restrictive permissions
+  if (!file.exists(path)) {
+    file.create(path)
+    Sys.chmod(path, "0600")
+  }
+
   log_entry <- function(event, ...) {
     entry <- list(
       timestamp = format(Sys.time(), "%Y-%m-%dT%H:%M:%OS3Z", tz = "UTC"),

@@ -143,7 +143,7 @@ build_limits_only_wrapper <- function(limits) {
     ulimit_cmds,
     sprintf('exec "%s" "$@"', r_bin)
   ), wrapper_path)
-  Sys.chmod(wrapper_path, "0755")
+  Sys.chmod(wrapper_path, "0700")
 
   list(
     wrapper      = wrapper_path,

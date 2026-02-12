@@ -38,6 +38,9 @@ SecureSessionPool <- R6::R6Class("SecureSessionPool",
       if (size < 1L) {
         stop("Pool size must be at least 1", call. = FALSE)
       }
+      if (size > 100L) {
+        stop("Pool size must not exceed 100", call. = FALSE)
+      }
 
       private$pool_tools <- tools
       private$pool_sandbox <- sandbox

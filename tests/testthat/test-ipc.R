@@ -188,7 +188,7 @@ test_that("session generates and stores an IPC token", {
 
   expect_true(is.character(token))
   expect_equal(length(token), 1)
-  expect_equal(nchar(token), 32)
+  expect_true(nchar(token) %in% c(32, 64))
   expect_true(grepl("^[A-Za-z0-9]+$", token))
 })
 

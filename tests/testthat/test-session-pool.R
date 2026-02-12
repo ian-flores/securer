@@ -97,6 +97,13 @@ test_that("pool size must be positive", {
   )
 })
 
+test_that("Pool rejects size exceeding maximum", {
+  expect_error(
+    SecureSessionPool$new(size = 101),
+    "must not exceed 100"
+  )
+})
+
 test_that("default pool size is 4", {
   pool <- SecureSessionPool$new(sandbox = FALSE)
   on.exit(pool$close())

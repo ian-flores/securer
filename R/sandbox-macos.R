@@ -215,6 +215,7 @@ build_sandbox_macos <- function(socket_path, r_home, limits = NULL) {
   profile_content <- generate_seatbelt_profile(socket_path, r_home)
   profile_path <- tempfile("securer_sb_", fileext = ".sb")
   writeLines(profile_content, profile_path)
+  Sys.chmod(profile_path, "0600")
 
   # Determine the real R binary path
 
@@ -233,7 +234,7 @@ build_sandbox_macos <- function(socket_path, r_home, limits = NULL) {
       profile_path, r_bin
     )
   ), wrapper_path)
-  Sys.chmod(wrapper_path, "0755")
+  Sys.chmod(wrapper_path, "0700")
 
   list(
     wrapper      = wrapper_path,

@@ -133,6 +133,9 @@ SecureSession <- R6::R6Class("SecureSession",
           call. = FALSE
         )
       }
+      if (!is.null(output_handler) && !is.function(output_handler)) {
+        stop("`output_handler` must be a function or NULL", call. = FALSE)
+      }
       if (isTRUE(validate)) {
         check <- validate_code(code)
         if (!check$valid) {
@@ -391,15 +394,21 @@ SecureSession <- R6::R6Class("SecureSession",
       }
       private$socket_dir <- tempfile("securer_", tmpdir = tmpdir_base)
       dir.create(private$socket_dir, mode = "0700")
+      Sys.chmod(private$socket_dir, "0700")
       private$socket_path <- file.path(private$socket_dir, "ipc.sock")
 
       # Generate a random authentication token.  The child must send
       # this as its first message after connecting; the parent rejects
       # connections that don't present the correct token.
-      private$ipc_token <- paste0(
-        sample(c(letters, LETTERS, 0:9), 32, replace = TRUE),
-        collapse = ""
-      )
+      private$ipc_token <- if (file.exists("/dev/urandom")) {
+        con <- suppressWarnings(file("/dev/urandom", open = "rb"))
+        raw_bytes <- readBin(con, "raw", 32)
+        close(con)
+        paste0(sprintf("%02x", as.integer(raw_bytes)), collapse = "")
+      } else {
+        paste0(sample(c(letters, LETTERS, 0:9), 32, replace = TRUE),
+               collapse = "")
+      }
 
       # Create server socket
       private$ipc_conn <- processx::conn_create_unix_socket(
@@ -565,7 +574,9 @@ SecureSession <- R6::R6Class("SecureSession",
           if (length(lines) == 0) break
           output_lines <<- c(output_lines, lines)
           if (is.function(output_handler)) {
-            for (ln in lines) output_handler(ln)
+            for (ln in lines) {
+              tryCatch(output_handler(ln), error = function(e) NULL)
+            }
           }
         }
       }
@@ -733,7 +744,7 @@ SecureSession <- R6::R6Class("SecureSession",
                   list(value = result)
                 }
               }, error = function(e) {
-                list(error = conditionMessage(e))
+                list(error = sanitize_error_message(conditionMessage(e)))
               })
 
               # Log the tool result
@@ -759,9 +770,18 @@ SecureSession <- R6::R6Class("SecureSession",
                 }
               }
 
+              result_summary <- if (!is.null(response$error)) {
+                NULL
+              } else {
+                tryCatch(
+                  substr(deparse(response$value, control = "keepNA")[1], 1, 500),
+                  error = function(e) "<unserializable>"
+                )
+              }
               private$audit_log("tool_result",
                 tool = tool_name,
                 error = response$error,
+                result_summary = result_summary,
                 elapsed_secs = as.numeric(
                   difftime(Sys.time(), tool_start, units = "secs")
                 )
@@ -800,7 +820,9 @@ SecureSession <- R6::R6Class("SecureSession",
               parts <- strsplit(raw, "\n", fixed = TRUE)[[1]]
               output_lines <- c(output_lines, parts)
               if (is.function(output_handler)) {
-                for (ln in parts) output_handler(ln)
+                for (ln in parts) {
+                  tryCatch(output_handler(ln), error = function(e) NULL)
+                }
               }
             }
           }

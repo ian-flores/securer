@@ -113,7 +113,7 @@ build_sandbox_linux <- function(socket_path, r_home, limits = NULL) {
       shQuote(bwrap_path), args_str, shQuote(r_bin)
     )
   ), wrapper_path)
-  Sys.chmod(wrapper_path, "0755")
+  Sys.chmod(wrapper_path, "0700")
 
   list(
     wrapper      = wrapper_path,
