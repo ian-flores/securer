@@ -181,3 +181,113 @@ test_that("pool print() outputs format string", {
   out <- capture.output(print(pool))
   expect_match(out, "SecureSessionPool")
 })
+
+# --- acquire_timeout tests (R8) ---
+
+test_that("acquire_timeout retries instead of failing immediately", {
+  pool <- SecureSessionPool$new(size = 1, sandbox = FALSE)
+  on.exit(pool$close())
+
+  # Simulate the single session being busy
+  priv <- pool$.__enclos_env__$private
+  priv$busy[[1]] <- TRUE
+
+  # With acquire_timeout = 0.3, it should retry for ~0.3 seconds before failing
+  start <- Sys.time()
+  expect_error(
+    pool$execute("1 + 1", acquire_timeout = 0.3),
+    "All sessions are busy"
+  )
+  elapsed <- as.numeric(difftime(Sys.time(), start, units = "secs"))
+  # Should have waited at least ~0.2 seconds (some tolerance for timing)
+  expect_true(elapsed >= 0.2)
+
+  # Reset busy flag for cleanup
+  priv$busy[[1]] <- FALSE
+})
+
+test_that("acquire_timeout = NULL fails immediately (default behavior)", {
+  pool <- SecureSessionPool$new(size = 1, sandbox = FALSE)
+  on.exit(pool$close())
+
+  priv <- pool$.__enclos_env__$private
+  priv$busy[[1]] <- TRUE
+
+  start <- Sys.time()
+  expect_error(pool$execute("1"), "All sessions are busy")
+  elapsed <- as.numeric(difftime(Sys.time(), start, units = "secs"))
+  # Should fail essentially immediately (< 0.1s)
+  expect_true(elapsed < 0.15)
+
+  priv$busy[[1]] <- FALSE
+})
+
+test_that("acquire_timeout succeeds when session becomes available", {
+  pool <- SecureSessionPool$new(size = 1, sandbox = FALSE)
+  on.exit(pool$close())
+
+  priv <- pool$.__enclos_env__$private
+  priv$busy[[1]] <- TRUE
+
+  # Release the session after a short delay using a later callback
+  # Since R is single-threaded, we simulate by releasing before the call
+  priv$busy[[1]] <- FALSE
+
+  result <- pool$execute("42", acquire_timeout = 1)
+  expect_equal(result, 42)
+})
+
+# --- status() method tests (R8) ---
+
+test_that("status() returns correct counts for healthy pool", {
+  pool <- SecureSessionPool$new(size = 3, sandbox = FALSE)
+  on.exit(pool$close())
+
+  st <- pool$status()
+  expect_equal(st$total, 3L)
+  expect_equal(st$busy, 0L)
+  expect_equal(st$idle, 3L)
+  expect_equal(st$dead, 0L)
+})
+
+test_that("status() reflects busy sessions", {
+  pool <- SecureSessionPool$new(size = 2, sandbox = FALSE)
+  on.exit(pool$close())
+
+  priv <- pool$.__enclos_env__$private
+  priv$busy[[1]] <- TRUE
+
+  st <- pool$status()
+  expect_equal(st$total, 2L)
+  expect_equal(st$busy, 1L)
+  expect_equal(st$idle, 1L)
+  expect_equal(st$dead, 0L)
+
+  priv$busy[[1]] <- FALSE
+})
+
+test_that("status() detects dead sessions", {
+  pool <- SecureSessionPool$new(size = 2, sandbox = FALSE)
+  on.exit(pool$close())
+
+  # Kill one session to make it dead
+  priv <- pool$.__enclos_env__$private
+  priv$sessions[[1]]$close()
+
+  st <- pool$status()
+  expect_equal(st$total, 2L)
+  expect_equal(st$busy, 0L)
+  expect_equal(st$idle, 1L)
+  expect_equal(st$dead, 1L)
+})
+
+test_that("status() returns zeros for closed pool", {
+  pool <- SecureSessionPool$new(size = 2, sandbox = FALSE)
+  pool$close()
+
+  st <- pool$status()
+  expect_equal(st$total, 0L)
+  expect_equal(st$busy, 0L)
+  expect_equal(st$idle, 0L)
+  expect_equal(st$dead, 0L)
+})

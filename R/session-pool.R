@@ -5,6 +5,14 @@
 #' can run immediately on an idle session without waiting for process startup.
 #' Sessions are returned to the pool after each execution completes (or errors).
 #'
+#' @section Thread Safety:
+#' \code{SecureSessionPool} is \strong{NOT} thread-safe. The acquire/release
+#' mechanism uses no locking and assumes single-threaded access. If you need
+#' to use pools from multiple processes (e.g., via \code{parallel::mclapply}
+#' or \code{future}), each process should create its own pool instance.
+#' Sharing a single pool across threads or forked processes will lead to
+#' race conditions in session acquisition.
+#'
 #' @examples
 #' \donttest{
 #' pool <- SecureSessionPool$new(size = 2, sandbox = FALSE)
@@ -52,13 +60,27 @@ SecureSessionPool <- R6::R6Class("SecureSessionPool",
     #' @description Execute R code on an available pooled session
     #' @param code Character string of R code to execute.
     #' @param timeout Timeout in seconds, or `NULL` for no timeout.
+    #' @param acquire_timeout Optional timeout in seconds to wait for a
+    #'   session to become available. If `NULL` (default), fails immediately
+    #'   when all sessions are busy. If provided, retries acquisition with
+    #'   a short sleep (0.1s) between retries until the timeout expires.
     #' @return The result of evaluating the code.
-    execute = function(code, timeout = NULL) {
+    execute = function(code, timeout = NULL, acquire_timeout = NULL) {
       if (private$closed) {
         stop("Pool is closed", call. = FALSE)
       }
 
       idx <- private$acquire()
+
+      # If no session available and acquire_timeout is set, retry with backoff
+      if (is.null(idx) && !is.null(acquire_timeout)) {
+        deadline <- Sys.time() + acquire_timeout
+        while (is.null(idx) && Sys.time() < deadline) {
+          Sys.sleep(0.1)
+          idx <- private$acquire()
+        }
+      }
+
       if (is.null(idx)) {
         stop("All sessions are busy", call. = FALSE)
       }
@@ -76,11 +98,27 @@ SecureSessionPool <- R6::R6Class("SecureSessionPool",
     },
 
     #' @description Number of idle (non-busy) sessions
-
     #' @return Integer
     available = function() {
       if (private$closed) return(0L)
       sum(!private$busy)
+    },
+
+    #' @description Summary of pool state
+    #' @return A named list with `total`, `busy`, `idle`, and `dead` counts.
+    #'   `dead` indicates sessions that have crashed and need restart.
+    status = function() {
+      if (private$closed) {
+        return(list(total = 0L, busy = 0L, idle = 0L, dead = 0L))
+      }
+      n_total <- length(private$sessions)
+      n_busy <- sum(private$busy)
+      # Check which sessions are alive
+      alive <- vapply(private$sessions, function(s) s$is_alive(), logical(1))
+      n_dead <- sum(!alive)
+      # Idle = not busy AND alive
+      n_idle <- sum(!private$busy & alive)
+      list(total = n_total, busy = n_busy, idle = n_idle, dead = n_dead)
     },
 
     #' @description Format method for display

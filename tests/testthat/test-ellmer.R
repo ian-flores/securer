@@ -111,7 +111,6 @@ test_that("dead session returns error ContentToolResult instead of throwing", {
   tool_def <- securer_as_ellmer_tool(session = session, timeout = 10)
 
   # Kill the session before calling the tool
-
   session$close()
   expect_false(session$is_alive())
 
@@ -147,4 +146,108 @@ test_that("format_tool_result truncates long general output beyond 50 lines", {
   result_lines <- strsplit(result, "\n")[[1]]
   # 50 lines + 1 truncation message = 51 lines
   expect_lte(length(result_lines), 51)
+})
+
+
+# --- sanitize_error_message() tests ---
+
+test_that("sanitize_error_message replaces Unix file paths with [path]", {
+  msg <- "cannot open file '/Users/john/data/secret.csv': No such file or directory"
+  result <- sanitize_error_message(msg)
+  expect_false(grepl("/Users/john", result))
+  expect_match(result, "\\[path\\]")
+  # Core error type is preserved
+  expect_match(result, "cannot open file")
+  expect_match(result, "No such file or directory")
+})
+
+test_that("sanitize_error_message replaces /home and /tmp paths", {
+  msg <- "Error reading '/home/deploy/.config/db.conf'"
+  result <- sanitize_error_message(msg)
+  expect_false(grepl("/home/deploy", result))
+  expect_match(result, "\\[path\\]")
+
+  msg2 <- "File '/tmp/Rtmp1234abc/session/data.rds' not found"
+  result2 <- sanitize_error_message(msg2)
+  expect_false(grepl("/tmp/Rtmp", result2))
+  expect_match(result2, "\\[path\\]")
+})
+
+test_that("sanitize_error_message replaces Windows file paths", {
+  msg <- "cannot open C:\\Users\\admin\\Documents\\passwords.txt"
+  result <- sanitize_error_message(msg)
+  expect_false(grepl("admin", result))
+  expect_match(result, "\\[path\\]")
+})
+
+test_that("sanitize_error_message replaces process IDs", {
+  msg <- "process '12345' exited with status 1"
+  result <- sanitize_error_message(msg)
+  expect_false(grepl("12345", result))
+  expect_match(result, "\\[pid\\]")
+
+  msg2 <- "PID 67890 killed by signal 9"
+  result2 <- sanitize_error_message(msg2)
+  expect_false(grepl("67890", result2))
+  expect_match(result2, "\\[pid\\]")
+})
+
+test_that("sanitize_error_message replaces IP addresses", {
+  msg <- "connection to 192.168.1.42:5432 refused"
+  result <- sanitize_error_message(msg)
+  expect_false(grepl("192.168.1.42", result))
+  expect_match(result, "\\[host\\]")
+})
+
+test_that("sanitize_error_message strips stack traces", {
+  msg <- "Error in foo(): bad input\nCall stack:\n  1. bar()\n  2. baz()"
+  result <- sanitize_error_message(msg)
+  expect_false(grepl("Call stack", result))
+  expect_false(grepl("bar()", result, fixed = TRUE))
+  # But the core error is preserved
+  expect_match(result, "bad input")
+})
+
+test_that("sanitize_error_message truncates long messages", {
+  long_msg <- paste(rep("error ", 200), collapse = "")
+  result <- sanitize_error_message(long_msg, max_length = 100)
+  expect_true(nchar(result) <= 100)
+  expect_match(result, "\\.\\.\\.$")
+})
+
+test_that("sanitize_error_message preserves simple error messages", {
+  msg <- "object 'x' not found"
+  result <- sanitize_error_message(msg)
+  expect_equal(result, msg)
+})
+
+test_that("sanitize_error_message handles NULL and empty input", {
+  expect_equal(sanitize_error_message(NULL), "Unknown error")
+  expect_equal(sanitize_error_message(character(0)), "Unknown error")
+})
+
+test_that("ellmer tool sanitizes file paths in errors", {
+  skip_if_not_installed("ellmer")
+
+  tool_def <- securer_as_ellmer_tool(sandbox = FALSE, timeout = 10)
+  # Use stop() to emit a path directly since callr may strip paths from
+  # native R errors like readRDS()
+  result <- tool_def(code = "stop('cannot open /Users/secret/data.rds')")
+  expect_s3_class(result, "S7_object")
+  expect_false(is.null(result@error))
+  # The path should be sanitized
+  expect_false(grepl("/Users/secret", result@error))
+  expect_match(result@error, "\\[path\\]")
+  # Core message is preserved
+  expect_match(result@error, "cannot open")
+})
+
+test_that("ellmer tool sanitizes PIDs in errors", {
+  skip_if_not_installed("ellmer")
+
+  tool_def <- securer_as_ellmer_tool(sandbox = FALSE, timeout = 10)
+  # Force an error with a PID-like message
+  result <- tool_def(code = "stop('process 99999 crashed at PID 12345')")
+  expect_false(grepl("99999", result@error))
+  expect_false(grepl("12345", result@error))
 })
