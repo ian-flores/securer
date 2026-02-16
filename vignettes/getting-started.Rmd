@@ -188,23 +188,7 @@ Apply `ulimit`-based caps to the child process. These work with or without the
 sandbox:
 
 ```{r}
-# Limit CPU to 10 seconds and memory to 256 MB
-execute_r(
-  "1 + 1",
-  limits = list(cpu = 10, memory = 256 * 1024 * 1024)
-)
-```
-
-With a persistent session:
-
-```{r}
-session <- SecureSession$new(
-  sandbox = TRUE,
-  limits = list(cpu = 30, fsize = 10 * 1024 * 1024)
-)
-
-session$execute("1 + 1")
-session$close()
+execute_r("1 + 1", limits = list(cpu = 10, memory = 256 * 1024 * 1024))
 ```
 
 Supported limits:
@@ -220,20 +204,15 @@ Supported limits:
 
 ## Execution timeout
 
-Each `$execute()` call accepts a `timeout` parameter (in seconds, default 30).
-If the code does not complete within the timeout, an error is raised:
+Each `$execute()` call accepts a `timeout` in seconds (default 30). If exceeded,
+the child is killed and the session auto-recovers for subsequent calls:
 
 ```{r}
 session <- SecureSession$new()
-
 session$execute("Sys.sleep(60)", timeout = 5)
 #> Error: Execution timed out
-
 session$close()
 ```
-
-The timeout applies to the total wall-clock time of the execution, including
-any tool calls.
 
 ## Error handling
 
@@ -285,13 +264,7 @@ $execute("tool_name('arg')")
   +-- return final value
 ```
 
-Key implementation details:
-
-- The child process uses `processx::conn_connect_unix_socket()` to connect to
-  the host's server socket
-- `processx::conn_accept_unix_socket()` transitions the server connection
-  in-place to a bidirectional data connection (it does not return a new object)
-- The sandbox wrapper script is injected via `callr::r_session_options(arch = ...)`
-  which callr treats as a direct path to the R binary when it contains `/`
-- Socket paths use `/tmp` directly to stay under the ~104 character limit for
-  Unix domain socket paths on macOS
+The sandbox wrapper is injected via `callr::r_session_options(arch = ...)` and
+IPC uses a Unix domain socket in `/tmp` (to stay under the ~104 char path limit
+on macOS). See `vignette("security-model")` for full details on the IPC
+protocol, trust boundaries, and defense layers.
