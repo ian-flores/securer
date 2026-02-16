@@ -1,0 +1,28 @@
+# R package build artifacts
+*.Rcheck/
+*.tar.gz
+src/*.o
+src/*.so
+src/*.dll
+
+# IDE
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+# OS
+.DS_Store
+Thumbs.db
+
+# pkgdown site (built locally)
+docs/
+
+# Byte-compiled
+*.pyc
+
+# Coverage
+covr-report.html
+
+# Generated vignette HTML (source is .Rmd)
+vignettes/*.html

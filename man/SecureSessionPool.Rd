@@ -13,6 +13,16 @@ Creates multiple sessions at initialization time so that \verb{$execute()} calls
 can run immediately on an idle session without waiting for process startup.
 Sessions are returned to the pool after each execution completes (or errors).
 }
+\section{Thread Safety}{
+
+\code{SecureSessionPool} is \strong{NOT} thread-safe. The acquire/release
+mechanism uses no locking and assumes single-threaded access. If you need
+to use pools from multiple processes (e.g., via \code{parallel::mclapply}
+or \code{future}), each process should create its own pool instance.
+Sharing a single pool across threads or forked processes will lead to
+race conditions in session acquisition.
+}
+
 \examples{
 \donttest{
 pool <- SecureSessionPool$new(size = 2, sandbox = FALSE)
@@ -29,6 +39,7 @@ pool$close()
 \item \href{#method-SecureSessionPool-execute}{\code{SecureSessionPool$execute()}}
 \item \href{#method-SecureSessionPool-size}{\code{SecureSessionPool$size()}}
 \item \href{#method-SecureSessionPool-available}{\code{SecureSessionPool$available()}}
+\item \href{#method-SecureSessionPool-status}{\code{SecureSessionPool$status()}}
 \item \href{#method-SecureSessionPool-format}{\code{SecureSessionPool$format()}}
 \item \href{#method-SecureSessionPool-print}{\code{SecureSessionPool$print()}}
 \item \href{#method-SecureSessionPool-close}{\code{SecureSessionPool$close()}}
@@ -72,7 +83,7 @@ Create a new SecureSessionPool
 \subsection{Method \code{execute()}}{
 Execute R code on an available pooled session
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{SecureSessionPool$execute(code, timeout = NULL)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{SecureSessionPool$execute(code, timeout = NULL, acquire_timeout = NULL)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -81,6 +92,11 @@ Execute R code on an available pooled session
 \item{\code{code}}{Character string of R code to execute.}
 
 \item{\code{timeout}}{Timeout in seconds, or \code{NULL} for no timeout.}
+
+\item{\code{acquire_timeout}}{Optional timeout in seconds to wait for a
+session to become available. If \code{NULL} (default), fails immediately
+when all sessions are busy. If provided, retries acquisition with
+a short sleep (0.1s) between retries until the timeout expires.}
 }
 \if{html}{\out{</div>}}
 }
@@ -112,6 +128,20 @@ Number of idle (non-busy) sessions
 
 \subsection{Returns}{
 Integer
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-SecureSessionPool-status"></a>}}
+\if{latex}{\out{\hypertarget{method-SecureSessionPool-status}{}}}
+\subsection{Method \code{status()}}{
+Summary of pool state
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{SecureSessionPool$status()}\if{html}{\out{</div>}}
+}
+
+\subsection{Returns}{
+A named list with \code{total}, \code{busy}, \code{idle}, and \code{dead} counts.
+\code{dead} indicates sessions that have crashed and need restart.
 }
 }
 \if{html}{\out{<hr>}}

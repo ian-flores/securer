@@ -39,20 +39,47 @@ Initial release.
 
 ## Security Hardening
 
-* IPC token authentication on Unix domain sockets.
-* Socket directory restricted to 0700 permissions.
-* Tool name and argument injection prevention.
-* Environment variable sanitization (R_LIBS, R_PROFILE, etc.).
-* Binding locks on injected runtime functions and tool wrappers in the child process.
-* IPC message size limits and schema validation.
+* IPC token authentication on Unix domain sockets using cryptographic randomness
+  (`/dev/urandom` on Unix, `sample()` fallback on Windows).
+* Closure-based UDS connection hiding in the child process — the connection object
+  is invisible to child code (no global `.securer_env`).
+* `unlockBinding` shadowed in child to prevent tampering with locked bindings.
+* `SECURER_TOKEN` and `SECURER_SOCKET` environment variables cleared after
+  authentication so child code cannot read credentials.
+* macOS Seatbelt profile hardened: `/bin/bash` removed from allowed executables,
+  `/opt/homebrew` narrowed to `lib/Cellar/opt`, `/dev` restricted to specific
+  device nodes, `mach*`/`iokit*`/`sysctl*` scoped to least-privilege operations.
+* Socket directory enforced to 0700 permissions (immune to umask).
+* Wrapper scripts and Seatbelt profiles set to owner-only (0700/0600).
+* IPC rate limiting to prevent message flood attacks.
+* Unknown IPC message types logged as warnings.
+* Tool name regex validation and `.Deprecated()` warning for legacy tool format.
+* Zero-argument tools reject unexpected arguments.
+* `R_LIBS` and `R_LIBS_USER` excluded from child environment allowlist to prevent
+  library injection via `.onLoad` hooks.
+* Audit log path validated for symlinks, device files, and path traversal.
+* Audit log code field truncated to prevent unbounded growth.
+* Audit log files created with 0600 permissions.
+* Audit log tool results include truncated return value summary for forensics.
+* `output_handler` validated upfront and wrapped in `tryCatch` to prevent
+  handler errors from corrupting session state.
+* Tool error messages sanitized before returning to child process (strips file
+  paths, PIDs, IPs, and stack traces).
+* Windows sandbox emits an explicit warning about limited isolation scope.
+* Session pool size capped at 100 to prevent resource exhaustion.
 
 ## Integrations
 
 * `securer_as_ellmer_tool()` for using securer as a code execution tool in
-  ellmer LLM chats. Errors returned as `ContentToolResult(error=...)`.
+  ellmer LLM chats. Error messages sanitized before returning to the LLM
+  (strips file paths, PIDs, hostnames, and stack traces).
 
 ## Observability
 
-* File-based JSONL audit logging for session lifecycle, tool calls, and execution events.
+* File-based JSONL audit logging for session lifecycle, tool calls (with truncated
+  result summaries), and execution events. Logs validated and created with
+  restrictive file permissions.
+* `SecureSessionPool$status()` method returning total/busy/idle/dead counts.
+* `$execute(acquire_timeout = N)` for session pool with configurable wait time.
 * Verbose `message()` logging for debugging (tool call timing, lifecycle events).
 * Streaming output capture from child `cat()`/`print()` via piped stdout/stderr.
