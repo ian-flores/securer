@@ -13,6 +13,16 @@ completes (or errors).
 
 An R6 object of class `SecureSessionPool`.
 
+## Thread Safety
+
+`SecureSessionPool` is **NOT** thread-safe. The acquire/release
+mechanism uses no locking and assumes single-threaded access. If you
+need to use pools from multiple processes (e.g., via
+[`parallel::mclapply`](https://rdrr.io/r/parallel/mclapply.html) or
+`future`), each process should create its own pool instance. Sharing a
+single pool across threads or forked processes will lead to race
+conditions in session acquisition.
+
 ## Methods
 
 ### Public methods
@@ -24,6 +34,8 @@ An R6 object of class `SecureSessionPool`.
 - [`SecureSessionPool$size()`](#method-SecureSessionPool-size)
 
 - [`SecureSessionPool$available()`](#method-SecureSessionPool-available)
+
+- [`SecureSessionPool$status()`](#method-SecureSessionPool-status)
 
 - [`SecureSessionPool$format()`](#method-SecureSessionPool-format)
 
@@ -81,7 +93,7 @@ Execute R code on an available pooled session
 
 #### Usage
 
-    SecureSessionPool$execute(code, timeout = NULL)
+    SecureSessionPool$execute(code, timeout = NULL, acquire_timeout = NULL)
 
 #### Arguments
 
@@ -92,6 +104,13 @@ Execute R code on an available pooled session
 - `timeout`:
 
   Timeout in seconds, or `NULL` for no timeout.
+
+- `acquire_timeout`:
+
+  Optional timeout in seconds to wait for a session to become available.
+  If `NULL` (default), fails immediately when all sessions are busy. If
+  provided, retries acquisition with a short sleep (0.1s) between
+  retries until the timeout expires.
 
 #### Returns
 
@@ -124,6 +143,21 @@ Number of idle (non-busy) sessions
 #### Returns
 
 Integer
+
+------------------------------------------------------------------------
+
+### Method `status()`
+
+Summary of pool state
+
+#### Usage
+
+    SecureSessionPool$status()
+
+#### Returns
+
+A named list with `total`, `busy`, `idle`, and `dead` counts. `dead`
+indicates sessions that have crashed and need restart.
 
 ------------------------------------------------------------------------
 

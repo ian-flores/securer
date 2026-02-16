@@ -85,21 +85,43 @@
 </ul></div>
 <div class="section level3">
 <h3 id="security-hardening-0-1-0">Security Hardening<a class="anchor" aria-label="anchor" href="#security-hardening-0-1-0"></a></h3>
-<ul><li>IPC token authentication on Unix domain sockets.</li>
-<li>Socket directory restricted to 0700 permissions.</li>
-<li>Tool name and argument injection prevention.</li>
-<li>Environment variable sanitization (R_LIBS, R_PROFILE, etc.).</li>
-<li>Binding locks on injected runtime functions and tool wrappers in the child process.</li>
-<li>IPC message size limits and schema validation.</li>
+<ul><li>IPC token authentication on Unix domain sockets using cryptographic randomness (<code>/dev/urandom</code> on Unix, <code><a href="https://rdrr.io/r/base/sample.html" class="external-link">sample()</a></code> fallback on Windows).</li>
+<li>Closure-based UDS connection hiding in the child process — the connection object is invisible to child code (no global <code>.securer_env</code>).</li>
+<li>
+<code>unlockBinding</code> shadowed in child to prevent tampering with locked bindings.</li>
+<li>
+<code>SECURER_TOKEN</code> and <code>SECURER_SOCKET</code> environment variables cleared after authentication so child code cannot read credentials.</li>
+<li>macOS Seatbelt profile hardened: <code>/bin/bash</code> removed from allowed executables, <code>/opt/homebrew</code> narrowed to <code>lib/Cellar/opt</code>, <code>/dev</code> restricted to specific device nodes, <code>mach*</code>/<code>iokit*</code>/<code>sysctl*</code> scoped to least-privilege operations.</li>
+<li>Socket directory enforced to 0700 permissions (immune to umask).</li>
+<li>Wrapper scripts and Seatbelt profiles set to owner-only (0700/0600).</li>
+<li>IPC rate limiting to prevent message flood attacks.</li>
+<li>Unknown IPC message types logged as warnings.</li>
+<li>Tool name regex validation and <code><a href="https://rdrr.io/r/base/Deprecated.html" class="external-link">.Deprecated()</a></code> warning for legacy tool format.</li>
+<li>Zero-argument tools reject unexpected arguments.</li>
+<li>
+<code>R_LIBS</code> and <code>R_LIBS_USER</code> excluded from child environment allowlist to prevent library injection via <code>.onLoad</code> hooks.</li>
+<li>Audit log path validated for symlinks, device files, and path traversal.</li>
+<li>Audit log code field truncated to prevent unbounded growth.</li>
+<li>Audit log files created with 0600 permissions.</li>
+<li>Audit log tool results include truncated return value summary for forensics.</li>
+<li>
+<code>output_handler</code> validated upfront and wrapped in <code>tryCatch</code> to prevent handler errors from corrupting session state.</li>
+<li>Tool error messages sanitized before returning to child process (strips file paths, PIDs, IPs, and stack traces).</li>
+<li>Windows sandbox emits an explicit warning about limited isolation scope.</li>
+<li>Session pool size capped at 100 to prevent resource exhaustion.</li>
 </ul></div>
 <div class="section level3">
 <h3 id="integrations-0-1-0">Integrations<a class="anchor" aria-label="anchor" href="#integrations-0-1-0"></a></h3>
 <ul><li>
-<code><a href="../reference/securer_as_ellmer_tool.html">securer_as_ellmer_tool()</a></code> for using securer as a code execution tool in ellmer LLM chats. Errors returned as <code>ContentToolResult(error=...)</code>.</li>
+<code><a href="../reference/securer_as_ellmer_tool.html">securer_as_ellmer_tool()</a></code> for using securer as a code execution tool in ellmer LLM chats. Error messages sanitized before returning to the LLM (strips file paths, PIDs, hostnames, and stack traces).</li>
 </ul></div>
 <div class="section level3">
 <h3 id="observability-0-1-0">Observability<a class="anchor" aria-label="anchor" href="#observability-0-1-0"></a></h3>
-<ul><li>File-based JSONL audit logging for session lifecycle, tool calls, and execution events.</li>
+<ul><li>File-based JSONL audit logging for session lifecycle, tool calls (with truncated result summaries), and execution events. Logs validated and created with restrictive file permissions.</li>
+<li>
+<code>SecureSessionPool$status()</code> method returning total/busy/idle/dead counts.</li>
+<li>
+<code>$execute(acquire_timeout = N)</code> for session pool with configurable wait time.</li>
 <li>Verbose <code><a href="https://rdrr.io/r/base/message.html" class="external-link">message()</a></code> logging for debugging (tool call timing, lifecycle events).</li>
 <li>Streaming output capture from child <code><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat()</a></code>/<code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> via piped stdout/stderr.</li>
 </ul></div>

@@ -57,6 +57,17 @@ Sessions are returned to the pool after each execution completes (or errors).</p
     <p>An R6 object of class <code>SecureSessionPool</code>.</p>
     </div>
     <div class="section level2">
+    <h2 id="thread-safety">Thread Safety<a class="anchor" aria-label="anchor" href="#thread-safety"></a></h2>
+
+
+<p><code>SecureSessionPool</code> is <strong>NOT</strong> thread-safe. The acquire/release
+mechanism uses no locking and assumes single-threaded access. If you need
+to use pools from multiple processes (e.g., via <code><a href="https://rdrr.io/r/parallel/mclapply.html" class="external-link">parallel::mclapply</a></code>
+or <code>future</code>), each process should create its own pool instance.
+Sharing a single pool across threads or forked processes will lead to
+race conditions in session acquisition.</p>
+    </div>
+    <div class="section level2">
     <h2 id="methods">Methods<a class="anchor" aria-label="anchor" href="#methods"></a></h2>
 
 <div class="section">
@@ -66,6 +77,7 @@ Sessions are returned to the pool after each execution completes (or errors).</p
 <li><p><a href="#method-SecureSessionPool-execute"><code>SecureSessionPool$execute()</code></a></p></li>
 <li><p><a href="#method-SecureSessionPool-size"><code>SecureSessionPool$size()</code></a></p></li>
 <li><p><a href="#method-SecureSessionPool-available"><code>SecureSessionPool$available()</code></a></p></li>
+<li><p><a href="#method-SecureSessionPool-status"><code>SecureSessionPool$status()</code></a></p></li>
 <li><p><a href="#method-SecureSessionPool-format"><code>SecureSessionPool$format()</code></a></p></li>
 <li><p><a href="#method-SecureSessionPool-print"><code>SecureSessionPool$print()</code></a></p></li>
 <li><p><a href="#method-SecureSessionPool-close"><code>SecureSessionPool$close()</code></a></p></li>
@@ -112,7 +124,7 @@ Sessions are returned to the pool after each execution completes (or errors).</p
 <h3 id="method-execute-">Method <code>execute()</code><a class="anchor" aria-label="anchor" href="#method-execute-"></a></h3>
 <p>Execute R code on an available pooled session</p><div class="section">
 <h4 id="usage-1">Usage<a class="anchor" aria-label="anchor" href="#usage-1"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">SecureSessionPool</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="va">code</span>, timeout <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">SecureSessionPool</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="va">code</span>, timeout <span class="op">=</span> <span class="cn">NULL</span>, acquire_timeout <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
 <div class="section">
@@ -123,6 +135,13 @@ Sessions are returned to the pool after each execution completes (or errors).</p
 
 <dt><code>timeout</code></dt>
 <dd><p>Timeout in seconds, or <code>NULL</code> for no timeout.</p></dd>
+
+
+<dt><code>acquire_timeout</code></dt>
+<dd><p>Optional timeout in seconds to wait for a
+session to become available. If <code>NULL</code> (default), fails immediately
+when all sessions are busy. If provided, retries acquisition with
+a short sleep (0.1s) between retries until the timeout expires.</p></dd>
 
 
 </dl><p></p></div>
@@ -156,10 +175,23 @@ Sessions are returned to the pool after each execution completes (or errors).</p
 <p>Integer</p>
 </div>
 
+</div><p></p><hr><a id="method-SecureSessionPool-status"></a><div class="section">
+<h3 id="method-status-">Method <code>status()</code><a class="anchor" aria-label="anchor" href="#method-status-"></a></h3>
+<p>Summary of pool state</p><div class="section">
+<h4 id="usage-4">Usage<a class="anchor" aria-label="anchor" href="#usage-4"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">SecureSessionPool</span><span class="op">$</span><span class="fu">status</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div>
+
+<div class="section">
+<h4 id="returns-3">Returns<a class="anchor" aria-label="anchor" href="#returns-3"></a></h4>
+<p>A named list with <code>total</code>, <code>busy</code>, <code>idle</code>, and <code>dead</code> counts.
+<code>dead</code> indicates sessions that have crashed and need restart.</p>
+</div>
+
 </div><p></p><hr><a id="method-SecureSessionPool-format"></a><div class="section">
 <h3 id="method-format-">Method <code><a href="https://rdrr.io/r/base/format.html" class="external-link">format()</a></code><a class="anchor" aria-label="anchor" href="#method-format-"></a></h3>
 <p>Format method for display</p><div class="section">
-<h4 id="usage-4">Usage<a class="anchor" aria-label="anchor" href="#usage-4"></a></h4>
+<h4 id="usage-5">Usage<a class="anchor" aria-label="anchor" href="#usage-5"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">SecureSessionPool</span><span class="op">$</span><span class="fu">format</span><span class="op">(</span><span class="va">...</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
@@ -172,14 +204,14 @@ Sessions are returned to the pool after each execution completes (or errors).</p
 </dl><p></p></div>
 </div>
 <div class="section">
-<h4 id="returns-3">Returns<a class="anchor" aria-label="anchor" href="#returns-3"></a></h4>
+<h4 id="returns-4">Returns<a class="anchor" aria-label="anchor" href="#returns-4"></a></h4>
 <p>A character string describing the pool.</p>
 </div>
 
 </div><p></p><hr><a id="method-SecureSessionPool-print"></a><div class="section">
 <h3 id="method-print-">Method <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code><a class="anchor" aria-label="anchor" href="#method-print-"></a></h3>
 <p>Print method</p><div class="section">
-<h4 id="usage-5">Usage<a class="anchor" aria-label="anchor" href="#usage-5"></a></h4>
+<h4 id="usage-6">Usage<a class="anchor" aria-label="anchor" href="#usage-6"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">SecureSessionPool</span><span class="op">$</span><span class="fu">print</span><span class="op">(</span><span class="va">...</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
@@ -192,26 +224,26 @@ Sessions are returned to the pool after each execution completes (or errors).</p
 </dl><p></p></div>
 </div>
 <div class="section">
-<h4 id="returns-4">Returns<a class="anchor" aria-label="anchor" href="#returns-4"></a></h4>
+<h4 id="returns-5">Returns<a class="anchor" aria-label="anchor" href="#returns-5"></a></h4>
 <p>Invisible self.</p>
 </div>
 
 </div><p></p><hr><a id="method-SecureSessionPool-close"></a><div class="section">
 <h3 id="method-close-">Method <code><a href="https://rdrr.io/r/base/connections.html" class="external-link">close()</a></code><a class="anchor" aria-label="anchor" href="#method-close-"></a></h3>
 <p>Close all sessions and shut down the pool</p><div class="section">
-<h4 id="usage-6">Usage<a class="anchor" aria-label="anchor" href="#usage-6"></a></h4>
+<h4 id="usage-7">Usage<a class="anchor" aria-label="anchor" href="#usage-7"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">SecureSessionPool</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
 <div class="section">
-<h4 id="returns-5">Returns<a class="anchor" aria-label="anchor" href="#returns-5"></a></h4>
+<h4 id="returns-6">Returns<a class="anchor" aria-label="anchor" href="#returns-6"></a></h4>
 <p>Invisible self</p>
 </div>
 
 </div><p></p><hr><a id="method-SecureSessionPool-clone"></a><div class="section">
 <h3 id="method-clone-">Method <code>clone()</code><a class="anchor" aria-label="anchor" href="#method-clone-"></a></h3>
 <p>The objects of this class are cloneable with this method.</p><div class="section">
-<h4 id="usage-7">Usage<a class="anchor" aria-label="anchor" href="#usage-7"></a></h4>
+<h4 id="usage-8">Usage<a class="anchor" aria-label="anchor" href="#usage-8"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">SecureSessionPool</span><span class="op">$</span><span class="fu">clone</span><span class="op">(</span>deep <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
