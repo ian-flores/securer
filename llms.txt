@@ -169,11 +169,8 @@ session <- SecureSession$new(verbose = TRUE)
 | **macOS**   | Seatbelt (`sandbox-exec`)   | Yes             | Yes                   | Yes (ulimit)                     |
 | **Windows** | Job Objects + env isolation | No              | No                    | Yes (memory, CPU, process count) |
 
-Linux and macOS provide full OS-level sandboxing including network and
-filesystem restrictions. Windows provides environment isolation and
-resource limits via Job Objects (memory, CPU time, active process
-count). All platforms support tool call IPC, execution timeouts, and
-code pre-validation.
+All platforms support tool call IPC, execution timeouts, and code
+pre-validation.
 
 ## Security
 
@@ -190,6 +187,8 @@ rather than filing a public issue.
 
 - [`vignette("getting-started", package = "securer")`](https://ian-flores.github.io/securer/articles/getting-started.md)
   — full walkthrough
+- [`vignette("ellmer-integration", package = "securer")`](https://ian-flores.github.io/securer/articles/ellmer-integration.md)
+  — using securer with ellmer LLM chats
 - [`vignette("security-model", package = "securer")`](https://ian-flores.github.io/securer/articles/security-model.md)
   — security architecture and threat model
 - [pkgdown site](https://ian-flores.github.io/securer/) — API reference

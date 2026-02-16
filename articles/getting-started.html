@@ -277,20 +277,7 @@ filesystem or network restrictions. A warning is issued.</p>
 <p>Apply <code>ulimit</code>-based caps to the child process. These work
 with or without the sandbox:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Limit CPU to 10 seconds and memory to 256 MB</span></span>
-<span><span class="fu"><a href="../reference/execute_r.html">execute_r</a></span><span class="op">(</span></span>
-<span>  <span class="st">"1 + 1"</span>,</span>
-<span>  limits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>cpu <span class="op">=</span> <span class="fl">10</span>, memory <span class="op">=</span> <span class="fl">256</span> <span class="op">*</span> <span class="fl">1024</span> <span class="op">*</span> <span class="fl">1024</span><span class="op">)</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p>With a persistent session:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  sandbox <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  limits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>cpu <span class="op">=</span> <span class="fl">30</span>, fsize <span class="op">=</span> <span class="fl">10</span> <span class="op">*</span> <span class="fl">1024</span> <span class="op">*</span> <span class="fl">1024</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">"1 + 1"</span><span class="op">)</span></span>
-<span><span class="va">session</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/execute_r.html">execute_r</a></span><span class="op">(</span><span class="st">"1 + 1"</span>, limits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>cpu <span class="op">=</span> <span class="fl">10</span>, memory <span class="op">=</span> <span class="fl">256</span> <span class="op">*</span> <span class="fl">1024</span> <span class="op">*</span> <span class="fl">1024</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <p>Supported limits:</p>
 <table class="table">
 <thead><tr class="header">
@@ -342,28 +329,24 @@ with or without the sandbox:</p>
 <div class="section level2">
 <h2 id="execution-timeout">Execution timeout<a class="anchor" aria-label="anchor" href="#execution-timeout"></a>
 </h2>
-<p>Each <code>$execute()</code> call accepts a <code>timeout</code>
-parameter (in seconds, default 30). If the code does not complete within
-the timeout, an error is raised:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<p>Each <code>$execute()</code> call accepts a <code>timeout</code> in
+seconds (default 30). If exceeded, the child is killed and the session
+auto-recovers for subsequent calls:</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span><span class="op">)</span></span>
-<span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">"Sys.sleep(60)"</span>, timeout <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Error: Execution timed out</span></span>
-<span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-<p>The timeout applies to the total wall-clock time of the execution,
-including any tool calls.</p>
 </div>
 <div class="section level2">
 <h2 id="error-handling">Error handling<a class="anchor" aria-label="anchor" href="#error-handling"></a>
 </h2>
 <p>Errors in the child process are propagated to the host:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/execute_r.html">execute_r</a></span><span class="op">(</span><span class="st">'stop("something went wrong")'</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Error: something went wrong</span></span></code></pre></div>
 <p>Errors in tool execution are also propagated:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">bad_tool</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/securer_tool.html">securer_tool</a></span><span class="op">(</span><span class="st">"fail"</span>, <span class="st">"Always fails"</span>,</span>
 <span>  fn <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="kw"><a href="https://rdrr.io/r/base/stop.html" class="external-link">stop</a></span><span class="op">(</span><span class="st">"tool error"</span><span class="op">)</span>,</span>
 <span>  args <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
@@ -372,7 +355,7 @@ including any tool calls.</p>
 <span><span class="fu"><a href="../reference/execute_r.html">execute_r</a></span><span class="op">(</span><span class="st">'fail()'</span>, tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">bad_tool</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Error: tool error</span></span></code></pre></div>
 <p>If a tool name is not registered, the child receives an error:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/execute_r.html">execute_r</a></span><span class="op">(</span><span class="st">'nonexistent_tool()'</span>, tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Error: Unknown tool: nonexistent_tool</span></span></code></pre></div>
 </div>
@@ -396,22 +379,11 @@ $execute("tool_name('arg')")
   |                                       +-- return result
   |   &lt;---- process complete -------------|
   +-- return final value</code></pre>
-<p>Key implementation details:</p>
-<ul>
-<li>The child process uses
-<code><a href="http://processx.r-lib.org/reference/processx_sockets.html" class="external-link">processx::conn_connect_unix_socket()</a></code> to connect to the
-host’s server socket</li>
-<li>
-<code><a href="http://processx.r-lib.org/reference/processx_sockets.html" class="external-link">processx::conn_accept_unix_socket()</a></code> transitions the
-server connection in-place to a bidirectional data connection (it does
-not return a new object)</li>
-<li>The sandbox wrapper script is injected via
-<code>callr::r_session_options(arch = ...)</code> which callr treats as
-a direct path to the R binary when it contains <code>/</code>
-</li>
-<li>Socket paths use <code>/tmp</code> directly to stay under the ~104
-character limit for Unix domain socket paths on macOS</li>
-</ul>
+<p>The sandbox wrapper is injected via
+<code>callr::r_session_options(arch = ...)</code> and IPC uses a Unix
+domain socket in <code>/tmp</code> (to stay under the ~104 char path
+limit on macOS). See <code><a href="../articles/security-model.html">vignette("security-model")</a></code> for full
+details on the IPC protocol, trust boundaries, and defense layers.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

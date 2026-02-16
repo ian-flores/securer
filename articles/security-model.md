@@ -443,31 +443,20 @@ trade-offs, not bugs, but deployers should understand them.
 
 ### Windows has no filesystem or network restrictions
 
-The Windows sandbox provides only environment isolation and Job Object
-resource limits. The child process can read and write any file the user
-account has access to, and can make arbitrary network connections.
-Implementing filesystem and network isolation on Windows would require
-`AppContainer` or `Windows Sandbox` APIs, which need compiled C/C++ code
-and potentially elevated privileges.
-
-**Mitigation**: On Windows, run the host process inside a Docker
-container or Windows Sandbox to provide the missing isolation layers.
+See Layer 1 (Windows) above. **Mitigation**: Run the host process inside
+a Docker container or Windows Sandbox.
 
 ### macOS Seatbelt allows broad file reads
 
-R requires access to system libraries, frameworks, and shared objects at
-runtime. The Seatbelt profile allows `file-read*` on `/usr`,
-`/Library/Frameworks`, `/System/Library`, `/opt/homebrew`, `/bin`, and
-`/dev`. This means the child can read most system files, though not the
-user’s home directory.
+`file-read*` is allowed on `/usr`, `/Library/Frameworks`,
+`/System/Library`, `/opt/homebrew`, `/bin`, and `/dev` (R needs system
+libraries at runtime). `file-read-metadata` is allowed globally (R needs
+`stat()`), so the child can discover file existence and size even where
+it cannot read contents. The user’s home directory is not readable.
 
-Notably, `file-read-metadata` is allowed globally (R needs `stat()` for
-path resolution), which means the child can discover the existence and
-size of any file, even if it cannot read the contents.
-
-**Mitigation**: Sensitive data should not be stored in system-wide
-readable locations. The environment sanitization (Layer 6) protects
-credentials stored in environment variables.
+**Mitigation**: Don’t store sensitive data in system-wide readable
+locations. Environment sanitization (Layer 6) protects credentials in
+env vars.
 
 ### `sandbox-exec` is deprecated by Apple
 
@@ -502,34 +491,15 @@ everything the session can access.
 
 ### Code pre-validation is advisory only
 
-The
-[`validate_code()`](https://ian-flores.github.io/securer/reference/validate_code.md)
-function uses regex pattern matching, which:
-
-- Produces false positives: `"system() is useful"` (string, not a call)
-  triggers a warning
-- Produces false negatives: `get("sys" %p% "tem")()` or
-  `do.call("system", list("ls"))` evade detection
-
-The sandbox is the actual enforcement layer. Pre-validation is a
-convenience for catching obvious mistakes, not a security boundary.
+See Layer 8 above. Regex matching has both false positives and false
+negatives. The OS sandbox is the actual enforcement layer.
 
 ### Tool wrapper functions are not locked
 
-While `.securer_call_tool()`, `.securer_connect()`, and `.securer_env`
-are protected by [`lockBinding()`](https://rdrr.io/r/base/bindenv.html),
-the generated tool wrapper functions (e.g., `add()`, `get_weather()`)
-are not locked. Child code could redefine these:
-
-``` r
-# Child code could do:
-add <- function(a, b) .securer_call_tool("add", a = a * 1000, b = b)
-```
-
-This only affects the child’s own calling convention. The parent-side
-argument validation and tool function execution are unaffected. The
-child can already call `.securer_call_tool()` directly with any
-arguments, so redefining the wrapper provides no additional capability.
+See Layer 10 above. Child code can redefine wrappers like `add()`, but
+this only affects its own calling convention. The child can already call
+`.securer_call_tool()` directly, so redefining wrappers provides no
+additional capability.
 
 ### Session pooling multiplies the attack surface
 
@@ -541,36 +511,15 @@ hitting a resource limit) gets replaced transparently.
 
 ### Fallback to unsandboxed execution
 
-When the platform-specific sandbox tool is unavailable (`sandbox-exec`
-not found on macOS, `bwrap` not found on Linux), securer falls back to
-running without OS-level sandboxing. A warning is emitted, but execution
-proceeds. The other defense layers (resource limits, IPC validation,
-environment sanitization) still apply.
-
-``` r
-# Warning message:
-# "bwrap (bubblewrap) not found; falling back to unsandboxed session"
-```
+When `sandbox-exec` (macOS) or `bwrap` (Linux) is not found, securer
+falls back to unsandboxed execution with a warning. Resource limits, IPC
+validation, and environment sanitization still apply.
 
 ### The child can consume resources within limits
 
-Resource limits bound but do not prevent resource use. A child can
-still:
-
-- Allocate up to 512 MB of memory (default)
-- Use 60 seconds of CPU time (default)
-- Write files up to 50 MB (default)
-- Create up to 50 processes (default)
-
-If these defaults are too generous for your use case, pass tighter
-limits:
-
-``` r
-session <- SecureSession$new(
-  sandbox = TRUE,
-  limits = list(cpu = 5, memory = 64 * 1024 * 1024, nproc = 5)
-)
-```
+Resource limits bound but do not prevent resource use. The defaults (60s
+CPU, 512 MB memory, 50 MB file, 50 processes) may be too generous for
+your use case. See “Tighten resource limits” in Recommendations below.
 
 ### `lockBinding` can be bypassed via environments
 
@@ -671,57 +620,33 @@ killed, the IPC connection is torn down, and a new session is started.
 ### Always use `sandbox = TRUE` in production
 
 Without the sandbox, the child process has the same privileges as the
-parent. This includes full filesystem access, network access, and
-process execution.
+parent.
 
-### Set explicit resource limits
+### Tighten resource limits for your workload
 
-Even with the sandbox enabled, set limits appropriate to your workload:
+The defaults (60s CPU, 512 MB memory) are intentionally generous.
+Tighten them:
 
 ``` r
 session <- SecureSession$new(
   sandbox = TRUE,
-  limits = list(
-    cpu = 10,                      # 10 seconds CPU
-    memory = 128 * 1024 * 1024,    # 128 MB
-    fsize = 10 * 1024 * 1024,      # 10 MB max file
-    nproc = 10,                    # 10 processes
-    nofile = 64                    # 64 open files
-  )
+  limits = list(cpu = 10, memory = 128 * 1024 * 1024, nproc = 10)
 )
 ```
 
-The defaults (60s CPU, 512 MB memory, 50 MB file, 50 processes, 256
-files) are intentionally generous to avoid breaking legitimate
-workloads. Tighten them based on what your LLM-generated code actually
-needs.
-
-### Use execution timeouts
-
-Always pass a `timeout` to `$execute()`:
-
-``` r
-session$execute(llm_code, timeout = 30)
-```
-
-This catches cases where `ulimit -t` does not apply (e.g., the child is
-blocked on I/O, sleeping, or waiting for a lock).
-
-### Use `max_tool_calls` to prevent loops
-
-If the LLM generates code that calls a tool in a tight loop, it can
-overwhelm the host. Set a cap:
+### Use execution timeouts and tool call caps
 
 ``` r
 session$execute(llm_code, timeout = 30, max_tool_calls = 50)
 ```
 
+Timeouts catch cases where `ulimit -t` does not apply (I/O blocking,
+sleeping). Tool call caps prevent tight-loop abuse.
+
 ### Review tool functions carefully
 
-Tool functions execute on the host with full privileges. A tool that
-runs arbitrary SQL, writes to arbitrary paths, or makes unconstrained
-API calls undermines the sandbox. Apply the principle of least privilege
-to each tool:
+Tool functions run on the host with full privileges. Apply least
+privilege:
 
 ``` r
 # BAD: arbitrary SQL
@@ -729,7 +654,7 @@ securer_tool("query", "Run SQL",
   fn = function(sql) DBI::dbGetQuery(conn, sql),
   args = list(sql = "character"))
 
-# BETTER: parameterized query with allowlist
+# BETTER: parameterized query
 securer_tool("get_user", "Look up user by ID",
   fn = function(user_id) {
     stopifnot(is.numeric(user_id), user_id > 0)
@@ -741,21 +666,8 @@ securer_tool("get_user", "Look up user by ID",
 
 ### Enable audit logging
 
-For compliance and incident investigation, enable the file-based audit
-log:
-
 ``` r
-session <- SecureSession$new(
-  sandbox = TRUE,
-  audit_log = "/var/log/securer/audit.jsonl"
-)
-```
-
-Each entry is a JSON object with a timestamp, event type, and session
-ID:
-
-``` json
-{"timestamp":"2025-01-15T10:30:00.123Z","event":"tool_call","session_id":"sess_abc123","tool":"add","args":{"a":1,"b":2}}
+session <- SecureSession$new(sandbox = TRUE, audit_log = "/var/log/securer/audit.jsonl")
 ```
 
 Events logged: `session_start`, `session_close`, `execute_start`,
@@ -764,23 +676,12 @@ Events logged: `session_start`, `session_close`, `execute_start`,
 
 ### On Windows, use container isolation
 
-Since the Windows sandbox does not restrict filesystem or network
-access, run the host process inside a Docker container (with Windows
-containers) or WSL2 with bwrap to get the missing isolation layers.
+Run the host process inside Docker or WSL2 with bwrap to get the
+filesystem and network restrictions the Windows sandbox lacks.
 
-### Monitor for sandbox fallback warnings
-
-If `sandbox-exec` or `bwrap` is not installed, securer falls back to
-unsandboxed execution with a warning. In production, treat this warning
-as a deployment error. Ensure sandbox tools are installed and on PATH
-before starting sessions.
+### Verify sandbox tooling at deploy time
 
 ``` r
-# Verify sandbox tooling is available:
-if (Sys.info()[["sysname"]] == "Linux") {
-  stopifnot(nzchar(Sys.which("bwrap")))
-}
-if (Sys.info()[["sysname"]] == "Darwin") {
-  stopifnot(file.exists("/usr/bin/sandbox-exec"))
-}
+if (Sys.info()[["sysname"]] == "Linux") stopifnot(nzchar(Sys.which("bwrap")))
+if (Sys.info()[["sysname"]] == "Darwin") stopifnot(file.exists("/usr/bin/sandbox-exec"))
 ```
