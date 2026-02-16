@@ -39,7 +39,7 @@
 #'   sandbox = FALSE
 #' )
 #' }
-#' \dontrun{
+#' \donttest{
 #' # With resource limits (Unix only)
 #' execute_r("1 + 1", limits = list(cpu = 10, memory = 256 * 1024 * 1024))
 #' }

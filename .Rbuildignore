@@ -9,3 +9,4 @@
 ^\.gitignore$
 ^codecov\.yml$
 ^cran-comments\.md$
+^vignettes/.*\.html$
