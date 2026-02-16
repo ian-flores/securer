@@ -95,8 +95,11 @@ result <- execute_r(
   sandbox = FALSE
 )
 # }
-if (FALSE) { # \dontrun{
+# \donttest{
 # With resource limits (Unix only)
 execute_r("1 + 1", limits = list(cpu = 10, memory = 256 * 1024 * 1024))
-} # }
+#> Warning: bwrap (bubblewrap) not found; falling back to unsandboxed session
+#> Warning: OS-level sandbox not available on this platform; session will run without sandboxing
+#> [1] 2
+# }
 ```

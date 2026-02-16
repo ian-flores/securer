@@ -290,10 +290,13 @@ session$execute("add(2, 3)")
 #> [1] 5
 session$close()
 # }
-if (FALSE) { # \dontrun{
+# \donttest{
 # With sandbox (requires platform-specific tools)
 session <- SecureSession$new(sandbox = TRUE)
+#> Warning: bwrap (bubblewrap) not found; falling back to unsandboxed session
+#> Warning: OS-level sandbox not available on this platform; session will run without sandboxing
 session$execute("1 + 1")
+#> [1] 2
 session$close()
-} # }
+# }
 ```
