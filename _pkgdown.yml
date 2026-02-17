@@ -19,6 +19,7 @@ reference:
       - SecureSession
       - SecureSessionPool
       - execute_r
+      - with_secure_session
       - securer_tool
 
   - title: Validation & Logging
