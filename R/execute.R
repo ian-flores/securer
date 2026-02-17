@@ -75,7 +75,7 @@ execute_r <- function(code, tools = list(), timeout = 30, sandbox = TRUE,
 #' \donttest{
 #' # Run multiple commands on the same session
 #' result <- with_secure_session(function(session) {
-#'   session$execute("x <- 10", sandbox = FALSE)
+#'   session$execute("x <- 10")
 #'   session$execute("x * 2")
 #' }, sandbox = FALSE)
 #'

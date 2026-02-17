@@ -48,9 +48,12 @@ generate_bwrap_args <- function(socket_path, r_home) {
     # /proc/self/environ exposes all environment variables (including any
     # secrets that weren't unset before reaching this point).
     # /proc/self/maps reveals the memory layout, which aids ASLR bypass.
+    # /proc/self/fd/ reveals open file descriptors including the UDS socket,
+    # which could be used to directly write raw IPC messages.
     # We mask these with empty tmpfs mounts.
     "--tmpfs", "/proc/self/environ",
     "--tmpfs", "/proc/self/maps",
+    "--tmpfs", "/proc/self/fd",
 
     # -- Writable temp (clean) -------------------------------------------------
     "--tmpfs", "/tmp",

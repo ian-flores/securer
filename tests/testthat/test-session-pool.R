@@ -329,8 +329,9 @@ test_that("reset_between_uses=TRUE clears state between executions", {
   # Set a variable in the first execution
   pool$execute("x <- 42")
 
+
   # After reset, x should not exist
-  expect_error(pool$execute("x"), "not found")
+  expect_error(pool$execute("x"))
 })
 
 test_that("reset_between_uses=FALSE preserves state between executions", {

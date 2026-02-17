@@ -153,11 +153,9 @@ Execute R code in the secure session
 \item{\code{code}}{Character string of R code to execute}
 
 \item{\code{timeout}}{Timeout in seconds (default 30).  Pass \code{NULL} to
-disable the timeout entirely.
-
-@note The \code{execute_r()} convenience wrapper also defaults to 30
-seconds.  For long-running workloads, pass an explicit higher value
-or \code{NULL}.}
+disable the timeout entirely.  Both this method and the
+\code{\link[=execute_r]{execute_r()}} convenience wrapper default to 30 seconds.  For
+long-running workloads, pass an explicit higher value or \code{NULL}.}
 
 \item{\code{validate}}{Logical, whether to pre-validate the code for syntax
 errors before sending it to the child process (default \code{TRUE}).}

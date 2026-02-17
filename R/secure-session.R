@@ -137,11 +137,9 @@ SecureSession <- R6::R6Class("SecureSession",
     #' @description Execute R code in the secure session
     #' @param code Character string of R code to execute
     #' @param timeout Timeout in seconds (default 30).  Pass `NULL` to
-    #'   disable the timeout entirely.
-    #'
-    #'   @note The `execute_r()` convenience wrapper also defaults to 30
-    #'   seconds.  For long-running workloads, pass an explicit higher value
-    #'   or `NULL`.
+    #'   disable the timeout entirely.  Both this method and the
+    #'   [execute_r()] convenience wrapper default to 30 seconds.  For
+    #'   long-running workloads, pass an explicit higher value or `NULL`.
     #' @param validate Logical, whether to pre-validate the code for syntax
     #'   errors before sending it to the child process (default `TRUE`).
     #' @param output_handler An optional callback function that receives output
@@ -417,11 +415,11 @@ SecureSession <- R6::R6Class("SecureSession",
 
       if (is.character(sock_path) && length(sock_path) == 1 &&
           file.exists(sock_path)) {
-        unlink(sock_path)
+        try(unlink(sock_path), silent = TRUE)
       }
       if (is.character(sock_dir) && length(sock_dir) == 1 &&
           dir.exists(sock_dir)) {
-        unlink(sock_dir, recursive = TRUE)
+        try(unlink(sock_dir, recursive = TRUE), silent = TRUE)
       }
       if (is.list(sb_config)) {
         if (is.character(sb_config$wrapper))

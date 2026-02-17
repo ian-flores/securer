@@ -1,7 +1,5 @@
 test_that("securer_as_ellmer_tool() requires ellmer", {
-  skip_if_no_session()
-  # This test just checks the function exists and the API is correct.
-  # If ellmer is not installed, the function should error clearly.
+  # Pure unit test — no child process spawned, only checks API surface.
   skip_if_not_installed("ellmer")
 
   tool_def <- securer_as_ellmer_tool(sandbox = FALSE)
@@ -10,7 +8,7 @@ test_that("securer_as_ellmer_tool() requires ellmer", {
 })
 
 test_that("ellmer tool has correct name and description", {
-  skip_if_no_session()
+  # Pure unit test — no child process spawned.
   skip_if_not_installed("ellmer")
 
   tool_def <- securer_as_ellmer_tool(sandbox = FALSE)

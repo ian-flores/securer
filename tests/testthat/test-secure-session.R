@@ -866,6 +866,16 @@ test_that("max_code_length allows code within limit", {
   expect_equal(result, 2)
 })
 
+test_that("max_code_length boundary: code exactly at limit is accepted", {
+  skip_if_no_session()
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  code <- "1 + 1"  # 5 chars
+  result <- session$execute(code, max_code_length = nchar(code))
+  expect_equal(result, 2)
+})
+
 # --- New feature tests: max_output_lines ---
 
 test_that("max_output_lines caps accumulated output", {
@@ -880,8 +890,8 @@ test_that("max_output_lines caps accumulated output", {
   )
   expect_true(result)
   output <- attr(result, "output")
-  # Output should be capped (no more than 3 stored lines)
-  expect_true(length(output) <= 3)
+  # Output should be capped at exactly the limit (code prints 100 lines)
+  expect_equal(length(output), 3)
 })
 
 # --- New feature tests: max_executions ---
