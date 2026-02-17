@@ -1,4 +1,5 @@
 # --- validate_code() unit tests ---
+# These tests do not spawn child processes, so no skip_if_no_session() needed.
 
 test_that("valid code passes validation", {
   result <- validate_code("1 + 1")
@@ -177,6 +178,7 @@ test_that("do.call() is flagged", {
 # --- Integration with SecureSession$execute(validate=...) ---
 
 test_that("execute() rejects syntax errors by default", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -189,6 +191,7 @@ test_that("execute() rejects syntax errors by default", {
 })
 
 test_that("execute() with validate=FALSE skips validation", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -198,6 +201,7 @@ test_that("execute() with validate=FALSE skips validation", {
 })
 
 test_that("execute() validation does not affect valid code", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -206,6 +210,7 @@ test_that("execute() validation does not affect valid code", {
 })
 
 test_that("execute_r() rejects syntax errors", {
+  skip_if_no_session()
   expect_error(
     execute_r("if (TRUE {", sandbox = FALSE),
     "syntax error"
@@ -213,6 +218,7 @@ test_that("execute_r() rejects syntax errors", {
 })
 
 test_that("execute_r() with validate=FALSE skips validation", {
+  skip_if_no_session()
   # Should still error, but from child process not from pre-validation
   expect_error(execute_r("if (TRUE {", validate = FALSE, sandbox = FALSE))
 })

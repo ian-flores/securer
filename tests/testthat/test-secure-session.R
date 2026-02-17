@@ -1,4 +1,5 @@
 test_that("SecureSession can execute simple code", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -7,6 +8,7 @@ test_that("SecureSession can execute simple code", {
 })
 
 test_that("SecureSession can execute multi-line code", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -19,6 +21,7 @@ test_that("SecureSession can execute multi-line code", {
 })
 
 test_that("SecureSession reports errors in user code", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -26,18 +29,21 @@ test_that("SecureSession reports errors in user code", {
 })
 
 test_that("SecureSession$close() works", {
+  skip_if_no_session()
   session <- SecureSession$new()
   session$close()
   expect_false(session$is_alive())
 })
 
 test_that("execute on closed session errors", {
+  skip_if_no_session()
   session <- SecureSession$new()
   session$close()
   expect_error(session$execute("1"), "not running")
 })
 
 test_that("sequential execute() calls work fine", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -47,6 +53,7 @@ test_that("sequential execute() calls work fine", {
 })
 
 test_that("executing flag resets after error in user code", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -56,8 +63,8 @@ test_that("executing flag resets after error in user code", {
 })
 
 test_that("concurrent execute() is rejected", {
+  skip_if_no_session()
   # We can't truly call execute() in parallel from one R session, but we
-
   # can simulate the guard by manually setting the private field.
   session <- SecureSession$new()
   on.exit(session$close())
@@ -77,6 +84,7 @@ test_that("concurrent execute() is rejected", {
 })
 
 test_that("execute() completes within timeout", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -85,6 +93,7 @@ test_that("execute() completes within timeout", {
 })
 
 test_that("execute() times out on infinite loop", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -95,6 +104,7 @@ test_that("execute() times out on infinite loop", {
 })
 
 test_that("execute() with NULL timeout works normally (no timeout)", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -104,11 +114,11 @@ test_that("execute() with NULL timeout works normally (no timeout)", {
 })
 
 test_that("session is usable after a timeout", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
   # First, cause a timeout
-
   expect_error(
     session$execute("while(TRUE) {}", timeout = 1),
     "timed out"
@@ -123,6 +133,7 @@ test_that("session is usable after a timeout", {
 # --- Streaming output capture tests ---
 
 test_that("execute() captures cat() output", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -133,6 +144,7 @@ test_that("execute() captures cat() output", {
 })
 
 test_that("execute() captures print() output", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -143,6 +155,7 @@ test_that("execute() captures print() output", {
 })
 
 test_that("output_handler receives lines as they arrive", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -158,6 +171,7 @@ test_that("output_handler receives lines as they arrive", {
 })
 
 test_that("output and return value are separate", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -170,6 +184,7 @@ test_that("output and return value are separate", {
 # --- Rate limiting tests (Finding 14) ---
 
 test_that("max_tool_calls limits tool invocations", {
+  skip_if_no_session()
   tools <- list(
     securer_tool(
       "counter", "Count calls",
@@ -188,6 +203,7 @@ test_that("max_tool_calls limits tool invocations", {
 })
 
 test_that("max_tool_calls NULL allows unlimited tool calls", {
+  skip_if_no_session()
   tools <- list(
     securer_tool(
       "inc", "Increment",
@@ -208,6 +224,7 @@ test_that("max_tool_calls NULL allows unlimited tool calls", {
 })
 
 test_that("max_tool_calls allows exactly the limit", {
+  skip_if_no_session()
   tools <- list(
     securer_tool(
       "inc", "Increment",
@@ -219,7 +236,6 @@ test_that("max_tool_calls allows exactly the limit", {
   on.exit(session$close())
 
   # Allow exactly 2 tool calls, and code makes exactly 2
-
   result <- session$execute("
     a <- inc(1)
     b <- inc(a)
@@ -231,6 +247,7 @@ test_that("max_tool_calls allows exactly the limit", {
 # --- Parent-side argument validation tests (Finding 5) ---
 
 test_that("unexpected tool arguments are rejected by parent", {
+  skip_if_no_session()
   tools <- list(
     securer_tool(
       "add", "Add numbers",
@@ -249,6 +266,7 @@ test_that("unexpected tool arguments are rejected by parent", {
 })
 
 test_that("correct tool arguments pass parent-side validation", {
+  skip_if_no_session()
   tools <- list(
     securer_tool(
       "add", "Add numbers",
@@ -266,6 +284,7 @@ test_that("correct tool arguments pass parent-side validation", {
 # --- IPC message size limit tests (Finding 10) ---
 
 test_that("max_ipc_message_size private field is 1MB", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -274,6 +293,7 @@ test_that("max_ipc_message_size private field is 1MB", {
 })
 
 test_that("IPC message exceeding size limit is rejected", {
+  skip_if_no_session()
   # Register a tool so the parent enters the tool-call dispatch path
   tools <- list(
     securer_tool("echo", "Echo input", function(x) x, args = list(x = "character"))
@@ -297,6 +317,7 @@ test_that("IPC message exceeding size limit is rejected", {
 # --- Malformed IPC JSON schema validation tests (Finding 10) ---
 
 test_that("child code cannot access .securer_env (closure-based hiding)", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -306,6 +327,7 @@ test_that("child code cannot access .securer_env (closure-based hiding)", {
 })
 
 test_that("child code cannot access .securer_connect (closure-based hiding)", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -315,11 +337,11 @@ test_that("child code cannot access .securer_connect (closure-based hiding)", {
 })
 
 test_that("child code cannot access the raw UDS connection", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
   # The connection is captured in the closure's enclosing environment,
-
   # not in any accessible global or named environment.
   # Attempting to get it via environment() on the closure should not
   # expose a usable conn object to arbitrary child code.
@@ -334,6 +356,7 @@ test_that("child code cannot access the raw UDS connection", {
 # --- Tool name regex sanitization tests (Finding 10) ---
 
 test_that("injection-style tool name is sanitized to <invalid>", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -347,6 +370,7 @@ test_that("injection-style tool name is sanitized to <invalid>", {
 })
 
 test_that("tool name with leading digit is sanitized", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -358,6 +382,7 @@ test_that("tool name with leading digit is sanitized", {
 })
 
 test_that("tool name with special characters is sanitized", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -369,6 +394,7 @@ test_that("tool name with special characters is sanitized", {
 })
 
 test_that("valid tool name pattern is accepted", {
+  skip_if_no_session()
   # Ensure the regex doesn't reject legitimate R-style names
   tools <- list(
     securer_tool("my.tool_v2", "A tool", function() 42, args = list())
@@ -383,6 +409,7 @@ test_that("valid tool name pattern is accepted", {
 # --- Non-list args coercion tests (Finding 5) ---
 
 test_that("non-list args from child are rejected via .securer_call_tool", {
+  skip_if_no_session()
   # With the closure-based pattern, child code cannot access the raw
   # connection to send malformed messages. This test verifies that
   # unexpected arg types are caught through the normal tool call path.
@@ -400,6 +427,7 @@ test_that("non-list args from child are rejected via .securer_call_tool", {
 })
 
 test_that("tool_call with no args works via wrapper function", {
+  skip_if_no_session()
   # Verify tool calls with no arguments work correctly through the
   # wrapper function (the normal code path).
   tools <- list(
@@ -415,6 +443,7 @@ test_that("tool_call with no args works via wrapper function", {
 # --- Environment sanitization tests (V29) ---
 
 test_that("child does not inherit parent env vars", {
+  skip_if_no_session()
   # Set a custom env var in the parent
   Sys.setenv(SECURER_TEST_SECRET = "leaked")
   on.exit(Sys.unsetenv("SECURER_TEST_SECRET"))
@@ -427,6 +456,7 @@ test_that("child does not inherit parent env vars", {
 })
 
 test_that("child inherits safe vars like PATH and HOME", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -435,6 +465,7 @@ test_that("child inherits safe vars like PATH and HOME", {
 })
 
 test_that("child SECURER_SOCKET env var is cleared after connect", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -446,6 +477,7 @@ test_that("child SECURER_SOCKET env var is cleared after connect", {
 # --- R_LIBS env hardening tests (S11) ---
 
 test_that("R_LIBS is NOT inherited by the child process (S11 fix)", {
+  skip_if_no_session()
   # Set R_LIBS in the parent to simulate attacker-controlled path
   old_val <- Sys.getenv("R_LIBS", unset = NA)
   Sys.setenv(R_LIBS = "/tmp/malicious_packages")
@@ -461,6 +493,7 @@ test_that("R_LIBS is NOT inherited by the child process (S11 fix)", {
 })
 
 test_that("R_LIBS_USER is cleared in child process (S11 fix)", {
+  skip_if_no_session()
   # Set R_LIBS_USER in the parent
   old_val <- Sys.getenv("R_LIBS_USER", unset = NA)
   Sys.setenv(R_LIBS_USER = "/tmp/malicious_user_packages")
@@ -482,6 +515,7 @@ test_that("R_LIBS_USER is cleared in child process (S11 fix)", {
 # --- Default limits tests (V9) ---
 
 test_that("sandbox=TRUE auto-applies default resource limits", {
+  skip_if_no_session()
   skip_on_os(c("windows", "linux"))
   skip_if_not(file.exists("/usr/bin/sandbox-exec"), "sandbox-exec not available")
 
@@ -499,6 +533,7 @@ test_that("sandbox=TRUE auto-applies default resource limits", {
 })
 
 test_that("sandbox=FALSE does not auto-apply limits", {
+  skip_if_no_session()
   session <- SecureSession$new(sandbox = FALSE)
   on.exit(session$close())
 
@@ -541,6 +576,7 @@ test_that("default_limits returns expected structure", {
 })
 
 test_that("GC finalizer cleans up child process", {
+  skip_if_no_session()
   # Run in a local environment so the session reference is truly dropped
   pid <- local({
     s <- SecureSession$new()
@@ -560,6 +596,7 @@ test_that("GC finalizer cleans up child process", {
 # --- print/format method tests ---
 
 test_that("format() shows session info for running session", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -571,6 +608,7 @@ test_that("format() shows session info for running session", {
 })
 
 test_that("format() shows stopped after close", {
+  skip_if_no_session()
   session <- SecureSession$new()
   session$close()
 
@@ -580,6 +618,7 @@ test_that("format() shows stopped after close", {
 })
 
 test_that("format() shows tool count", {
+  skip_if_no_session()
   tools <- list(
     securer_tool("add", "Add", fn = function(a, b) a + b,
       args = list(a = "numeric", b = "numeric"))
@@ -592,6 +631,7 @@ test_that("format() shows tool count", {
 })
 
 test_that("print() outputs format string", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -602,6 +642,7 @@ test_that("print() outputs format string", {
 # --- $tools() accessor tests ---
 
 test_that("$tools() returns empty list when no tools registered", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -610,6 +651,7 @@ test_that("$tools() returns empty list when no tools registered", {
 })
 
 test_that("$tools() returns registered securer_tool info", {
+  skip_if_no_session()
   tools <- list(
     securer_tool("add", "Add numbers",
       fn = function(a, b) a + b,
@@ -630,6 +672,7 @@ test_that("$tools() returns registered securer_tool info", {
 })
 
 test_that("$tools() works with legacy tool format", {
+  skip_if_no_session()
   tools <- list(add = function(a, b) a + b)
   expect_warning(
     session <- SecureSession$new(tools = tools),
@@ -646,6 +689,7 @@ test_that("$tools() works with legacy tool format", {
 # --- $restart() method tests ---
 
 test_that("$restart() creates a fresh session with new PID", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -658,6 +702,7 @@ test_that("$restart() creates a fresh session with new PID", {
 })
 
 test_that("$restart() re-registers tools", {
+  skip_if_no_session()
   tools <- list(
     securer_tool("add", "Add numbers",
       fn = function(a, b) a + b,
@@ -676,6 +721,7 @@ test_that("$restart() re-registers tools", {
 })
 
 test_that("$restart() works on a dead session", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -691,6 +737,7 @@ test_that("$restart() works on a dead session", {
 })
 
 test_that("$restart() errors during active execution", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -707,6 +754,7 @@ test_that("$restart() errors during active execution", {
 # --- Total message flood protection tests (I4 fix) ---
 
 test_that("total_messages counter initialized from max_tool_calls", {
+  skip_if_no_session()
   # Verify the max_messages cap is computed correctly.
   # With max_tool_calls = 2, the cap should be 2 * 10 = 20.
   # We test by making exactly 2 tool calls (within limit) and confirming
@@ -730,6 +778,7 @@ test_that("total_messages counter initialized from max_tool_calls", {
 })
 
 test_that("unknown IPC message type emits a warning", {
+  skip_if_no_session()
   # Verify the warning code path exists and normal execution
   # still works (no false positives from the counter).
   session <- SecureSession$new()
@@ -742,6 +791,7 @@ test_that("unknown IPC message type emits a warning", {
 # --- T4 fix: tools with args=list() reject extra arguments ---
 
 test_that("tool with args=list() rejects extra arguments via .securer_call_tool", {
+  skip_if_no_session()
   tools <- list(
     securer_tool(
       "ping", "Ping with no args",
@@ -760,6 +810,7 @@ test_that("tool with args=list() rejects extra arguments via .securer_call_tool"
 })
 
 test_that("tool with args=list() works when called with no arguments", {
+  skip_if_no_session()
   tools <- list(
     securer_tool(
       "ping", "Ping with no args",
@@ -775,6 +826,7 @@ test_that("tool with args=list() works when called with no arguments", {
 })
 
 test_that("tool with args=list() rejects multiple extra arguments", {
+  skip_if_no_session()
   tools <- list(
     securer_tool(
       "noop", "No args allowed",
@@ -788,5 +840,145 @@ test_that("tool with args=list() rejects multiple extra arguments", {
   expect_error(
     session$execute('.securer_call_tool("noop", x = 1, y = 2)'),
     "Unexpected arguments.*noop"
+  )
+})
+
+# --- New feature tests: max_code_length ---
+
+test_that("max_code_length rejects oversized code", {
+  skip_if_no_session()
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  # Set a very small max_code_length to test rejection
+  expect_error(
+    session$execute("1 + 1", max_code_length = 3),
+    "Code too long"
+  )
+})
+
+test_that("max_code_length allows code within limit", {
+  skip_if_no_session()
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  result <- session$execute("1 + 1", max_code_length = 100)
+  expect_equal(result, 2)
+})
+
+# --- New feature tests: max_output_lines ---
+
+test_that("max_output_lines caps accumulated output", {
+  skip_if_no_session()
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  # Print many lines but cap at 3
+  result <- session$execute(
+    'for (i in 1:100) cat(i, "\\n"); TRUE',
+    max_output_lines = 3
+  )
+  expect_true(result)
+  output <- attr(result, "output")
+  # Output should be capped (no more than 3 stored lines)
+  expect_true(length(output) <= 3)
+})
+
+# --- New feature tests: max_executions ---
+
+test_that("max_executions limits the number of execute() calls", {
+  skip_if_no_session()
+  session <- SecureSession$new(max_executions = 2)
+  on.exit(session$close())
+
+  expect_equal(session$execute("1"), 1)
+  expect_equal(session$execute("2"), 2)
+  expect_error(session$execute("3"), "Maximum executions \\(2\\) reached")
+})
+
+# --- New feature tests: pre_execute_hook ---
+
+test_that("pre_execute_hook can block execution", {
+  skip_if_no_session()
+  session <- SecureSession$new(
+    pre_execute_hook = function(code) {
+      !grepl("system", code)
+    }
+  )
+  on.exit(session$close())
+
+  # Safe code passes
+  expect_equal(session$execute("1 + 1"), 2)
+
+  # Code mentioning system is blocked
+  expect_error(
+    session$execute('system("whoami")'),
+    "Execution blocked by pre_execute_hook"
+  )
+})
+
+test_that("pre_execute_hook returning TRUE allows execution", {
+  skip_if_no_session()
+  session <- SecureSession$new(
+    pre_execute_hook = function(code) TRUE
+  )
+  on.exit(session$close())
+
+  result <- session$execute("42")
+  expect_equal(result, 42)
+})
+
+# --- New feature tests: sanitize_errors ---
+
+test_that("sanitize_errors strips file paths from error messages", {
+  skip_if_no_session()
+  session <- SecureSession$new(sanitize_errors = TRUE)
+  on.exit(session$close())
+
+  expect_error(
+    session$execute("stop('cannot open /Users/secret/data.rds')"),
+    "\\[path\\]"
+  )
+})
+
+test_that("sanitize_errors=FALSE preserves original error message", {
+  skip_if_no_session()
+  session <- SecureSession$new(sanitize_errors = FALSE)
+  on.exit(session$close())
+
+  expect_error(
+    session$execute("stop('cannot open /Users/secret/data.rds')"),
+    "/Users/secret"
+  )
+})
+
+# --- Closure hardening tests ---
+
+test_that("child cannot modify .ipc_store environment (locked)", {
+  skip_if_no_session()
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  # The .ipc_store environment is locked, so assigning to it should fail
+  expect_error(
+    session$execute('
+      env <- environment(.securer_call_tool)
+      store <- env$.ipc_store
+      store$evil <- "injected"
+    ')
+  )
+})
+
+test_that("child cannot add new bindings to .ipc_store", {
+  skip_if_no_session()
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  expect_error(
+    session$execute('
+      env <- environment(.securer_call_tool)
+      store <- env$.ipc_store
+      assign("evil", "injected", envir = store)
+    ')
   )
 })

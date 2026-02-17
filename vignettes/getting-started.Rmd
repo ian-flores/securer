@@ -13,6 +13,7 @@ knitr::opts_chunk$set(
   comment = "#>",
   eval = FALSE
 )
+can_eval <- requireNamespace("securer", quietly = TRUE)
 ```
 
 ## Overview
@@ -50,13 +51,15 @@ By default `execute_r()` enables the OS sandbox (`sandbox = TRUE`). Pass
 Tools let sandboxed code call functions on the host. Define them with
 `securer_tool()`:
 
-```{r}
+```{r, eval = can_eval}
+library(securer)
 add_tool <- securer_tool(
   name = "add",
   description = "Add two numbers",
   fn = function(a, b) a + b,
   args = list(a = "numeric", b = "numeric")
 )
+add_tool
 ```
 
 Each tool has four components:
@@ -135,6 +138,44 @@ State persists across `$execute()` calls within the same session. The variable
 Always call `$close()` when done. This terminates the child process, removes
 the Unix domain socket, and cleans up any temporary sandbox files.
 
+### Automatic cleanup with `with_secure_session()`
+
+If you prefer not to manage `$close()` manually, use `with_secure_session()`.
+It creates a session, passes it to your function, and guarantees cleanup:
+
+```{r}
+result <- with_secure_session(function(session) {
+  session$execute("x <- 10")
+  session$execute("x * 2")
+}, sandbox = FALSE)
+```
+
+## Safety features for agent workflows
+
+`SecureSession` includes several features for hardening LLM agent deployments:
+
+- **`max_code_length`** (in `$execute()`): Reject code strings longer than a
+  threshold (default 100,000 characters) before parsing.
+- **`max_executions`** (in `$new()`): Limit the total number of `$execute()`
+  calls on a session. Once reached, further calls error immediately.
+- **`pre_execute_hook`** (in `$new()`): A function called before every
+  execution. Return `FALSE` to block it. Useful for content-based filtering.
+- **`sanitize_errors`** (in `$new()`): Strip file paths, PIDs, and hostnames
+  from error messages before they reach the LLM.
+
+```{r}
+session <- SecureSession$new(
+  max_executions = 100,
+  pre_execute_hook = function(code) {
+    # Block code that mentions system()
+    !grepl("system\\(", code)
+  },
+  sanitize_errors = TRUE
+)
+```
+
+See `vignette("security-model")` for the full threat model and defense layers.
+
 ## Sandbox
 
 When `sandbox = TRUE`, the child process runs inside platform-native OS-level
@@ -201,6 +242,28 @@ Supported limits:
 | `nproc`  | count   | `-u`        | Maximum processes           |
 | `nofile` | count   | `-n`        | Maximum open files          |
 | `stack`  | bytes   | `-s`        | Stack size                  |
+
+Default limits applied when `sandbox = TRUE`:
+
+```{r, eval = can_eval}
+default_limits()
+```
+
+## Code pre-validation
+
+`validate_code()` checks for syntax errors and dangerous patterns before
+sending code to the child process:
+
+```{r, eval = can_eval}
+# Valid code
+validate_code("1 + 1")
+
+# Syntax error
+validate_code("if (TRUE {")
+
+# Dangerous pattern (advisory warning, not a hard block)
+validate_code("system('ls')")
+```
 
 ## Execution timeout
 

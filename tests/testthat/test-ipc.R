@@ -1,4 +1,5 @@
 test_that("Tool call pause/resume works", {
+  skip_if_no_session()
   add_fn <- function(a, b) a + b
 
   expect_warning(
@@ -12,6 +13,7 @@ test_that("Tool call pause/resume works", {
 })
 
 test_that("Multiple tool calls in sequence work", {
+  skip_if_no_session()
   add_fn <- function(a, b) a + b
 
   expect_warning(
@@ -29,6 +31,7 @@ test_that("Multiple tool calls in sequence work", {
 })
 
 test_that("Unknown tool call returns error", {
+  skip_if_no_session()
   session <- SecureSession$new(tools = list())
   on.exit(session$close())
 
@@ -39,6 +42,7 @@ test_that("Unknown tool call returns error", {
 })
 
 test_that("Tool execution error is propagated", {
+  skip_if_no_session()
   bad_fn <- function() stop("tool failed")
 
   expect_warning(
@@ -54,6 +58,7 @@ test_that("Tool execution error is propagated", {
 })
 
 test_that("Overwriting .securer_call_tool in child is prevented", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -64,6 +69,7 @@ test_that("Overwriting .securer_call_tool in child is prevented", {
 })
 
 test_that("unlockBinding is shadowed in child", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -74,6 +80,7 @@ test_that("unlockBinding is shadowed in child", {
 })
 
 test_that("Overwriting unlockBinding in child is prevented", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -84,6 +91,7 @@ test_that("Overwriting unlockBinding in child is prevented", {
 })
 
 test_that("SECURER_TOKEN env var is cleared in child after auth", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -92,6 +100,7 @@ test_that("SECURER_TOKEN env var is cleared in child after auth", {
 })
 
 test_that("SECURER_SOCKET env var is cleared in child after connect", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -100,6 +109,7 @@ test_that("SECURER_SOCKET env var is cleared in child after connect", {
 })
 
 test_that("Tool calls still work after bindings are locked", {
+  skip_if_no_session()
   add_fn <- function(a, b) a + b
 
   expect_warning(
@@ -115,6 +125,7 @@ test_that("Tool calls still work after bindings are locked", {
 # --- Socket directory isolation tests (Finding 8) ---
 
 test_that("socket lives in a private directory with 0700 permissions", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -123,7 +134,6 @@ test_that("socket lives in a private directory with 0700 permissions", {
   socket_path <- priv$socket_path
 
   # Socket directory exists and is a directory
-
   expect_true(dir.exists(socket_dir))
 
   # Socket path is inside the private directory
@@ -145,6 +155,7 @@ test_that("socket lives in a private directory with 0700 permissions", {
 })
 
 test_that("socket directory is cleaned up on close", {
+  skip_if_no_session()
   session <- SecureSession$new()
   priv <- session$.__enclos_env__$private
   socket_dir <- priv$socket_dir
@@ -155,6 +166,7 @@ test_that("socket directory is cleaned up on close", {
 })
 
 test_that("socket directory is cleaned up on timeout", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -180,6 +192,7 @@ test_that("socket directory is cleaned up on timeout", {
 # --- IPC authentication tests (Finding 9) ---
 
 test_that("session generates and stores an IPC token", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
@@ -193,11 +206,11 @@ test_that("session generates and stores an IPC token", {
 })
 
 test_that("child used the token for auth (env var is cleared after)", {
+  skip_if_no_session()
   session <- SecureSession$new()
   on.exit(session$close())
 
   # The session is alive and functional, which means the token was
-
   # successfully sent to the parent during child startup.
   # After auth, the env var is cleared for security.
   result <- session$execute("Sys.getenv('SECURER_TOKEN')")
@@ -210,13 +223,13 @@ test_that("child used the token for auth (env var is cleared after)", {
 # --- Low-level IPC helper timeout/error tests ---
 
 test_that("ipc_accept() errors on timeout when no client connects", {
+  skip_if_no_session()
   socket_path <- file.path("/tmp", paste0("securer_test_accept_", Sys.getpid(), ".sock"))
   on.exit(unlink(socket_path), add = TRUE)
 
   server <- processx::conn_create_unix_socket(socket_path)
 
   # No client connects — should timeout
-
   expect_error(
     ipc_accept(server, timeout = 100L),
     "Timeout waiting for client connection"
@@ -224,6 +237,7 @@ test_that("ipc_accept() errors on timeout when no client connects", {
 })
 
 test_that("ipc_read_message() errors on timeout when no data sent", {
+  skip_if_no_session()
   socket_path <- file.path("/tmp", paste0("securer_test_read_", Sys.getpid(), ".sock"))
   on.exit(unlink(socket_path), add = TRUE)
 
@@ -241,6 +255,7 @@ test_that("ipc_read_message() errors on timeout when no data sent", {
 })
 
 test_that("ipc_read_message() errors on empty message (closed connection)", {
+  skip_if_no_session()
   socket_path <- file.path("/tmp", paste0("securer_test_empty_", Sys.getpid(), ".sock"))
   on.exit(unlink(socket_path), add = TRUE)
 
@@ -264,6 +279,7 @@ test_that("ipc_read_message() errors on empty message (closed connection)", {
 })
 
 test_that("each session gets a unique token", {
+  skip_if_no_session()
   s1 <- SecureSession$new()
   s2 <- SecureSession$new()
   on.exit({ s1$close(); s2$close() })

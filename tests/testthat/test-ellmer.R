@@ -1,4 +1,5 @@
 test_that("securer_as_ellmer_tool() requires ellmer", {
+  skip_if_no_session()
   # This test just checks the function exists and the API is correct.
   # If ellmer is not installed, the function should error clearly.
   skip_if_not_installed("ellmer")
@@ -9,6 +10,7 @@ test_that("securer_as_ellmer_tool() requires ellmer", {
 })
 
 test_that("ellmer tool has correct name and description", {
+  skip_if_no_session()
   skip_if_not_installed("ellmer")
 
   tool_def <- securer_as_ellmer_tool(sandbox = FALSE)
@@ -17,6 +19,7 @@ test_that("ellmer tool has correct name and description", {
 })
 
 test_that("ellmer tool executes simple code", {
+  skip_if_no_session()
   skip_if_not_installed("ellmer")
 
   tool_def <- securer_as_ellmer_tool(sandbox = FALSE, timeout = 10)
@@ -25,6 +28,7 @@ test_that("ellmer tool executes simple code", {
 })
 
 test_that("ellmer tool executes code returning a vector", {
+  skip_if_no_session()
   skip_if_not_installed("ellmer")
 
   tool_def <- securer_as_ellmer_tool(sandbox = FALSE, timeout = 10)
@@ -33,6 +37,7 @@ test_that("ellmer tool executes code returning a vector", {
 })
 
 test_that("ellmer tool returns error as ContentToolResult on failure", {
+  skip_if_no_session()
   skip_if_not_installed("ellmer")
 
   tool_def <- securer_as_ellmer_tool(sandbox = FALSE, timeout = 10)
@@ -43,6 +48,7 @@ test_that("ellmer tool returns error as ContentToolResult on failure", {
 })
 
 test_that("ellmer tool works with securer tools", {
+  skip_if_no_session()
   skip_if_not_installed("ellmer")
 
   tools <- list(
@@ -56,6 +62,7 @@ test_that("ellmer tool works with securer tools", {
 })
 
 test_that("ellmer tool works with pre-existing session", {
+  skip_if_no_session()
   skip_if_not_installed("ellmer")
 
   session <- SecureSession$new(sandbox = FALSE)
@@ -70,6 +77,7 @@ test_that("ellmer tool works with pre-existing session", {
 })
 
 test_that("ellmer tool handles timeout", {
+  skip_if_no_session()
   skip_if_not_installed("ellmer")
 
   tool_def <- securer_as_ellmer_tool(sandbox = FALSE, timeout = 1)
@@ -80,6 +88,7 @@ test_that("ellmer tool handles timeout", {
 })
 
 test_that("ellmer tool handles invisible results", {
+  skip_if_no_session()
   skip_if_not_installed("ellmer")
 
   tool_def <- securer_as_ellmer_tool(sandbox = FALSE, timeout = 10)
@@ -88,6 +97,7 @@ test_that("ellmer tool handles invisible results", {
 })
 
 test_that("ellmer tool returns data frame results", {
+  skip_if_no_session()
   skip_if_not_installed("ellmer")
 
   tool_def <- securer_as_ellmer_tool(sandbox = FALSE, timeout = 10)
@@ -105,6 +115,7 @@ test_that("format_tool_result handles various types", {
 })
 
 test_that("dead session returns error ContentToolResult instead of throwing", {
+  skip_if_no_session()
   skip_if_not_installed("ellmer")
 
   session <- SecureSession$new(sandbox = FALSE)
@@ -227,6 +238,7 @@ test_that("sanitize_error_message handles NULL and empty input", {
 })
 
 test_that("ellmer tool sanitizes file paths in errors", {
+  skip_if_no_session()
   skip_if_not_installed("ellmer")
 
   tool_def <- securer_as_ellmer_tool(sandbox = FALSE, timeout = 10)
@@ -243,6 +255,7 @@ test_that("ellmer tool sanitizes file paths in errors", {
 })
 
 test_that("ellmer tool sanitizes PIDs in errors", {
+  skip_if_no_session()
   skip_if_not_installed("ellmer")
 
   tool_def <- securer_as_ellmer_tool(sandbox = FALSE, timeout = 10)

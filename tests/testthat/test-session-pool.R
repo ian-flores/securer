@@ -1,4 +1,5 @@
 test_that("SecureSessionPool creates N sessions", {
+  skip_if_no_session()
   pool <- SecureSessionPool$new(size = 2, sandbox = FALSE)
   on.exit(pool$close())
 
@@ -8,6 +9,7 @@ test_that("SecureSessionPool creates N sessions", {
 })
 
 test_that("SecureSessionPool$execute() runs code and returns result", {
+  skip_if_no_session()
   pool <- SecureSessionPool$new(size = 2, sandbox = FALSE)
   on.exit(pool$close())
 
@@ -16,6 +18,7 @@ test_that("SecureSessionPool$execute() runs code and returns result", {
 })
 
 test_that("sequential executions reuse sessions from pool", {
+  skip_if_no_session()
   pool <- SecureSessionPool$new(size = 2, sandbox = FALSE)
   on.exit(pool$close())
 
@@ -28,11 +31,11 @@ test_that("sequential executions reuse sessions from pool", {
   expect_equal(r3, 33)
 
   # All sessions should be available again after sequential use
-
   expect_equal(pool$available(), 2)
 })
 
 test_that("pool with tools works", {
+  skip_if_no_session()
   tools <- list(
     securer_tool("add", "Add two numbers",
       fn = function(a, b) a + b,
@@ -47,6 +50,7 @@ test_that("pool with tools works", {
 })
 
 test_that("close() shuts down all sessions", {
+  skip_if_no_session()
   pool <- SecureSessionPool$new(size = 2, sandbox = FALSE)
   pool$close()
 
@@ -55,6 +59,7 @@ test_that("close() shuts down all sessions", {
 })
 
 test_that("execute on closed pool errors", {
+  skip_if_no_session()
   pool <- SecureSessionPool$new(size = 1, sandbox = FALSE)
   pool$close()
 
@@ -62,6 +67,7 @@ test_that("execute on closed pool errors", {
 })
 
 test_that("error in execution doesn't break the pool", {
+  skip_if_no_session()
   pool <- SecureSessionPool$new(size = 2, sandbox = FALSE)
   on.exit(pool$close())
 
@@ -77,6 +83,7 @@ test_that("error in execution doesn't break the pool", {
 })
 
 test_that("pool respects timeout", {
+  skip_if_no_session()
   pool <- SecureSessionPool$new(size = 1, sandbox = FALSE)
   on.exit(pool$close())
 
@@ -105,6 +112,7 @@ test_that("Pool rejects size exceeding maximum", {
 })
 
 test_that("default pool size is 4", {
+  skip_if_no_session()
   pool <- SecureSessionPool$new(sandbox = FALSE)
   on.exit(pool$close())
 
@@ -112,6 +120,7 @@ test_that("default pool size is 4", {
 })
 
 test_that("dead session is auto-restarted on acquire", {
+  skip_if_no_session()
   pool <- SecureSessionPool$new(size = 2, sandbox = FALSE)
   on.exit(pool$close())
 
@@ -121,7 +130,6 @@ test_that("dead session is auto-restarted on acquire", {
   expect_false(priv$sessions[[1]]$is_alive())
 
   # execute() should transparently restart the dead session and succeed
-
   result <- pool$execute("1 + 1")
   expect_equal(result, 2)
 
@@ -133,6 +141,7 @@ test_that("dead session is auto-restarted on acquire", {
 })
 
 test_that("execute errors when all sessions are busy", {
+  skip_if_no_session()
   pool <- SecureSessionPool$new(size = 1, sandbox = FALSE)
   on.exit(pool$close())
 
@@ -149,6 +158,7 @@ test_that("execute errors when all sessions are busy", {
 # --- print/format method tests ---
 
 test_that("pool format() shows size and idle/busy counts", {
+  skip_if_no_session()
   pool <- SecureSessionPool$new(size = 2, sandbox = FALSE)
   on.exit(pool$close())
 
@@ -160,6 +170,7 @@ test_that("pool format() shows size and idle/busy counts", {
 })
 
 test_that("pool format() shows closed state", {
+  skip_if_no_session()
   pool <- SecureSessionPool$new(size = 1, sandbox = FALSE)
   pool$close()
 
@@ -168,6 +179,7 @@ test_that("pool format() shows closed state", {
 })
 
 test_that("pool format() reflects busy sessions", {
+  skip_if_no_session()
   pool <- SecureSessionPool$new(size = 2, sandbox = FALSE)
   on.exit(pool$close())
 
@@ -182,6 +194,7 @@ test_that("pool format() reflects busy sessions", {
 })
 
 test_that("pool print() outputs format string", {
+  skip_if_no_session()
   pool <- SecureSessionPool$new(size = 2, sandbox = FALSE)
   on.exit(pool$close())
 
@@ -192,6 +205,7 @@ test_that("pool print() outputs format string", {
 # --- acquire_timeout tests (R8) ---
 
 test_that("acquire_timeout retries instead of failing immediately", {
+  skip_if_no_session()
   pool <- SecureSessionPool$new(size = 1, sandbox = FALSE)
   on.exit(pool$close())
 
@@ -214,6 +228,7 @@ test_that("acquire_timeout retries instead of failing immediately", {
 })
 
 test_that("acquire_timeout = NULL fails immediately (default behavior)", {
+  skip_if_no_session()
   pool <- SecureSessionPool$new(size = 1, sandbox = FALSE)
   on.exit(pool$close())
 
@@ -230,6 +245,7 @@ test_that("acquire_timeout = NULL fails immediately (default behavior)", {
 })
 
 test_that("acquire_timeout succeeds when session becomes available", {
+  skip_if_no_session()
   pool <- SecureSessionPool$new(size = 1, sandbox = FALSE)
   on.exit(pool$close())
 
@@ -247,6 +263,7 @@ test_that("acquire_timeout succeeds when session becomes available", {
 # --- status() method tests (R8) ---
 
 test_that("status() returns correct counts for healthy pool", {
+  skip_if_no_session()
   pool <- SecureSessionPool$new(size = 3, sandbox = FALSE)
   on.exit(pool$close())
 
@@ -258,6 +275,7 @@ test_that("status() returns correct counts for healthy pool", {
 })
 
 test_that("status() reflects busy sessions", {
+  skip_if_no_session()
   pool <- SecureSessionPool$new(size = 2, sandbox = FALSE)
   on.exit(pool$close())
 
@@ -274,6 +292,7 @@ test_that("status() reflects busy sessions", {
 })
 
 test_that("status() detects dead sessions", {
+  skip_if_no_session()
   pool <- SecureSessionPool$new(size = 2, sandbox = FALSE)
   on.exit(pool$close())
 
@@ -289,6 +308,7 @@ test_that("status() detects dead sessions", {
 })
 
 test_that("status() returns zeros for closed pool", {
+  skip_if_no_session()
   pool <- SecureSessionPool$new(size = 2, sandbox = FALSE)
   pool$close()
 
@@ -297,4 +317,31 @@ test_that("status() returns zeros for closed pool", {
   expect_equal(st$busy, 0L)
   expect_equal(st$idle, 0L)
   expect_equal(st$dead, 0L)
+})
+
+# --- reset_between_uses tests ---
+
+test_that("reset_between_uses=TRUE clears state between executions", {
+  skip_if_no_session()
+  pool <- SecureSessionPool$new(size = 1, sandbox = FALSE, reset_between_uses = TRUE)
+  on.exit(pool$close())
+
+  # Set a variable in the first execution
+  pool$execute("x <- 42")
+
+  # After reset, x should not exist
+  expect_error(pool$execute("x"), "not found")
+})
+
+test_that("reset_between_uses=FALSE preserves state between executions", {
+  skip_if_no_session()
+  pool <- SecureSessionPool$new(size = 1, sandbox = FALSE, reset_between_uses = FALSE)
+  on.exit(pool$close())
+
+  # Set a variable in the first execution
+  pool$execute("x <- 42")
+
+  # Without reset, x should still exist
+  result <- pool$execute("x")
+  expect_equal(result, 42)
 })

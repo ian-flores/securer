@@ -187,6 +187,7 @@ test_that("build_sandbox_fallback returns NULLs with a warning", {
 # --- sandbox_strict tests ---
 
 test_that("sandbox_strict parameter is accepted by SecureSession", {
+  skip_if_no_session()
   # With sandbox = FALSE, sandbox_strict should not matter
   session <- SecureSession$new(sandbox = FALSE, sandbox_strict = TRUE)
   on.exit(session$close())
@@ -194,14 +195,15 @@ test_that("sandbox_strict parameter is accepted by SecureSession", {
 })
 
 test_that("sandbox_strict parameter is accepted by execute_r", {
+  skip_if_no_session()
   # With sandbox = FALSE, sandbox_strict should not matter
   result <- execute_r("1 + 1", sandbox = FALSE, sandbox_strict = TRUE)
   expect_equal(result, 2)
 })
 
 test_that("sandbox_strict errors when sandbox tools unavailable on fallback", {
+  skip_if_no_session()
   # build_sandbox_fallback returns NULL wrapper + NULL env, which is the
-
   # signal that sandbox tools are missing.  We test the strict check by
   # mocking a platform that falls through to the fallback.
   skip_on_os(c("windows"))  # Windows has env-based sandbox
@@ -348,19 +350,8 @@ test_that("Seatbelt profile scopes mach and iokit permissions", {
 
 # ── Integration tests (require sandbox-exec) ─────────────────────────
 
-# Helper: check if sandbox-exec can actually launch R with our profile.
-# On some CI runners the Seatbelt profile doesn't have the right paths
-# for the runner's R installation layout.
-sandbox_exec_works <- function() {
-  if (!file.exists("/usr/bin/sandbox-exec")) return(FALSE)
-  tryCatch({
-    session <- SecureSession$new(sandbox = TRUE)
-    session$close()
-    TRUE
-  }, error = function(e) FALSE)
-}
-
 test_that("Sandbox session can execute simple code", {
+  skip_if_no_session()
   skip_on_os(c("windows", "linux"))
   skip_if_not(sandbox_exec_works(), "sandbox-exec cannot start R (likely CI runner path mismatch)")
 
@@ -372,6 +363,7 @@ test_that("Sandbox session can execute simple code", {
 })
 
 test_that("Sandbox session can execute multi-line code", {
+  skip_if_no_session()
   skip_on_os(c("windows", "linux"))
   skip_if_not(sandbox_exec_works(), "sandbox-exec cannot start R (likely CI runner path mismatch)")
 
@@ -387,6 +379,7 @@ test_that("Sandbox session can execute multi-line code", {
 })
 
 test_that("Sandbox session blocks network access", {
+  skip_if_no_session()
   skip_on_os(c("windows", "linux"))
   skip_if_not(sandbox_exec_works(), "sandbox-exec cannot start R (likely CI runner path mismatch)")
 
@@ -404,6 +397,7 @@ test_that("Sandbox session blocks network access", {
 })
 
 test_that("Sandbox session blocks writing to protected paths", {
+  skip_if_no_session()
   skip_on_os(c("windows", "linux"))
   skip_if_not(sandbox_exec_works(), "sandbox-exec cannot start R (likely CI runner path mismatch)")
 
@@ -421,6 +415,7 @@ test_that("Sandbox session blocks writing to protected paths", {
 })
 
 test_that("Sandbox session allows writing to temp directory", {
+  skip_if_no_session()
   skip_on_os(c("windows", "linux"))
   skip_if_not(sandbox_exec_works(), "sandbox-exec cannot start R (likely CI runner path mismatch)")
 
@@ -438,6 +433,7 @@ test_that("Sandbox session allows writing to temp directory", {
 })
 
 test_that("Sandbox session allows tool calls", {
+  skip_if_no_session()
   skip_on_os(c("windows", "linux"))
   skip_if_not(sandbox_exec_works(), "sandbox-exec cannot start R (likely CI runner path mismatch)")
 
@@ -456,6 +452,7 @@ test_that("Sandbox session allows tool calls", {
 })
 
 test_that("Sandbox session cleans up temp files on close", {
+  skip_if_no_session()
   skip_on_os(c("windows", "linux"))
   skip_if_not(sandbox_exec_works(), "sandbox-exec cannot start R (likely CI runner path mismatch)")
 
@@ -476,6 +473,7 @@ test_that("Sandbox session cleans up temp files on close", {
 })
 
 test_that("Sandbox session blocks reading user home directory files", {
+  skip_if_no_session()
   skip_on_os(c("windows", "linux"))
   skip_if_not(sandbox_exec_works(), "sandbox-exec cannot start R (likely CI runner path mismatch)")
 
@@ -505,6 +503,7 @@ test_that("Sandbox session blocks reading user home directory files", {
 })
 
 test_that("Sandbox session blocks executing non-R binaries", {
+  skip_if_no_session()
   skip_on_os(c("windows", "linux"))
   skip_if_not(sandbox_exec_works(), "sandbox-exec cannot start R (likely CI runner path mismatch)")
 
@@ -518,6 +517,7 @@ test_that("Sandbox session blocks executing non-R binaries", {
 })
 
 test_that("Non-sandbox session still works (regression)", {
+  skip_if_no_session()
   session <- SecureSession$new(sandbox = FALSE)
   on.exit(session$close())
 
@@ -527,21 +527,8 @@ test_that("Non-sandbox session still works (regression)", {
 
 # ── Linux bwrap integration tests (require bwrap) ─────────────────────
 
-# Helper: check if bwrap can actually create namespaces (fails in containers)
-bwrap_works <- function() {
-  bwrap <- Sys.which("bwrap")
-  if (!nzchar(bwrap)) return(FALSE)
-  res <- tryCatch(
-    processx::run(bwrap, c("--unshare-all", "--ro-bind", "/usr", "/usr",
-                           "--dev", "/dev", "--proc", "/proc",
-                           "--", "/usr/bin/true"),
-                  timeout = 5, error_on_status = FALSE),
-    error = function(e) list(status = 1)
-  )
-  res$status == 0
-}
-
 test_that("bwrap sandbox session can execute simple code", {
+  skip_if_no_session()
   skip_on_os(c("windows", "mac"))
   skip_if_not(bwrap_works(), "bwrap cannot create namespaces (likely in a container)")
 
@@ -553,6 +540,7 @@ test_that("bwrap sandbox session can execute simple code", {
 })
 
 test_that("bwrap sandbox session can execute multi-line code", {
+  skip_if_no_session()
   skip_on_os(c("windows", "mac"))
   skip_if_not(bwrap_works(), "bwrap cannot create namespaces (likely in a container)")
 
@@ -568,6 +556,7 @@ test_that("bwrap sandbox session can execute multi-line code", {
 })
 
 test_that("bwrap sandbox blocks network access", {
+  skip_if_no_session()
   skip_on_os(c("windows", "mac"))
   skip_if_not(bwrap_works(), "bwrap cannot create namespaces (likely in a container)")
 
@@ -584,6 +573,7 @@ test_that("bwrap sandbox blocks network access", {
 })
 
 test_that("bwrap sandbox blocks writing to protected paths", {
+  skip_if_no_session()
   skip_on_os(c("windows", "mac"))
   skip_if_not(bwrap_works(), "bwrap cannot create namespaces (likely in a container)")
 
@@ -597,6 +587,7 @@ test_that("bwrap sandbox blocks writing to protected paths", {
 })
 
 test_that("bwrap sandbox allows writing to temp directory", {
+  skip_if_no_session()
   skip_on_os(c("windows", "mac"))
   skip_if_not(bwrap_works(), "bwrap cannot create namespaces (likely in a container)")
 
@@ -614,6 +605,7 @@ test_that("bwrap sandbox allows writing to temp directory", {
 })
 
 test_that("bwrap sandbox allows tool calls", {
+  skip_if_no_session()
   skip_on_os(c("windows", "mac"))
   skip_if_not(bwrap_works(), "bwrap cannot create namespaces (likely in a container)")
 
@@ -632,6 +624,7 @@ test_that("bwrap sandbox allows tool calls", {
 })
 
 test_that("bwrap sandbox cleans up wrapper on close", {
+  skip_if_no_session()
   skip_on_os(c("windows", "mac"))
   skip_if_not(bwrap_works(), "bwrap cannot create namespaces (likely in a container)")
 
@@ -731,6 +724,7 @@ test_that("windows_supported_limits returns expected names", {
 })
 
 test_that("build_sandbox_windows integration: session executes code with sandbox", {
+  skip_if_no_session()
   skip_on_os(c("mac", "linux"))
   session <- SecureSession$new(sandbox = TRUE)
   on.exit(session$close())
@@ -739,6 +733,7 @@ test_that("build_sandbox_windows integration: session executes code with sandbox
 })
 
 test_that("build_sandbox_windows integration: env isolation works", {
+  skip_if_no_session()
   skip_on_os(c("mac", "linux"))
   session <- SecureSession$new(sandbox = TRUE)
   on.exit(session$close())
@@ -892,6 +887,7 @@ test_that("build_limits_only_wrapper returns NULL wrapper for NULL limits", {
 # ── Resource limits integration tests ─────────────────────────────────
 
 test_that("Session with limits can execute simple code", {
+  skip_if_no_session()
   skip_on_os("windows")
 
   session <- SecureSession$new(
@@ -905,6 +901,7 @@ test_that("Session with limits can execute simple code", {
 })
 
 test_that("Session with sandbox + limits can execute code", {
+  skip_if_no_session()
   skip_on_os(c("windows", "linux"))
   skip_if_not(sandbox_exec_works(), "sandbox-exec cannot start R (likely CI runner path mismatch)")
 
@@ -919,6 +916,7 @@ test_that("Session with sandbox + limits can execute code", {
 })
 
 test_that("CPU limit causes error on infinite loop", {
+  skip_if_no_session()
   skip_on_os("windows")
 
   session <- SecureSession$new(
@@ -934,6 +932,7 @@ test_that("CPU limit causes error on infinite loop", {
 })
 
 test_that("File size limit restricts large writes", {
+  skip_if_no_session()
   skip_on_os("windows")
   # Skip if ulimit -f can't be enforced (containers may ignore it)
   skip_if_not(

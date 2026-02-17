@@ -1,21 +1,16 @@
 ## R CMD check results
 
-0 errors | 0 warnings | 0 notes
+0 errors | 0 warnings | 1 note
+
+* This is a new submission.
 
 ## Test environments
 
-- macOS (latest), R release
-- Ubuntu (latest), R release
-- Ubuntu (latest), R devel
-- Ubuntu (latest), R oldrel-1
-- Windows (latest), R release
+* local macOS (aarch64-apple-darwin), R 4.4.x
+* GitHub Actions: ubuntu-latest (R release, R devel), macOS-latest (R release), windows-latest (R release)
 
 ## Notes
 
-This package optionally uses platform-specific sandbox tools:
-- **Linux**: bubblewrap (`bwrap`) for namespace isolation
-- **macOS**: `sandbox-exec` (included with macOS)
-- **Windows**: PowerShell (included with Windows) for Job Object resource limits
-
-All sandbox features are optional and the package functions correctly
-without them by using `sandbox = FALSE`.
+* Tests that spawn child R processes are skipped on CRAN via `skip_on_cran()` to stay within time limits and avoid resource contention.
+* Unix domain sockets are created in `/tmp` rather than `tempdir()` due to the ~104 character path length limit on macOS. Socket directories are created with 0700 permissions and cleaned up on session close, timeout, and GC finalization.
+* The package optionally uses system tools (`sandbox-exec` on macOS, `bwrap` on Linux) for OS-level sandboxing. These are declared in SystemRequirements and the package functions correctly without them (sandboxing is gracefully disabled).

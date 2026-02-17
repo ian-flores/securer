@@ -1,3 +1,6 @@
+# --- securer_tool() unit tests ---
+# These do NOT spawn child processes, so no skip_if_no_session() needed.
+
 test_that("securer_tool() creates valid tool objects", {
   tool <- securer_tool(
     "add", "Add two numbers",
@@ -121,7 +124,10 @@ test_that("generate_tool_wrappers() creates callable code", {
   expect_true(grepl(".securer_call_tool", code))
 })
 
+# --- End-to-end tests (require child process) ---
+
 test_that("Tool wrappers work end-to-end via SecureSession", {
+  skip_if_no_session()
   tools <- list(
     securer_tool(
       "add", "Add numbers",
@@ -137,6 +143,7 @@ test_that("Tool wrappers work end-to-end via SecureSession", {
 })
 
 test_that("Multiple tools with wrappers work", {
+  skip_if_no_session()
   tools <- list(
     securer_tool(
       "add", "Add",
@@ -161,6 +168,7 @@ test_that("Multiple tools with wrappers work", {
 })
 
 test_that("Tool wrappers compose with regular R code", {
+  skip_if_no_session()
   tools <- list(
     securer_tool(
       "get_data", "Get a value",
@@ -181,6 +189,7 @@ test_that("Tool wrappers compose with regular R code", {
 })
 
 test_that("Legacy tool format still works with SecureSession", {
+  skip_if_no_session()
   # Backward compatibility: named list of functions (emits deprecation warning)
   expect_warning(
     session <- SecureSession$new(tools = list(add = function(a, b) a + b)),
@@ -255,6 +264,7 @@ test_that("generate_tool_wrappers() skips checks for tools with no typed args", 
 })
 
 test_that("Type checking passes for correct types end-to-end", {
+  skip_if_no_session()
   tools <- list(
     securer_tool(
       "add", "Add numbers",
@@ -270,6 +280,7 @@ test_that("Type checking passes for correct types end-to-end", {
 })
 
 test_that("Type checking rejects wrong types end-to-end", {
+  skip_if_no_session()
   tools <- list(
     securer_tool(
       "add", "Add numbers",
@@ -287,6 +298,7 @@ test_that("Type checking rejects wrong types end-to-end", {
 })
 
 test_that("Type checking validates multiple args independently", {
+  skip_if_no_session()
   tools <- list(
     securer_tool(
       "greet", "Greet",
@@ -315,6 +327,7 @@ test_that("Type checking validates multiple args independently", {
 })
 
 test_that("Tool wrapper functions are locked in child", {
+  skip_if_no_session()
   add_fn <- function(a, b) a + b
   session <- SecureSession$new(tools = list(
     securer_tool("add", "Add two numbers", add_fn,
@@ -341,6 +354,7 @@ test_that("generate_tool_wrappers() includes lockBinding calls", {
 })
 
 test_that("Type checking skips unannotated args end-to-end", {
+  skip_if_no_session()
   tools <- list(
     securer_tool(
       "flexible", "Flexible tool",

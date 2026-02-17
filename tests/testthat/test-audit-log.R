@@ -1,4 +1,5 @@
 test_that("audit_log=NULL produces no file", {
+  skip_if_no_session()
   log_path <- tempfile("audit_", fileext = ".jsonl")
   on.exit(unlink(log_path), add = TRUE)
 
@@ -12,6 +13,7 @@ test_that("audit_log=NULL produces no file", {
 })
 
 test_that("audit log file is created when path is provided", {
+  skip_if_no_session()
   log_path <- tempfile("audit_", fileext = ".jsonl")
   on.exit(unlink(log_path), add = TRUE)
 
@@ -22,6 +24,7 @@ test_that("audit log file is created when path is provided", {
 })
 
 test_that("session_start event is logged", {
+  skip_if_no_session()
   log_path <- tempfile("audit_", fileext = ".jsonl")
   on.exit(unlink(log_path), add = TRUE)
 
@@ -36,6 +39,7 @@ test_that("session_start event is logged", {
 })
 
 test_that("session_close event is logged", {
+  skip_if_no_session()
   log_path <- tempfile("audit_", fileext = ".jsonl")
   on.exit(unlink(log_path), add = TRUE)
 
@@ -50,6 +54,7 @@ test_that("session_close event is logged", {
 })
 
 test_that("execute events are logged with code", {
+  skip_if_no_session()
   log_path <- tempfile("audit_", fileext = ".jsonl")
   on.exit(unlink(log_path), add = TRUE)
 
@@ -71,6 +76,7 @@ test_that("execute events are logged with code", {
 })
 
 test_that("execute_error is logged on failure", {
+  skip_if_no_session()
   log_path <- tempfile("audit_", fileext = ".jsonl")
   on.exit(unlink(log_path), add = TRUE)
 
@@ -90,6 +96,7 @@ test_that("execute_error is logged on failure", {
 })
 
 test_that("execute_timeout is logged on timeout", {
+  skip_if_no_session()
   log_path <- tempfile("audit_", fileext = ".jsonl")
   on.exit(unlink(log_path), add = TRUE)
 
@@ -106,6 +113,7 @@ test_that("execute_timeout is logged on timeout", {
 })
 
 test_that("tool_call and tool_result events are logged", {
+  skip_if_no_session()
   log_path <- tempfile("audit_", fileext = ".jsonl")
   on.exit(unlink(log_path), add = TRUE)
 
@@ -131,6 +139,7 @@ test_that("tool_call and tool_result events are logged", {
 })
 
 test_that("all entries are valid JSONL with required fields", {
+  skip_if_no_session()
   log_path <- tempfile("audit_", fileext = ".jsonl")
   on.exit(unlink(log_path), add = TRUE)
 
@@ -163,6 +172,7 @@ test_that("all entries are valid JSONL with required fields", {
 })
 
 test_that("session_id is consistent across entries", {
+  skip_if_no_session()
   log_path <- tempfile("audit_", fileext = ".jsonl")
   on.exit(unlink(log_path), add = TRUE)
 
@@ -179,6 +189,7 @@ test_that("session_id is consistent across entries", {
 })
 
 test_that("execute_r() passes audit_log through", {
+  skip_if_no_session()
   log_path <- tempfile("audit_", fileext = ".jsonl")
   on.exit(unlink(log_path), add = TRUE)
 
@@ -199,6 +210,7 @@ test_that("execute_r() passes audit_log through", {
 # --- Audit log path validation tests ---
 
 test_that("audit log rejects symlink paths", {
+  skip_if_no_session()
   skip_on_os("windows")
 
   tmp_dir <- tempfile("audit_symlink_")
@@ -219,6 +231,7 @@ test_that("audit log rejects symlink paths", {
 })
 
 test_that("audit log rejects /dev paths", {
+  skip_if_no_session()
   skip_on_os("windows")
 
   expect_error(
@@ -233,6 +246,7 @@ test_that("audit log rejects /dev paths", {
 })
 
 test_that("audit log truncates large code strings in entries", {
+  skip_if_no_session()
   log_path <- tempfile("audit_", fileext = ".jsonl")
   on.exit(unlink(log_path), add = TRUE)
 
