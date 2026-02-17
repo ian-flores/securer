@@ -43,7 +43,6 @@ pool$close()
 \item \href{#method-SecureSessionPool-format}{\code{SecureSessionPool$format()}}
 \item \href{#method-SecureSessionPool-print}{\code{SecureSessionPool$print()}}
 \item \href{#method-SecureSessionPool-close}{\code{SecureSessionPool$close()}}
-\item \href{#method-SecureSessionPool-clone}{\code{SecureSessionPool$clone()}}
 }
 }
 \if{html}{\out{<hr>}}
@@ -57,7 +56,8 @@ Create a new SecureSessionPool
   tools = list(),
   sandbox = TRUE,
   limits = NULL,
-  verbose = FALSE
+  verbose = FALSE,
+  reset_between_uses = FALSE
 )}\if{html}{\out{</div>}}
 }
 
@@ -73,6 +73,12 @@ Create a new SecureSessionPool
 \item{\code{limits}}{Optional named list of resource limits.}
 
 \item{\code{verbose}}{Logical, whether to emit diagnostic messages.}
+
+\item{\code{reset_between_uses}}{Logical, whether to restart each session
+after an execution before returning it to the pool (default \code{FALSE}).
+When \code{TRUE}, calls \code{session$restart()} after every \verb{$execute()} to
+prevent state leaking between executions (e.g., variables, loaded
+packages, options set by prior code).}
 }
 \if{html}{\out{</div>}}
 }
@@ -195,23 +201,6 @@ Close all sessions and shut down the pool
 
 \subsection{Returns}{
 Invisible self
-}
-}
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-SecureSessionPool-clone"></a>}}
-\if{latex}{\out{\hypertarget{method-SecureSessionPool-clone}{}}}
-\subsection{Method \code{clone()}}{
-The objects of this class are cloneable with this method.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{SecureSessionPool$clone(deep = FALSE)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{deep}}{Whether to make a deep clone.}
-}
-\if{html}{\out{</div>}}
 }
 }
 }

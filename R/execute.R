@@ -55,3 +55,47 @@ execute_r <- function(code, tools = list(), timeout = 30, sandbox = TRUE,
   on.exit(session$close())
   session$execute(code, timeout = timeout, validate = validate)
 }
+
+
+#' Execute code with an auto-managed SecureSession
+#'
+#' Creates a [SecureSession], passes it to a user function, and guarantees
+#' cleanup via [on.exit()].
+#' This is useful when you need to run multiple executions on the same session
+#' (e.g., building up state across calls) without worrying about leaked
+#' processes.
+#'
+#' @param fn A function that receives a [SecureSession] as its first argument.
+#' @param tools List of [securer_tool()] objects to register in the session.
+#' @param sandbox Logical, whether to enable OS-level sandboxing (default `TRUE`).
+#' @param ... Additional arguments passed to [SecureSession]`$new()`.
+#' @return The return value of `fn(session)`.
+#'
+#' @examples
+#' \donttest{
+#' # Run multiple commands on the same session
+#' result <- with_secure_session(function(session) {
+#'   session$execute("x <- 10", sandbox = FALSE)
+#'   session$execute("x * 2")
+#' }, sandbox = FALSE)
+#'
+#' # With tools
+#' result <- with_secure_session(
+#'   fn = function(session) {
+#'     session$execute("add(2, 3)")
+#'   },
+#'   tools = list(
+#'     securer_tool("add", "Add two numbers",
+#'       fn = function(a, b) a + b,
+#'       args = list(a = "numeric", b = "numeric"))
+#'   ),
+#'   sandbox = FALSE
+#' )
+#' }
+#'
+#' @export
+with_secure_session <- function(fn, tools = list(), sandbox = TRUE, ...) {
+  session <- SecureSession$new(tools = tools, sandbox = sandbox, ...)
+  on.exit(session$close(), add = TRUE)
+  fn(session)
+}

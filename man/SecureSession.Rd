@@ -49,7 +49,6 @@ session$close()
 \item \href{#method-SecureSession-print}{\code{SecureSession$print()}}
 \item \href{#method-SecureSession-tools}{\code{SecureSession$tools()}}
 \item \href{#method-SecureSession-restart}{\code{SecureSession$restart()}}
-\item \href{#method-SecureSession-clone}{\code{SecureSession$clone()}}
 }
 }
 \if{html}{\out{<hr>}}
@@ -64,7 +63,10 @@ Create a new SecureSession
   limits = NULL,
   verbose = FALSE,
   sandbox_strict = FALSE,
-  audit_log = NULL
+  audit_log = NULL,
+  max_executions = NULL,
+  pre_execute_hook = NULL,
+  sanitize_errors = FALSE
 )}\if{html}{\out{</div>}}
 }
 
@@ -108,6 +110,22 @@ a warning is emitted and the session continues without sandboxing.}
 logging.  If \code{NULL} (the default), no file logging is performed.
 When a path is provided, structured JSON entries are appended for
 session lifecycle events, executions, and tool calls.}
+
+\item{\code{max_executions}}{Optional integer, the maximum number of
+\verb{$execute()} calls allowed on this session (default \code{NULL} = unlimited).
+Once the limit is reached, subsequent \verb{$execute()} calls stop with
+an error.  Useful for disposable sessions in agent workflows.}
+
+\item{\code{pre_execute_hook}}{Optional function taking a single \code{code}
+argument.  Called at the start of every \verb{$execute()} invocation.
+If it returns \code{FALSE}, execution is blocked with an error.  Any
+other return value (including \code{NULL} or \code{TRUE}) allows execution
+to proceed.  Default \code{NULL} (no hook).}
+
+\item{\code{sanitize_errors}}{Logical, whether to strip sensitive details
+(file paths, PIDs, hostnames) from error messages returned by
+\verb{$execute()} (default \code{FALSE}).  When \code{TRUE},
+\code{\link[=sanitize_error_message]{sanitize_error_message()}} is applied before the error is raised.}
 }
 \if{html}{\out{</div>}}
 }
@@ -120,10 +138,12 @@ Execute R code in the secure session
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{SecureSession$execute(
   code,
-  timeout = NULL,
+  timeout = 30,
   validate = TRUE,
   output_handler = NULL,
-  max_tool_calls = NULL
+  max_tool_calls = NULL,
+  max_code_length = 100000L,
+  max_output_lines = NULL
 )}\if{html}{\out{</div>}}
 }
 
@@ -132,7 +152,12 @@ Execute R code in the secure session
 \describe{
 \item{\code{code}}{Character string of R code to execute}
 
-\item{\code{timeout}}{Timeout in seconds, or \code{NULL} for no timeout (default \code{NULL})}
+\item{\code{timeout}}{Timeout in seconds (default 30).  Pass \code{NULL} to
+disable the timeout entirely.
+
+@note The \code{execute_r()} convenience wrapper also defaults to 30
+seconds.  For long-running workloads, pass an explicit higher value
+or \code{NULL}.}
 
 \item{\code{validate}}{Logical, whether to pre-validate the code for syntax
 errors before sending it to the child process (default \code{TRUE}).}
@@ -144,6 +169,14 @@ attribute on the result.}
 
 \item{\code{max_tool_calls}}{Maximum number of tool calls allowed in this
 execution, or \code{NULL} for unlimited (default \code{NULL}).}
+
+\item{\code{max_code_length}}{Maximum allowed \code{nchar(code)} (default 100000).
+Code exceeding this limit is rejected before parsing.  Prevents
+resource exhaustion from extremely large code strings.}
+
+\item{\code{max_output_lines}}{Maximum number of output lines to accumulate
+(default \code{NULL} = unlimited).  Once the limit is reached, further
+output from the child is still drained but not stored.}
 }
 \if{html}{\out{</div>}}
 }
@@ -248,23 +281,6 @@ The session remains usable for subsequent \verb{$execute()} calls.
 
 \subsection{Returns}{
 Invisible self.
-}
-}
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-SecureSession-clone"></a>}}
-\if{latex}{\out{\hypertarget{method-SecureSession-clone}{}}}
-\subsection{Method \code{clone()}}{
-The objects of this class are cloneable with this method.
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{SecureSession$clone(deep = FALSE)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{deep}}{Whether to make a deep clone.}
-}
-\if{html}{\out{</div>}}
 }
 }
 }

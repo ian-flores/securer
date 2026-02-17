@@ -50,6 +50,7 @@
 #'
 #' @export
 SecureSession <- R6::R6Class("SecureSession",
+  cloneable = FALSE,
   public = list(
     #' @description Create a new SecureSession
     #' @param tools A list of [securer_tool()] objects, or a named list of
@@ -84,15 +85,40 @@ SecureSession <- R6::R6Class("SecureSession",
     #'   logging.  If `NULL` (the default), no file logging is performed.
     #'   When a path is provided, structured JSON entries are appended for
     #'   session lifecycle events, executions, and tool calls.
+    #' @param max_executions Optional integer, the maximum number of
+    #'   `$execute()` calls allowed on this session (default `NULL` = unlimited).
+    #'   Once the limit is reached, subsequent `$execute()` calls stop with
+    #'   an error.  Useful for disposable sessions in agent workflows.
+    #' @param pre_execute_hook Optional function taking a single `code`
+    #'   argument.  Called at the start of every `$execute()` invocation.
+    #'   If it returns `FALSE`, execution is blocked with an error.  Any
+    #'   other return value (including `NULL` or `TRUE`) allows execution
+    #'   to proceed.  Default `NULL` (no hook).
+    #' @param sanitize_errors Logical, whether to strip sensitive details
+    #'   (file paths, PIDs, hostnames) from error messages returned by
+    #'   `$execute()` (default `FALSE`).  When `TRUE`,
+    #'   [sanitize_error_message()] is applied before the error is raised.
     initialize = function(tools = list(), sandbox = FALSE, limits = NULL,
                           verbose = FALSE, sandbox_strict = FALSE,
-                          audit_log = NULL) {
+                          audit_log = NULL, max_executions = NULL,
+                          pre_execute_hook = NULL,
+                          sanitize_errors = FALSE) {
       private$raw_tools <- tools
       validated <- validate_tools(tools)
       private$tool_fns <- validated$fns
       private$tool_arg_meta <- validated$arg_meta
       private$sandbox_enabled <- sandbox
       private$sandbox_strict <- sandbox_strict
+      if (!is.null(max_executions)) {
+        stopifnot(is.numeric(max_executions), length(max_executions) == 1,
+                  max_executions > 0)
+        private$max_executions <- as.integer(max_executions)
+      }
+      if (!is.null(pre_execute_hook)) {
+        stopifnot(is.function(pre_execute_hook))
+        private$pre_execute_hook <- pre_execute_hook
+      }
+      private$sanitize_errors <- isTRUE(sanitize_errors)
       # Apply default resource limits when sandboxing is enabled and
       # no explicit limits were provided.  Users can pass limits = list()
       # (empty list) to explicitly disable defaults.
@@ -110,7 +136,12 @@ SecureSession <- R6::R6Class("SecureSession",
 
     #' @description Execute R code in the secure session
     #' @param code Character string of R code to execute
-    #' @param timeout Timeout in seconds, or `NULL` for no timeout (default `NULL`)
+    #' @param timeout Timeout in seconds (default 30).  Pass `NULL` to
+    #'   disable the timeout entirely.
+    #'
+    #'   @note The `execute_r()` convenience wrapper also defaults to 30
+    #'   seconds.  For long-running workloads, pass an explicit higher value
+    #'   or `NULL`.
     #' @param validate Logical, whether to pre-validate the code for syntax
     #'   errors before sending it to the child process (default `TRUE`).
     #' @param output_handler An optional callback function that receives output
@@ -119,10 +150,18 @@ SecureSession <- R6::R6Class("SecureSession",
     #'   attribute on the result.
     #' @param max_tool_calls Maximum number of tool calls allowed in this
     #'   execution, or `NULL` for unlimited (default `NULL`).
+    #' @param max_code_length Maximum allowed `nchar(code)` (default 100000).
+    #'   Code exceeding this limit is rejected before parsing.  Prevents
+    #'   resource exhaustion from extremely large code strings.
+    #' @param max_output_lines Maximum number of output lines to accumulate
+    #'   (default `NULL` = unlimited).  Once the limit is reached, further
+    #'   output from the child is still drained but not stored.
     #' @return The result of evaluating the code, with an `"output"` attribute
     #'   containing all captured stdout/stderr as a character vector.
-    execute = function(code, timeout = NULL, validate = TRUE,
-                       output_handler = NULL, max_tool_calls = NULL) {
+    execute = function(code, timeout = 30, validate = TRUE,
+                       output_handler = NULL, max_tool_calls = NULL,
+                       max_code_length = 100000L,
+                       max_output_lines = NULL) {
       if (is.null(private$session) || !private$session$is_alive()) {
         stop("Session is not running", call. = FALSE)
       }
@@ -133,6 +172,46 @@ SecureSession <- R6::R6Class("SecureSession",
           call. = FALSE
         )
       }
+
+      # --- Execution counter check ---
+      if (!is.null(private$max_executions) &&
+          private$execution_count >= private$max_executions) {
+        stop(
+          sprintf(
+            "Maximum executions (%d) reached for this session",
+            private$max_executions
+          ),
+          call. = FALSE
+        )
+      }
+
+      # --- Pre-execute hook ---
+      if (!is.null(private$pre_execute_hook)) {
+        hook_result <- tryCatch(
+          private$pre_execute_hook(code),
+          error = function(e) {
+            stop(
+              "pre_execute_hook error: ", conditionMessage(e),
+              call. = FALSE
+            )
+          }
+        )
+        if (identical(hook_result, FALSE)) {
+          stop("Execution blocked by pre_execute_hook", call. = FALSE)
+        }
+      }
+
+      # --- Code length check ---
+      if (!is.null(max_code_length) && nchar(code) > max_code_length) {
+        stop(
+          sprintf(
+            "Code too long (%d chars, max %d)",
+            nchar(code), as.integer(max_code_length)
+          ),
+          call. = FALSE
+        )
+      }
+
       if (!is.null(output_handler) && !is.function(output_handler)) {
         stop("`output_handler` must be a function or NULL", call. = FALSE)
       }
@@ -146,8 +225,22 @@ SecureSession <- R6::R6Class("SecureSession",
         }
       }
       private$executing <- TRUE
+      private$execution_count <- private$execution_count + 1L
       on.exit(private$executing <- FALSE)
-      private$run_with_tools(code, timeout, output_handler, max_tool_calls)
+      if (private$sanitize_errors) {
+        tryCatch(
+          private$run_with_tools(
+            code, timeout, output_handler, max_tool_calls, max_output_lines
+          ),
+          error = function(e) {
+            stop(sanitize_error_message(conditionMessage(e)), call. = FALSE)
+          }
+        )
+      } else {
+        private$run_with_tools(
+          code, timeout, output_handler, max_tool_calls, max_output_lines
+        )
+      }
     },
 
     #' @description Close the session and clean up resources
@@ -155,57 +248,12 @@ SecureSession <- R6::R6Class("SecureSession",
     close = function() {
       private$audit_log("session_close")
       private$log("Session closed")
-      if (!is.null(private$session)) {
-        # Kill the child process but do NOT call $close() on the callr
-        # session.  callr$close() calls processx_conn_close() on internal
-        # pipe connections; when GC later finalizes those same connection
-        # objects, the C-level double-close corrupts the malloc heap
-        # (processx 3.8.6, "BUG IN CLIENT OF LIBMALLOC").
-        # Instead, just kill the process and park the R6 object.  The GC
-        # finalizer will clean up connections and temp files safely.
-        try(private$session$kill(), silent = TRUE)
-        .securer_closed_sessions_add(private$session)
-        private$session <- NULL
-      }
+      private$cleanup_resources()
       private$child_pid <- NULL
       # Disarm the GC finalizer so it won't try to kill a recycled PID
       if (!is.null(private$gc_prevent)) {
         private$gc_prevent$pid <- NULL
         private$gc_prevent <- NULL
-      }
-      if (!is.null(private$ipc_conn)) {
-        # Don't call close() on the processx connection — the C-level
-        # finalizer will close the file descriptor during GC.  Explicitly
-        # closing + later GC finalization causes a double-free that
-        # corrupts the malloc heap (processx 3.8.6).
-        .securer_closed_sessions_add(private$ipc_conn)
-        private$ipc_conn <- NULL
-      }
-      # Filesystem cleanup: save paths as local variables first, then
-      # NULL out the private fields.  This avoids segfaults when close()
-      # is called during GC finalization (private fields may already be
-      # freed, but local copies on the stack are safe).
-      sock_path <- private$socket_path
-      sock_dir  <- private$socket_dir
-      sb_config <- private$sandbox_config
-      private$socket_path    <- NULL
-      private$socket_dir     <- NULL
-      private$sandbox_config <- NULL
-      if (is.character(sock_path) && length(sock_path) == 1 &&
-          file.exists(sock_path)) {
-        unlink(sock_path)
-      }
-      if (is.character(sock_dir) && length(sock_dir) == 1 &&
-          dir.exists(sock_dir)) {
-        unlink(sock_dir, recursive = TRUE)
-      }
-      if (is.list(sb_config)) {
-        if (is.character(sb_config$wrapper))
-          unlink(sb_config$wrapper)
-        if (is.character(sb_config$profile_path))
-          unlink(sb_config$profile_path)
-        if (is.character(sb_config$sandbox_tmp))
-          unlink(sb_config$sandbox_tmp, recursive = TRUE)
       }
       invisible(self)
     },
@@ -276,41 +324,7 @@ SecureSession <- R6::R6Class("SecureSession",
       }
       private$log("Restarting session")
       private$audit_log("session_restart")
-
-      # Kill the child process
-      if (!is.null(private$session)) {
-        try(private$session$kill(), silent = TRUE)
-        .securer_closed_sessions_add(private$session)
-        private$session <- NULL
-      }
-
-      # Clean up the old socket
-      if (!is.null(private$ipc_conn)) {
-        .securer_closed_sessions_add(private$ipc_conn)
-        private$ipc_conn <- NULL
-      }
-      if (!is.null(private$socket_path) && file.exists(private$socket_path)) {
-        unlink(private$socket_path)
-      }
-      if (!is.null(private$socket_dir) && dir.exists(private$socket_dir)) {
-        unlink(private$socket_dir, recursive = TRUE)
-        private$socket_dir <- NULL
-      }
-
-      # Clean up old sandbox temp files
-      if (!is.null(private$sandbox_config)) {
-        if (!is.null(private$sandbox_config$wrapper)) {
-          try(unlink(private$sandbox_config$wrapper), silent = TRUE)
-        }
-        if (!is.null(private$sandbox_config$profile_path)) {
-          try(unlink(private$sandbox_config$profile_path), silent = TRUE)
-        }
-        if (!is.null(private$sandbox_config$sandbox_tmp)) {
-          try(unlink(private$sandbox_config$sandbox_tmp, recursive = TRUE),
-              silent = TRUE)
-        }
-        private$sandbox_config <- NULL
-      }
+      private$cleanup_resources()
 
       # Start a fresh session (re-injects runtime + tool wrappers)
       private$start_session()
@@ -328,6 +342,10 @@ SecureSession <- R6::R6Class("SecureSession",
     tool_fns = list(),
     tool_arg_meta = list(),
     executing = FALSE,
+    execution_count = 0L,
+    max_executions = NULL,
+    pre_execute_hook = NULL,
+    sanitize_errors = FALSE,
     sandbox_enabled = FALSE,
     sandbox_strict = FALSE,
     sandbox_config = NULL,
@@ -371,6 +389,49 @@ SecureSession <- R6::R6Class("SecureSession",
     # the finalizer runs.  Instead, start_session() registers a plain
     # reg.finalizer() on a dedicated environment that holds only the
     # child PID (a safe integer).  See start_session() below.
+
+    # Shared cleanup for close(), restart(), and handle_timeout().
+    # Kills the child process, parks references, and removes temp files.
+    cleanup_resources = function() {
+      # Kill the child process and park the R6 object
+      if (!is.null(private$session)) {
+        try(private$session$kill(), silent = TRUE)
+        .securer_closed_sessions_add(private$session)
+        private$session <- NULL
+      }
+
+      # Park and clear the IPC connection
+      if (!is.null(private$ipc_conn)) {
+        .securer_closed_sessions_add(private$ipc_conn)
+        private$ipc_conn <- NULL
+      }
+
+      # Filesystem cleanup: save paths as local variables first, then
+      # NULL out the private fields to avoid segfaults during GC.
+      sock_path <- private$socket_path
+      sock_dir  <- private$socket_dir
+      sb_config <- private$sandbox_config
+      private$socket_path    <- NULL
+      private$socket_dir     <- NULL
+      private$sandbox_config <- NULL
+
+      if (is.character(sock_path) && length(sock_path) == 1 &&
+          file.exists(sock_path)) {
+        unlink(sock_path)
+      }
+      if (is.character(sock_dir) && length(sock_dir) == 1 &&
+          dir.exists(sock_dir)) {
+        unlink(sock_dir, recursive = TRUE)
+      }
+      if (is.list(sb_config)) {
+        if (is.character(sb_config$wrapper))
+          try(unlink(sb_config$wrapper), silent = TRUE)
+        if (is.character(sb_config$profile_path))
+          try(unlink(sb_config$profile_path), silent = TRUE)
+        if (is.character(sb_config$sandbox_tmp))
+          try(unlink(sb_config$sandbox_tmp, recursive = TRUE), silent = TRUE)
+      }
+    },
 
     audit_log = function(event, ...) {
       if (!is.null(private$audit)) private$audit$log(event, ...)
@@ -443,7 +504,7 @@ SecureSession <- R6::R6Class("SecureSession",
         if (!is.null(private$sandbox_config$wrapper)) {
           # Override the R binary with our sandbox wrapper script.
           # callr interprets `arch` values containing "/" as a direct
-          # path to the R executable (see callr:::setup_r_binary_and_args).
+          # path to the R executable (see callr internal setup_r_binary_and_args).
           session_opts$arch <- private$sandbox_config$wrapper
         }
         if (!is.null(private$sandbox_config$env)) {
@@ -553,10 +614,12 @@ SecureSession <- R6::R6Class("SecureSession",
     max_ipc_message_size = 1048576L,
 
     run_with_tools = function(code, timeout, output_handler = NULL,
-                              max_tool_calls = NULL) {
+                              max_tool_calls = NULL,
+                              max_output_lines = NULL) {
       exec_start <- Sys.time()
       private$audit_log("execute_start", code = code)
-      output_lines <- character()
+      output_collector <- list()
+      output_line_count <- 0L
       tool_call_count <- 0L
       total_messages <- 0L
       max_messages <- if (!is.null(max_tool_calls)) {
@@ -572,7 +635,23 @@ SecureSession <- R6::R6Class("SecureSession",
           err <- private$session$read_error_lines(n = 100)
           lines <- c(out, err)
           if (length(lines) == 0) break
-          output_lines <<- c(output_lines, lines)
+          # Accumulate using list-append (O(1) amortized) instead of
+          # c(output_lines, lines) which is O(n) per call.
+          if (is.null(max_output_lines) ||
+              output_line_count < max_output_lines) {
+            if (!is.null(max_output_lines)) {
+              remaining <- max_output_lines - output_line_count
+              if (length(lines) > remaining) {
+                lines_to_keep <- lines[seq_len(remaining)]
+              } else {
+                lines_to_keep <- lines
+              }
+            } else {
+              lines_to_keep <- lines
+            }
+            output_collector[[length(output_collector) + 1L]] <<- lines_to_keep
+            output_line_count <<- output_line_count + length(lines_to_keep)
+          }
           if (is.function(output_handler)) {
             for (ln in lines) {
               tryCatch(output_handler(ln), error = function(e) NULL)
@@ -818,7 +897,22 @@ SecureSession <- R6::R6Class("SecureSession",
           for (raw in c(trailing_out, trailing_err)) {
             if (nzchar(raw)) {
               parts <- strsplit(raw, "\n", fixed = TRUE)[[1]]
-              output_lines <- c(output_lines, parts)
+              if (is.null(max_output_lines) ||
+                  output_line_count < max_output_lines) {
+                if (!is.null(max_output_lines)) {
+                  remaining <- max_output_lines - output_line_count
+                  if (length(parts) > remaining) {
+                    parts_to_keep <- parts[seq_len(remaining)]
+                  } else {
+                    parts_to_keep <- parts
+                  }
+                } else {
+                  parts_to_keep <- parts
+                }
+                output_collector[[length(output_collector) + 1L]] <-
+                  parts_to_keep
+                output_line_count <- output_line_count + length(parts_to_keep)
+              }
               if (is.function(output_handler)) {
                 for (ln in parts) {
                   tryCatch(output_handler(ln), error = function(e) NULL)
@@ -826,6 +920,9 @@ SecureSession <- R6::R6Class("SecureSession",
               }
             }
           }
+          # Flatten the list-based collector into a single character vector
+          output_lines <- unlist(output_collector, use.names = FALSE)
+          if (is.null(output_lines)) output_lines <- character()
           elapsed <- sprintf(
             "%.2fs",
             as.numeric(difftime(Sys.time(), exec_start, units = "secs"))
@@ -855,36 +952,7 @@ SecureSession <- R6::R6Class("SecureSession",
     handle_timeout = function(timeout) {
       private$log(sprintf("Execution timed out after %ss", timeout))
       private$audit_log("execute_timeout", timeout_secs = timeout)
-      # Kill the child process and restart so the session remains usable
-      try(private$session$kill(), silent = TRUE)
-      .securer_closed_sessions_add(private$session)
-      private$session <- NULL
-      if (!is.null(private$ipc_conn)) {
-        .securer_closed_sessions_add(private$ipc_conn)
-        private$ipc_conn <- NULL
-      }
-      if (!is.null(private$socket_path) && file.exists(private$socket_path)) {
-        unlink(private$socket_path)
-      }
-      if (!is.null(private$socket_dir) && dir.exists(private$socket_dir)) {
-        unlink(private$socket_dir, recursive = TRUE)
-        private$socket_dir <- NULL
-      }
-
-      # Clean up old sandbox temp files before restarting
-      if (!is.null(private$sandbox_config)) {
-        if (!is.null(private$sandbox_config$wrapper)) {
-          try(unlink(private$sandbox_config$wrapper), silent = TRUE)
-        }
-        if (!is.null(private$sandbox_config$profile_path)) {
-          try(unlink(private$sandbox_config$profile_path), silent = TRUE)
-        }
-        if (!is.null(private$sandbox_config$sandbox_tmp)) {
-          try(unlink(private$sandbox_config$sandbox_tmp, recursive = TRUE),
-              silent = TRUE)
-        }
-        private$sandbox_config <- NULL
-      }
+      private$cleanup_resources()
 
       # Restart the session so it's usable for future execute() calls
       private$start_session()

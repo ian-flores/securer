@@ -27,6 +27,11 @@
 #'   }
 #' @keywords internal
 build_sandbox_windows <- function(socket_path, r_home, limits = NULL) {
+  message(
+    "Note: Windows sandbox provides environment isolation only -- ",
+    "no filesystem or network restrictions. See ?SecureSession for details."
+  )
+
   # Create a private temp directory for the sandboxed session
   sandbox_tmp <- tempfile("securer_win_")
   dir.create(sandbox_tmp, recursive = TRUE)

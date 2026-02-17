@@ -25,6 +25,7 @@
 #'
 #' @export
 SecureSessionPool <- R6::R6Class("SecureSessionPool",
+  cloneable = FALSE,
   public = list(
     #' @description Create a new SecureSessionPool
     #' @param size Integer, number of sessions to pre-warm (default 4, minimum 1).
@@ -32,8 +33,14 @@ SecureSessionPool <- R6::R6Class("SecureSessionPool",
     #' @param sandbox Logical, whether to enable OS-level sandboxing.
     #' @param limits Optional named list of resource limits.
     #' @param verbose Logical, whether to emit diagnostic messages.
+    #' @param reset_between_uses Logical, whether to restart each session
+    #'   after an execution before returning it to the pool (default `FALSE`).
+    #'   When `TRUE`, calls `session$restart()` after every `$execute()` to
+    #'   prevent state leaking between executions (e.g., variables, loaded
+    #'   packages, options set by prior code).
     initialize = function(size = 4L, tools = list(), sandbox = TRUE,
-                          limits = NULL, verbose = FALSE) {
+                          limits = NULL, verbose = FALSE,
+                          reset_between_uses = FALSE) {
       size <- as.integer(size)
       if (size < 1L) {
         stop("Pool size must be at least 1", call. = FALSE)
@@ -46,6 +53,7 @@ SecureSessionPool <- R6::R6Class("SecureSessionPool",
       private$pool_sandbox <- sandbox
       private$pool_limits <- limits
       private$pool_verbose <- verbose
+      private$pool_reset <- reset_between_uses
       private$closed <- FALSE
 
       # Pre-warm all sessions
@@ -170,6 +178,7 @@ SecureSessionPool <- R6::R6Class("SecureSessionPool",
     pool_sandbox = FALSE,
     pool_limits = NULL,
     pool_verbose = FALSE,
+    pool_reset = FALSE,
 
     # Find and claim an idle session. Returns index or NULL.
     acquire = function() {
@@ -192,6 +201,12 @@ SecureSessionPool <- R6::R6Class("SecureSessionPool",
 
     # Return a session to the pool
     release = function(idx) {
+      if (private$pool_reset) {
+        tryCatch(
+          private$sessions[[idx]]$restart(),
+          error = function(e) NULL
+        )
+      }
       private$busy[[idx]] <- FALSE
     }
   )
