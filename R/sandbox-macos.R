@@ -77,7 +77,7 @@ generate_seatbelt_profile <- function(socket_path, r_home,
 ;; Allow file-read-metadata globally (stat, readdir for path traversal).
 ;; This reveals file existence/size but NOT contents.  Scoping metadata
 ;; reads more tightly breaks R path resolution and library loading, so
-;; this is an accepted tradeoff — the sandbox prevents reading actual
+;; this is an accepted tradeoff -- the sandbox prevents reading actual
 ;; file contents from sensitive locations.
 (allow file-read-metadata)
 
@@ -213,7 +213,7 @@ generate_seatbelt_profile <- function(socket_path, r_home,
 ;; libdispatch, CoreFoundation preferences, Security.framework for TLS,
 ;; and system logger.  Restricting to a specific allowlist is infeasible
 ;; because the set of required services varies across macOS versions and
-;; R configurations.  This is an accepted tradeoff — the sandbox still
+;; R configurations.  This is an accepted tradeoff -- the sandbox still
 ;; blocks network access, filesystem writes, and process execution.
 (allow sysctl-read)
 (allow mach-lookup)
