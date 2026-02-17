@@ -23,7 +23,12 @@ generate_seatbelt_profile <- function(socket_path, r_home,
 
   # Determine the current user's /private/var/folders/XX/YYYYYY path
   # so we can scope read/write rules to just this user's temp area.
+  # We also capture the full TMPDIR path (which includes a session-specific
+  # subdirectory like /private/var/folders/XX/YYYYYY/T/) so that write
+  # access can be scoped to that narrow path instead of the entire user
+  # cache hierarchy.
   user_var_folder <- NULL
+  session_tmpdir <- NULL
   tmpdir_val <- normalizePath(
     Sys.getenv("TMPDIR", tempdir()),
     mustWork = FALSE
@@ -34,6 +39,12 @@ generate_seatbelt_profile <- function(socket_path, r_home,
   )
   if (length(var_folder_match) == 1 && nzchar(var_folder_match)) {
     user_var_folder <- var_folder_match
+    # Use the full TMPDIR as the write-scoped path if it is a subdirectory
+    # of the user var folder (e.g., /private/var/folders/XX/YYY/T/)
+    if (startsWith(tmpdir_val, var_folder_match) &&
+        nchar(tmpdir_val) > nchar(var_folder_match)) {
+      session_tmpdir <- sub("/$", "", tmpdir_val)  # strip trailing slash
+    }
   }
 
   # Build explicit file-read rules for each R library path.
@@ -64,7 +75,10 @@ generate_seatbelt_profile <- function(socket_path, r_home,
 
 ;; -- File access (reads) ----------------------------------------------
 ;; Allow file-read-metadata globally (stat, readdir for path traversal).
-;; This reveals file existence/size but NOT contents.
+;; This reveals file existence/size but NOT contents.  Scoping metadata
+;; reads more tightly breaks R path resolution and library loading, so
+;; this is an accepted tradeoff — the sandbox prevents reading actual
+;; file contents from sensitive locations.
 (allow file-read-metadata)
 
 ;; Allow reading root directory listing (shell needs this for path resolution)
@@ -77,8 +91,15 @@ generate_seatbelt_profile <- function(socket_path, r_home,
 ;; R library paths (.libPaths() outside R.home())
 ', lib_read_section, '
 
-;; System libraries, frameworks, and shared objects
-(allow file-read* (subpath "/usr"))
+;; System libraries, frameworks, and shared objects.
+;; Scoped to specific /usr subdirectories instead of all of /usr to
+;; prevent reading user-installed binaries or other content under /usr.
+(allow file-read* (subpath "/usr/lib"))
+(allow file-read* (subpath "/usr/bin"))
+(allow file-read* (subpath "/usr/share"))
+(allow file-read* (subpath "/usr/local/lib"))
+(allow file-read* (subpath "/usr/local/share"))
+(allow file-read* (subpath "/usr/libexec"))
 (allow file-read* (subpath "/Library/Frameworks"))
 (allow file-read* (subpath "/System/Library"))
 (allow file-read* (subpath "/opt/homebrew/lib"))
@@ -133,7 +154,17 @@ generate_seatbelt_profile <- function(socket_path, r_home,
 ;; Allow writes ONLY to the session-specific socket directory and R temp
 ;; directories.  Blocks writes to other sessions or other apps in /tmp.
 (allow file-write* (subpath "', tmp_dir, '"))
-', if (!is.null(user_var_folder)) {
+', if (!is.null(session_tmpdir)) {
+    # Narrow write scope to the session-specific temp subdirectory
+    # (e.g., /private/var/folders/XX/YYY/T/) rather than the entire user
+    # cache hierarchy.  Read access is still broader (user_var_folder)
+    # because R reads from shared cache during startup.
+    paste0(
+      '(allow file-write* (subpath "', session_tmpdir, '"))\n',
+      '(allow file-write* (subpath "',
+      sub("^/private", "", session_tmpdir), '"))'
+    )
+  } else if (!is.null(user_var_folder)) {
     paste0(
       '(allow file-write* (subpath "', user_var_folder, '"))\n',
       '(allow file-write* (subpath "',
@@ -158,11 +189,16 @@ generate_seatbelt_profile <- function(socket_path, r_home,
 (deny network* (remote ip))
 
 ;; -- Process ----------------------------------------------------------
-;; Allow fork and exec of R binaries (bin/R script + bin/exec/R binary).
+;; process-fork is required globally because R uses fork() internally for
+;; parallel operations, and the R startup chain itself forks subprocesses.
+;; Restricting fork to specific binaries is not possible in Seatbelt.
+(allow process-fork)
+;; Allow exec of R binaries (bin/R script -> bin/exec/R binary).
 ;; Allow core POSIX utilities needed by R startup script (sed, grep, etc.).
 ;; Blocks execution of interpreters (python, perl, ruby, etc.).
-(allow process-fork)
 ', exec_rules, '
+;; /bin/sh is required because R\'s bin/R is a shell script that uses
+;; #!/bin/sh.  Without this, R itself cannot start inside the sandbox.
 (allow process-exec (literal "/bin/sh"))
 (allow process-exec (literal "/bin/rm"))
 (allow process-exec (literal "/usr/bin/sed"))
@@ -172,7 +208,13 @@ generate_seatbelt_profile <- function(socket_path, r_home,
 (allow process-exec (literal "/usr/bin/basename"))
 
 ;; -- Mach / IPC -------------------------------------------------------
-;; R needs mach lookups for system services, dyld, etc.
+;; R needs mach-lookup broadly because it interacts with numerous macOS
+;; system services at startup and during execution: dyld shared cache,
+;; libdispatch, CoreFoundation preferences, Security.framework for TLS,
+;; and system logger.  Restricting to a specific allowlist is infeasible
+;; because the set of required services varies across macOS versions and
+;; R configurations.  This is an accepted tradeoff — the sandbox still
+;; blocks network access, filesystem writes, and process execution.
 (allow sysctl-read)
 (allow mach-lookup)
 (allow mach-priv-host-port)

@@ -44,6 +44,14 @@ generate_bwrap_args <- function(socket_path, r_home) {
     "--proc", "/proc",
     "--dev", "/dev",
 
+    # -- Mask sensitive /proc entries ------------------------------------------
+    # /proc/self/environ exposes all environment variables (including any
+    # secrets that weren't unset before reaching this point).
+    # /proc/self/maps reveals the memory layout, which aids ASLR bypass.
+    # We mask these with empty tmpfs mounts.
+    "--tmpfs", "/proc/self/environ",
+    "--tmpfs", "/proc/self/maps",
+
     # -- Writable temp (clean) -------------------------------------------------
     "--tmpfs", "/tmp",
 
