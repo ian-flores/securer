@@ -30,7 +30,7 @@ session <- SecureSession$new(tools = tools)
 session$execute("add(2, 3)")
 session$close()
 }
-\donttest{
+\dontrun{
 # With sandbox (requires platform-specific tools)
 session <- SecureSession$new(sandbox = TRUE)
 session$execute("1 + 1")
