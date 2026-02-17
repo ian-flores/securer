@@ -32,8 +32,6 @@ An R6 object of class `SecureSession`.
 
 - [`SecureSession$restart()`](#method-SecureSession-restart)
 
-- [`SecureSession$clone()`](#method-SecureSession-clone)
-
 ------------------------------------------------------------------------
 
 ### Method `new()`
@@ -48,7 +46,10 @@ Create a new SecureSession
       limits = NULL,
       verbose = FALSE,
       sandbox_strict = FALSE,
-      audit_log = NULL
+      audit_log = NULL,
+      max_executions = NULL,
+      pre_execute_hook = NULL,
+      sanitize_errors = FALSE
     )
 
 #### Arguments
@@ -105,6 +106,28 @@ Create a new SecureSession
   structured JSON entries are appended for session lifecycle events,
   executions, and tool calls.
 
+- `max_executions`:
+
+  Optional integer, the maximum number of `$execute()` calls allowed on
+  this session (default `NULL` = unlimited). Once the limit is reached,
+  subsequent `$execute()` calls stop with an error. Useful for
+  disposable sessions in agent workflows.
+
+- `pre_execute_hook`:
+
+  Optional function taking a single `code` argument. Called at the start
+  of every `$execute()` invocation. If it returns `FALSE`, execution is
+  blocked with an error. Any other return value (including `NULL` or
+  `TRUE`) allows execution to proceed. Default `NULL` (no hook).
+
+- `sanitize_errors`:
+
+  Logical, whether to strip sensitive details (file paths, PIDs,
+  hostnames) from error messages returned by `$execute()` (default
+  `FALSE`). When `TRUE`,
+  [`sanitize_error_message()`](https://ian-flores.github.io/securer/reference/sanitize_error_message.md)
+  is applied before the error is raised.
+
 ------------------------------------------------------------------------
 
 ### Method `execute()`
@@ -115,10 +138,12 @@ Execute R code in the secure session
 
     SecureSession$execute(
       code,
-      timeout = NULL,
+      timeout = 30,
       validate = TRUE,
       output_handler = NULL,
-      max_tool_calls = NULL
+      max_tool_calls = NULL,
+      max_code_length = 100000L,
+      max_output_lines = NULL
     )
 
 #### Arguments
@@ -129,7 +154,11 @@ Execute R code in the secure session
 
 - `timeout`:
 
-  Timeout in seconds, or `NULL` for no timeout (default `NULL`)
+  Timeout in seconds (default 30). Pass `NULL` to disable the timeout
+  entirely. Both this method and the
+  [`execute_r()`](https://ian-flores.github.io/securer/reference/execute_r.md)
+  convenience wrapper default to 30 seconds. For long-running workloads,
+  pass an explicit higher value or `NULL`.
 
 - `validate`:
 
@@ -146,6 +175,18 @@ Execute R code in the secure session
 
   Maximum number of tool calls allowed in this execution, or `NULL` for
   unlimited (default `NULL`).
+
+- `max_code_length`:
+
+  Maximum allowed `nchar(code)` (default 100000). Code exceeding this
+  limit is rejected before parsing. Prevents resource exhaustion from
+  extremely large code strings.
+
+- `max_output_lines`:
+
+  Maximum number of output lines to accumulate (default `NULL` =
+  unlimited). Once the limit is reached, further output from the child
+  is still drained but not stored.
 
 #### Returns
 
@@ -252,22 +293,6 @@ remains usable for subsequent `$execute()` calls.
 #### Returns
 
 Invisible self.
-
-------------------------------------------------------------------------
-
-### Method `clone()`
-
-The objects of this class are cloneable with this method.
-
-#### Usage
-
-    SecureSession$clone(deep = FALSE)
-
-#### Arguments
-
-- `deep`:
-
-  Whether to make a deep clone.
 
 ## Examples
 

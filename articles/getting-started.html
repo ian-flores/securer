@@ -102,12 +102,34 @@ disable it.</p>
 <p>Tools let sandboxed code call functions on the host. Define them with
 <code><a href="../reference/securer_tool.html">securer_tool()</a></code>:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">add_tool</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/securer_tool.html">securer_tool</a></span><span class="op">(</span></span>
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ian-flores.github.io/securer/">securer</a></span><span class="op">)</span></span>
+<span><span class="va">add_tool</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/securer_tool.html">securer_tool</a></span><span class="op">(</span></span>
 <span>  name <span class="op">=</span> <span class="st">"add"</span>,</span>
 <span>  description <span class="op">=</span> <span class="st">"Add two numbers"</span>,</span>
 <span>  fn <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">a</span>, <span class="va">b</span><span class="op">)</span> <span class="va">a</span> <span class="op">+</span> <span class="va">b</span>,</span>
 <span>  args <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>a <span class="op">=</span> <span class="st">"numeric"</span>, b <span class="op">=</span> <span class="st">"numeric"</span><span class="op">)</span></span>
-<span><span class="op">)</span></span></code></pre></div>
+<span><span class="op">)</span></span>
+<span><span class="va">add_tool</span></span>
+<span><span class="co">#&gt; $name</span></span>
+<span><span class="co">#&gt; [1] "add"</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $description</span></span>
+<span><span class="co">#&gt; [1] "Add two numbers"</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $fn</span></span>
+<span><span class="co">#&gt; function (a, b) </span></span>
+<span><span class="co">#&gt; a + b</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $args</span></span>
+<span><span class="co">#&gt; $args$a</span></span>
+<span><span class="co">#&gt; [1] "numeric"</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $args$b</span></span>
+<span><span class="co">#&gt; [1] "numeric"</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; attr(,"class")</span></span>
+<span><span class="co">#&gt; [1] "securer_tool"</span></span></code></pre></div>
 <p>Each tool has four components:</p>
 <ul>
 <li>
@@ -215,6 +237,53 @@ available in the second.</p>
 <p>Always call <code>$close()</code> when done. This terminates the
 child process, removes the Unix domain socket, and cleans up any
 temporary sandbox files.</p>
+<div class="section level3">
+<h3 id="automatic-cleanup-with-with_secure_session">Automatic cleanup with <code>with_secure_session()</code><a class="anchor" aria-label="anchor" href="#automatic-cleanup-with-with_secure_session"></a>
+</h3>
+<p>If you prefer not to manage <code>$close()</code> manually, use
+<code><a href="../reference/with_secure_session.html">with_secure_session()</a></code>. It creates a session, passes it to
+your function, and guarantees cleanup:</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/with_secure_session.html">with_secure_session</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">session</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">"x &lt;- 10"</span><span class="op">)</span></span>
+<span>  <span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">"x * 2"</span><span class="op">)</span></span>
+<span><span class="op">}</span>, sandbox <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
+</div>
+</div>
+<div class="section level2">
+<h2 id="safety-features-for-agent-workflows">Safety features for agent workflows<a class="anchor" aria-label="anchor" href="#safety-features-for-agent-workflows"></a>
+</h2>
+<p><code>SecureSession</code> includes several features for hardening
+LLM agent deployments:</p>
+<ul>
+<li>
+<strong><code>max_code_length</code></strong> (in
+<code>$execute()</code>): Reject code strings longer than a threshold
+(default 100,000 characters) before parsing.</li>
+<li>
+<strong><code>max_executions</code></strong> (in
+<code>$new()</code>): Limit the total number of <code>$execute()</code>
+calls on a session. Once reached, further calls error immediately.</li>
+<li>
+<strong><code>pre_execute_hook</code></strong> (in
+<code>$new()</code>): A function called before every execution. Return
+<code>FALSE</code> to block it. Useful for content-based filtering.</li>
+<li>
+<strong><code>sanitize_errors</code></strong> (in
+<code>$new()</code>): Strip file paths, PIDs, and hostnames from error
+messages before they reach the LLM.</li>
+</ul>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
+<span>  max_executions <span class="op">=</span> <span class="fl">100</span>,</span>
+<span>  pre_execute_hook <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">code</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="co"># Block code that mentions system()</span></span>
+<span>    <span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grepl</a></span><span class="op">(</span><span class="st">"system\\("</span>, <span class="va">code</span><span class="op">)</span></span>
+<span>  <span class="op">}</span>,</span>
+<span>  sanitize_errors <span class="op">=</span> <span class="cn">TRUE</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>See <code><a href="../articles/security-model.html">vignette("security-model")</a></code> for the full threat model
+and defense layers.</p>
 </div>
 <div class="section level2">
 <h2 id="sandbox">Sandbox<a class="anchor" aria-label="anchor" href="#sandbox"></a>
@@ -233,7 +302,7 @@ packages)</li>
 <li>All remote network access is blocked (TCP/UDP)</li>
 <li>Unix domain sockets are allowed (needed for IPC with the host)</li>
 </ul>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>sandbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Computation works normally:</span></span>
@@ -276,7 +345,7 @@ filesystem or network restrictions. A warning is issued.</p>
 </h2>
 <p>Apply <code>ulimit</code>-based caps to the child process. These work
 with or without the sandbox:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/execute_r.html">execute_r</a></span><span class="op">(</span><span class="st">"1 + 1"</span>, limits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>cpu <span class="op">=</span> <span class="fl">10</span>, memory <span class="op">=</span> <span class="fl">256</span> <span class="op">*</span> <span class="fl">1024</span> <span class="op">*</span> <span class="fl">1024</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <p>Supported limits:</p>
 <table class="table">
@@ -325,6 +394,62 @@ with or without the sandbox:</p>
 </tr>
 </tbody>
 </table>
+<p>Default limits applied when <code>sandbox = TRUE</code>:</p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/default_limits.html">default_limits</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="co">#&gt; $cpu</span></span>
+<span><span class="co">#&gt; [1] 60</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $memory</span></span>
+<span><span class="co">#&gt; [1] 536870912</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $fsize</span></span>
+<span><span class="co">#&gt; [1] 52428800</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $nproc</span></span>
+<span><span class="co">#&gt; [1] 50</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $nofile</span></span>
+<span><span class="co">#&gt; [1] 256</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="code-pre-validation">Code pre-validation<a class="anchor" aria-label="anchor" href="#code-pre-validation"></a>
+</h2>
+<p><code><a href="../reference/validate_code.html">validate_code()</a></code> checks for syntax errors and dangerous
+patterns before sending code to the child process:</p>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Valid code</span></span>
+<span><span class="fu"><a href="../reference/validate_code.html">validate_code</a></span><span class="op">(</span><span class="st">"1 + 1"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; $valid</span></span>
+<span><span class="co">#&gt; [1] TRUE</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $error</span></span>
+<span><span class="co">#&gt; NULL</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $warnings</span></span>
+<span><span class="co">#&gt; character(0)</span></span>
+<span></span>
+<span><span class="co"># Syntax error</span></span>
+<span><span class="fu"><a href="../reference/validate_code.html">validate_code</a></span><span class="op">(</span><span class="st">"if (TRUE {"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; $valid</span></span>
+<span><span class="co">#&gt; [1] FALSE</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $error</span></span>
+<span><span class="co">#&gt; [1] "&lt;text&gt;:1:10: unexpected '{'\n1: if (TRUE {\n             ^"</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $warnings</span></span>
+<span><span class="co">#&gt; character(0)</span></span>
+<span></span>
+<span><span class="co"># Dangerous pattern (advisory warning, not a hard block)</span></span>
+<span><span class="fu"><a href="../reference/validate_code.html">validate_code</a></span><span class="op">(</span><span class="st">"system('ls')"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; $valid</span></span>
+<span><span class="co">#&gt; [1] TRUE</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $error</span></span>
+<span><span class="co">#&gt; NULL</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $warnings</span></span>
+<span><span class="co">#&gt; [1] "Code contains call to `system()` which may be restricted by the sandbox"</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="execution-timeout">Execution timeout<a class="anchor" aria-label="anchor" href="#execution-timeout"></a>
@@ -332,7 +457,7 @@ with or without the sandbox:</p>
 <p>Each <code>$execute()</code> call accepts a <code>timeout</code> in
 seconds (default 30). If exceeded, the child is killed and the session
 auto-recovers for subsequent calls:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">"Sys.sleep(60)"</span>, timeout <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Error: Execution timed out</span></span>
@@ -342,11 +467,11 @@ auto-recovers for subsequent calls:</p>
 <h2 id="error-handling">Error handling<a class="anchor" aria-label="anchor" href="#error-handling"></a>
 </h2>
 <p>Errors in the child process are propagated to the host:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/execute_r.html">execute_r</a></span><span class="op">(</span><span class="st">'stop("something went wrong")'</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Error: something went wrong</span></span></code></pre></div>
 <p>Errors in tool execution are also propagated:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">bad_tool</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/securer_tool.html">securer_tool</a></span><span class="op">(</span><span class="st">"fail"</span>, <span class="st">"Always fails"</span>,</span>
 <span>  fn <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="kw"><a href="https://rdrr.io/r/base/stop.html" class="external-link">stop</a></span><span class="op">(</span><span class="st">"tool error"</span><span class="op">)</span>,</span>
 <span>  args <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
@@ -355,7 +480,7 @@ auto-recovers for subsequent calls:</p>
 <span><span class="fu"><a href="../reference/execute_r.html">execute_r</a></span><span class="op">(</span><span class="st">'fail()'</span>, tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">bad_tool</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Error: tool error</span></span></code></pre></div>
 <p>If a tool name is not registered, the child receives an error:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/execute_r.html">execute_r</a></span><span class="op">(</span><span class="st">'nonexistent_tool()'</span>, tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Error: Unknown tool: nonexistent_tool</span></span></code></pre></div>
 </div>

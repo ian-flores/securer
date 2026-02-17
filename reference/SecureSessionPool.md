@@ -43,8 +43,6 @@ conditions in session acquisition.
 
 - [`SecureSessionPool$close()`](#method-SecureSessionPool-close)
 
-- [`SecureSessionPool$clone()`](#method-SecureSessionPool-clone)
-
 ------------------------------------------------------------------------
 
 ### Method `new()`
@@ -58,7 +56,8 @@ Create a new SecureSessionPool
       tools = list(),
       sandbox = TRUE,
       limits = NULL,
-      verbose = FALSE
+      verbose = FALSE,
+      reset_between_uses = FALSE
     )
 
 #### Arguments
@@ -84,6 +83,14 @@ Create a new SecureSessionPool
 - `verbose`:
 
   Logical, whether to emit diagnostic messages.
+
+- `reset_between_uses`:
+
+  Logical, whether to restart each session after an execution before
+  returning it to the pool (default `FALSE`). When `TRUE`, calls
+  `session$restart()` after every `$execute()` to prevent state leaking
+  between executions (e.g., variables, loaded packages, options set by
+  prior code).
 
 ------------------------------------------------------------------------
 
@@ -212,22 +219,6 @@ Close all sessions and shut down the pool
 #### Returns
 
 Invisible self
-
-------------------------------------------------------------------------
-
-### Method `clone()`
-
-The objects of this class are cloneable with this method.
-
-#### Usage
-
-    SecureSessionPool$clone(deep = FALSE)
-
-#### Arguments
-
-- `deep`:
-
-  Whether to make a deep clone.
 
 ## Examples
 

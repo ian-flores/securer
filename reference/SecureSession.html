@@ -70,7 +70,6 @@ parent side, and resume with the result.</p>
 <li><p><a href="#method-SecureSession-print"><code>SecureSession$print()</code></a></p></li>
 <li><p><a href="#method-SecureSession-tools"><code>SecureSession$tools()</code></a></p></li>
 <li><p><a href="#method-SecureSession-restart"><code>SecureSession$restart()</code></a></p></li>
-<li><p><a href="#method-SecureSession-clone"><code>SecureSession$clone()</code></a></p></li>
 </ul></div><p></p><hr><a id="method-SecureSession-new"></a><div class="section">
 <h3 id="method-new-">Method <code>new()</code><a class="anchor" aria-label="anchor" href="#method-new-"></a></h3>
 <p>Create a new SecureSession</p><div class="section">
@@ -81,7 +80,10 @@ parent side, and resume with the result.</p>
 <span>  limits <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  verbose <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  sandbox_strict <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  audit_log <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  audit_log <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  max_executions <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  pre_execute_hook <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  sanitize_errors <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
@@ -137,6 +139,28 @@ When a path is provided, structured JSON entries are appended for
 session lifecycle events, executions, and tool calls.</p></dd>
 
 
+<dt><code>max_executions</code></dt>
+<dd><p>Optional integer, the maximum number of
+<code>$execute()</code> calls allowed on this session (default <code>NULL</code> = unlimited).
+Once the limit is reached, subsequent <code>$execute()</code> calls stop with
+an error.  Useful for disposable sessions in agent workflows.</p></dd>
+
+
+<dt><code>pre_execute_hook</code></dt>
+<dd><p>Optional function taking a single <code>code</code>
+argument.  Called at the start of every <code>$execute()</code> invocation.
+If it returns <code>FALSE</code>, execution is blocked with an error.  Any
+other return value (including <code>NULL</code> or <code>TRUE</code>) allows execution
+to proceed.  Default <code>NULL</code> (no hook).</p></dd>
+
+
+<dt><code>sanitize_errors</code></dt>
+<dd><p>Logical, whether to strip sensitive details
+(file paths, PIDs, hostnames) from error messages returned by
+<code>$execute()</code> (default <code>FALSE</code>).  When <code>TRUE</code>,
+<code><a href="sanitize_error_message.html">sanitize_error_message()</a></code> is applied before the error is raised.</p></dd>
+
+
 </dl><p></p></div>
 </div>
 
@@ -146,10 +170,12 @@ session lifecycle events, executions, and tool calls.</p></dd>
 <h4 id="usage-1">Usage<a class="anchor" aria-label="anchor" href="#usage-1"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">SecureSession</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span></span>
 <span>  <span class="va">code</span>,</span>
-<span>  timeout <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  timeout <span class="op">=</span> <span class="fl">30</span>,</span>
 <span>  validate <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  output_handler <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  max_tool_calls <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  max_tool_calls <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  max_code_length <span class="op">=</span> <span class="fl">100000L</span>,</span>
+<span>  max_output_lines <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
@@ -160,7 +186,10 @@ session lifecycle events, executions, and tool calls.</p></dd>
 
 
 <dt><code>timeout</code></dt>
-<dd><p>Timeout in seconds, or <code>NULL</code> for no timeout (default <code>NULL</code>)</p></dd>
+<dd><p>Timeout in seconds (default 30).  Pass <code>NULL</code> to
+disable the timeout entirely.  Both this method and the
+<code><a href="execute_r.html">execute_r()</a></code> convenience wrapper default to 30 seconds.  For
+long-running workloads, pass an explicit higher value or <code>NULL</code>.</p></dd>
 
 
 <dt><code>validate</code></dt>
@@ -178,6 +207,18 @@ attribute on the result.</p></dd>
 <dt><code>max_tool_calls</code></dt>
 <dd><p>Maximum number of tool calls allowed in this
 execution, or <code>NULL</code> for unlimited (default <code>NULL</code>).</p></dd>
+
+
+<dt><code>max_code_length</code></dt>
+<dd><p>Maximum allowed <code>nchar(code)</code> (default 100000).
+Code exceeding this limit is rejected before parsing.  Prevents
+resource exhaustion from extremely large code strings.</p></dd>
+
+
+<dt><code>max_output_lines</code></dt>
+<dd><p>Maximum number of output lines to accumulate
+(default <code>NULL</code> = unlimited).  Once the limit is reached, further
+output from the child is still drained but not stored.</p></dd>
 
 
 </dl><p></p></div>
@@ -279,22 +320,6 @@ The session remains usable for subsequent <code>$execute()</code> calls.</p><div
 <div class="section">
 <h4 id="returns-6">Returns<a class="anchor" aria-label="anchor" href="#returns-6"></a></h4>
 <p>Invisible self.</p>
-</div>
-
-</div><p></p><hr><a id="method-SecureSession-clone"></a><div class="section">
-<h3 id="method-clone-">Method <code>clone()</code><a class="anchor" aria-label="anchor" href="#method-clone-"></a></h3>
-<p>The objects of this class are cloneable with this method.</p><div class="section">
-<h4 id="usage-8">Usage<a class="anchor" aria-label="anchor" href="#usage-8"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">SecureSession</span><span class="op">$</span><span class="fu">clone</span><span class="op">(</span>deep <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
-</div>
-
-<div class="section">
-<h4 id="arguments-4">Arguments<a class="anchor" aria-label="anchor" href="#arguments-4"></a></h4>
-<p></p><div class="arguments"><dl><dt><code>deep</code></dt>
-<dd><p>Whether to make a deep clone.</p></dd>
-
-
-</dl><p></p></div>
 </div>
 
 </div>

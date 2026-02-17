@@ -273,13 +273,23 @@ account has access, and can make network connections.</p>
 <p>Prevent resource exhaustion attacks. Applied via <code>ulimit</code>
 on Unix and Job Objects on Windows.</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Default limits (applied automatically when sandbox = TRUE):</span></span>
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ian-flores.github.io/securer/">securer</a></span><span class="op">)</span></span>
+<span><span class="co"># Default limits (applied automatically when sandbox = TRUE):</span></span>
 <span><span class="fu"><a href="../reference/default_limits.html">default_limits</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="co">#&gt; $cpu     60          # 60 seconds CPU time</span></span>
-<span><span class="co">#&gt; $memory  536870912   # 512 MB virtual memory</span></span>
-<span><span class="co">#&gt; $fsize   52428800    # 50 MB max file size</span></span>
-<span><span class="co">#&gt; $nproc   50          # 50 child processes</span></span>
-<span><span class="co">#&gt; $nofile  256         # 256 open file descriptors</span></span></code></pre></div>
+<span><span class="co">#&gt; $cpu</span></span>
+<span><span class="co">#&gt; [1] 60</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $memory</span></span>
+<span><span class="co">#&gt; [1] 536870912</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $fsize</span></span>
+<span><span class="co">#&gt; [1] 52428800</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $nproc</span></span>
+<span><span class="co">#&gt; [1] 50</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $nofile</span></span>
+<span><span class="co">#&gt; [1] 256</span></span></code></pre></div>
 <p>The wrapper script sets both soft and hard limits
 (<code>ulimit -S -H</code>) before <code>exec</code>-ing R, so the child
 cannot raise them:</p>
@@ -381,9 +391,18 @@ as “remove from child environment”):</p>
 <span>  <span class="st">"PATH"</span>, <span class="st">"HOME"</span>, <span class="st">"USER"</span>, <span class="st">"LOGNAME"</span>, <span class="st">"LANG"</span>, <span class="st">"LC_ALL"</span>, <span class="st">"LC_CTYPE"</span>,</span>
 <span>  <span class="st">"LC_MESSAGES"</span>, <span class="st">"LC_COLLATE"</span>, <span class="st">"LC_MONETARY"</span>, <span class="st">"LC_NUMERIC"</span>, <span class="st">"LC_TIME"</span>,</span>
 <span>  <span class="st">"SHELL"</span>, <span class="st">"TMPDIR"</span>, <span class="st">"TZ"</span>, <span class="st">"TERM"</span>,</span>
-<span>  <span class="st">"R_HOME"</span>, <span class="st">"R_LIBS"</span>, <span class="st">"R_LIBS_SITE"</span>, <span class="st">"R_LIBS_USER"</span>,</span>
+<span>  <span class="st">"R_HOME"</span>, <span class="st">"R_LIBS_SITE"</span>,</span>
 <span>  <span class="st">"R_PLATFORM"</span>, <span class="st">"R_ARCH"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
+<p><code>R_LIBS</code> and <code>R_LIBS_USER</code> are
+<strong>intentionally excluded</strong> from the allowlist. These
+variables can point to attacker-controlled directories, allowing
+malicious packages with <code>.onLoad</code> hooks to execute arbitrary
+code in the child process, bypassing sandbox restrictions. The child
+inherits only <code>R_HOME</code> and <code>R_LIBS_SITE</code>
+(system-level library paths controlled by the R installation).
+<code>R_LIBS_USER</code> is explicitly set to <code>""</code> to prevent
+user-level library injection on all platforms.</p>
 <p>Everything not on this list is removed. This means:</p>
 <ul>
 <li>
@@ -463,34 +482,43 @@ somehow obtains a file descriptor to the socket.</p>
 <div class="section level3">
 <h3 id="layer-10-child-runtime-hardening">Layer 10: Child runtime hardening<a class="anchor" aria-label="anchor" href="#layer-10-child-runtime-hardening"></a>
 </h3>
-<p>After the child runtime code is injected, key bindings are locked to
-prevent the child from redefining them:</p>
+<p>The child runtime uses a <strong>closure-based design</strong> with a
+sealed inner environment. <code>.securer_call_tool()</code> is defined
+via <code><a href="https://rdrr.io/r/base/eval.html" class="external-link">local()</a></code>, which captures the UDS connection in a private
+enclosing environment that is not directly accessible from the global
+environment. The connection object is stored in a sealed
+<code>.ipc_store</code> environment with a custom <code>$</code> method
+that blocks direct access.</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># In child_runtime_code():</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/bindenv.html" class="external-link">lockEnvironment</a></span><span class="op">(</span><span class="va">.securer_env</span>, bindings <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/bindenv.html" class="external-link">lockBinding</a></span><span class="op">(</span><span class="st">".securer_call_tool"</span>, <span class="fu"><a href="https://rdrr.io/r/base/environment.html" class="external-link">globalenv</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/bindenv.html" class="external-link">lockBinding</a></span><span class="op">(</span><span class="st">".securer_connect"</span>, <span class="fu"><a href="https://rdrr.io/r/base/environment.html" class="external-link">globalenv</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/bindenv.html" class="external-link">lockBinding</a></span><span class="op">(</span><span class="st">".securer_env"</span>, <span class="fu"><a href="https://rdrr.io/r/base/environment.html" class="external-link">globalenv</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<p><code><a href="https://rdrr.io/r/base/bindenv.html" class="external-link">lockBinding()</a></code> prevents reassignment via
-<code>&lt;-</code> or <code><a href="https://rdrr.io/r/base/assign.html" class="external-link">assign()</a></code>.
-<code><a href="https://rdrr.io/r/base/bindenv.html" class="external-link">lockEnvironment()</a></code> with <code>bindings = TRUE</code>
-prevents modifying <code>.securer_env$conn</code> or
-<code>.securer_env$socket_path</code>.</p>
+<span><span class="co"># .securer_call_tool is defined as a closure via local({...})</span></span>
+<span><span class="co"># The UDS connection is captured in .ipc_store inside the closure:</span></span>
+<span><span class="va">.ipc_store</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/environment.html" class="external-link">new.env</a></span><span class="op">(</span>parent <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/environment.html" class="external-link">emptyenv</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">.ipc_store</span><span class="op">$</span><span class="va">.c</span> <span class="op">&lt;-</span> <span class="va">.conn</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/bindenv.html" class="external-link">lockEnvironment</a></span><span class="op">(</span><span class="va">.ipc_store</span><span class="op">)</span></span>
+<span><span class="co"># ... the function is then locked in the global env:</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/bindenv.html" class="external-link">lockBinding</a></span><span class="op">(</span><span class="st">".securer_call_tool"</span>, <span class="fu"><a href="https://rdrr.io/r/base/environment.html" class="external-link">globalenv</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p>Additionally, <code><a href="https://rdrr.io/r/base/bindenv.html" class="external-link">unlockBinding()</a></code> is shadowed in the child’s
+global environment (and in the base namespace where possible) to prevent
+child code from unlocking the binding. <code><a href="https://rdrr.io/r/utils/getFromNamespace.html" class="external-link">getFromNamespace()</a></code>
+and <code><a href="https://rdrr.io/r/base/getNativeSymbolInfo.html" class="external-link">getNativeSymbolInfo()</a></code> are also blocked via active
+bindings.</p>
 <p>This means the child code cannot:</p>
 <ul>
 <li>Redefine <code>.securer_call_tool()</code> to bypass argument
 validation</li>
-<li>Modify <code>.securer_env$conn</code> to point to a different
-socket</li>
-<li>Replace <code>.securer_connect()</code> to alter the connection
-flow</li>
+<li>Access the raw UDS connection via
+<code>environment(.securer_call_tool)$conn</code>
+</li>
+<li>Use <code><a href="https://rdrr.io/r/base/bindenv.html" class="external-link">unlockBinding()</a></code> to remove the lock (even via
+<code><a href="https://rdrr.io/r/base/bindenv.html" class="external-link">base::unlockBinding()</a></code>)</li>
 </ul>
-<p>Note: Tool wrapper functions (e.g., <code>add()</code>,
+<p>Tool wrapper functions (e.g., <code>add()</code>,
 <code>get_weather()</code>) injected by
-<code><a href="../reference/generate_tool_wrappers.html">generate_tool_wrappers()</a></code> are <strong>not</strong> locked.
-Child code can redefine these, but doing so only affects the child’s own
-calling convention. The parent-side tool name allowlist and argument
-validation still apply.</p>
+<code><a href="../reference/generate_tool_wrappers.html">generate_tool_wrappers()</a></code> <strong>are</strong> locked.
+<code><a href="https://rdrr.io/r/base/bindenv.html" class="external-link">lockBinding()</a></code> is called for each wrapper after it is
+injected into the global environment, so child code cannot redefine them
+either.</p>
 </div>
 </div>
 <div class="section level2">
@@ -688,12 +716,15 @@ access.</p>
 negatives. The OS sandbox is the actual enforcement layer.</p>
 </div>
 <div class="section level3">
-<h3 id="tool-wrapper-functions-are-not-locked">Tool wrapper functions are not locked<a class="anchor" aria-label="anchor" href="#tool-wrapper-functions-are-not-locked"></a>
+<h3 id="tool-wrapper-functions-are-locked-but--securer_call_tool-remains-accessible">Tool wrapper functions are locked but
+<code>.securer_call_tool()</code> remains accessible<a class="anchor" aria-label="anchor" href="#tool-wrapper-functions-are-locked-but--securer_call_tool-remains-accessible"></a>
 </h3>
-<p>See Layer 10 above. Child code can redefine wrappers like
-<code>add()</code>, but this only affects its own calling convention.
-The child can already call <code>.securer_call_tool()</code> directly,
-so redefining wrappers provides no additional capability.</p>
+<p>Tool wrapper functions are now locked via <code><a href="https://rdrr.io/r/base/bindenv.html" class="external-link">lockBinding()</a></code>.
+However, the child can still call <code>.securer_call_tool()</code>
+directly to make arbitrary tool calls (subject to parent-side tool name
+allowlist and argument validation). Locking the wrappers prevents
+accidental redefinition but does not restrict tool access beyond what
+the parent already enforces.</p>
 </div>
 <div class="section level3">
 <h3 id="session-pooling-multiplies-the-attack-surface">Session pooling multiplies the attack surface<a class="anchor" aria-label="anchor" href="#session-pooling-multiplies-the-attack-surface"></a>
@@ -721,20 +752,20 @@ for your use case. See “Tighten resource limits” in Recommendations
 below.</p>
 </div>
 <div class="section level3">
-<h3 id="lockbinding-can-be-bypassed-via-environments">
-<code>lockBinding</code> can be bypassed via environments<a class="anchor" aria-label="anchor" href="#lockbinding-can-be-bypassed-via-environments"></a>
+<h3 id="lockbinding-bypass-routes-are-shadowed-but-not-eliminated">
+<code>lockBinding</code> bypass routes are shadowed but not
+eliminated<a class="anchor" aria-label="anchor" href="#lockbinding-bypass-routes-are-shadowed-but-not-eliminated"></a>
 </h3>
-<p>R’s <code><a href="https://rdrr.io/r/base/bindenv.html" class="external-link">lockBinding()</a></code> prevents <code>&lt;-</code> and
-<code><a href="https://rdrr.io/r/base/assign.html" class="external-link">assign()</a></code> on the global environment, but does not prevent
-all forms of modification. For example,
-<code>unlockBinding(".securer_call_tool", globalenv())</code> could
-remove the lock. However,
-<code>lockEnvironment(.securer_env, bindings = TRUE)</code> uses a
-stronger mechanism that cannot be unlocked for the
-<code>.securer_env</code> environment.</p>
+<p><code><a href="https://rdrr.io/r/base/bindenv.html" class="external-link">unlockBinding()</a></code> is shadowed in both the global
+environment and (where possible) the base namespace.
+<code><a href="https://rdrr.io/r/utils/getFromNamespace.html" class="external-link">getFromNamespace()</a></code> and <code><a href="https://rdrr.io/r/base/getNativeSymbolInfo.html" class="external-link">getNativeSymbolInfo()</a></code>
+are blocked via active bindings. However, a sufficiently determined
+attacker may find other reflection paths to recover the original
+<code><a href="https://rdrr.io/r/base/bindenv.html" class="external-link">base::unlockBinding</a></code>.</p>
 <p>The practical impact is low: even if a child redefines
 <code>.securer_call_tool()</code>, it can only change how it constructs
-IPC messages. The parent validates all messages independently.</p>
+IPC messages. The parent validates all messages independently
+(defense-in-depth).</p>
 </div>
 </div>
 <div class="section level2">

@@ -81,7 +81,6 @@ race conditions in session acquisition.</p>
 <li><p><a href="#method-SecureSessionPool-format"><code>SecureSessionPool$format()</code></a></p></li>
 <li><p><a href="#method-SecureSessionPool-print"><code>SecureSessionPool$print()</code></a></p></li>
 <li><p><a href="#method-SecureSessionPool-close"><code>SecureSessionPool$close()</code></a></p></li>
-<li><p><a href="#method-SecureSessionPool-clone"><code>SecureSessionPool$clone()</code></a></p></li>
 </ul></div><p></p><hr><a id="method-SecureSessionPool-new"></a><div class="section">
 <h3 id="method-new-">Method <code>new()</code><a class="anchor" aria-label="anchor" href="#method-new-"></a></h3>
 <p>Create a new SecureSessionPool</p><div class="section">
@@ -91,7 +90,8 @@ race conditions in session acquisition.</p>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  sandbox <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  limits <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  reset_between_uses <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
@@ -115,6 +115,14 @@ race conditions in session acquisition.</p>
 
 <dt><code>verbose</code></dt>
 <dd><p>Logical, whether to emit diagnostic messages.</p></dd>
+
+
+<dt><code>reset_between_uses</code></dt>
+<dd><p>Logical, whether to restart each session
+after an execution before returning it to the pool (default <code>FALSE</code>).
+When <code>TRUE</code>, calls <code>session$restart()</code> after every <code>$execute()</code> to
+prevent state leaking between executions (e.g., variables, loaded
+packages, options set by prior code).</p></dd>
 
 
 </dl><p></p></div>
@@ -238,22 +246,6 @@ a short sleep (0.1s) between retries until the timeout expires.</p></dd>
 <div class="section">
 <h4 id="returns-6">Returns<a class="anchor" aria-label="anchor" href="#returns-6"></a></h4>
 <p>Invisible self</p>
-</div>
-
-</div><p></p><hr><a id="method-SecureSessionPool-clone"></a><div class="section">
-<h3 id="method-clone-">Method <code>clone()</code><a class="anchor" aria-label="anchor" href="#method-clone-"></a></h3>
-<p>The objects of this class are cloneable with this method.</p><div class="section">
-<h4 id="usage-8">Usage<a class="anchor" aria-label="anchor" href="#usage-8"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">SecureSessionPool</span><span class="op">$</span><span class="fu">clone</span><span class="op">(</span>deep <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
-</div>
-
-<div class="section">
-<h4 id="arguments-4">Arguments<a class="anchor" aria-label="anchor" href="#arguments-4"></a></h4>
-<p></p><div class="arguments"><dl><dt><code>deep</code></dt>
-<dd><p>Whether to make a deep clone.</p></dd>
-
-
-</dl><p></p></div>
 </div>
 
 </div>

@@ -40,12 +40,34 @@ Tools let sandboxed code call functions on the host. Define them with
 [`securer_tool()`](https://ian-flores.github.io/securer/reference/securer_tool.md):
 
 ``` r
+library(securer)
 add_tool <- securer_tool(
   name = "add",
   description = "Add two numbers",
   fn = function(a, b) a + b,
   args = list(a = "numeric", b = "numeric")
 )
+add_tool
+#> $name
+#> [1] "add"
+#> 
+#> $description
+#> [1] "Add two numbers"
+#> 
+#> $fn
+#> function (a, b) 
+#> a + b
+#> 
+#> $args
+#> $args$a
+#> [1] "numeric"
+#> 
+#> $args$b
+#> [1] "numeric"
+#> 
+#> 
+#> attr(,"class")
+#> [1] "securer_tool"
 ```
 
 Each tool has four components:
@@ -127,6 +149,51 @@ Always call `$close()` when done. This terminates the child process,
 removes the Unix domain socket, and cleans up any temporary sandbox
 files.
 
+### Automatic cleanup with `with_secure_session()`
+
+If you prefer not to manage `$close()` manually, use
+[`with_secure_session()`](https://ian-flores.github.io/securer/reference/with_secure_session.md).
+It creates a session, passes it to your function, and guarantees
+cleanup:
+
+``` r
+result <- with_secure_session(function(session) {
+  session$execute("x <- 10")
+  session$execute("x * 2")
+}, sandbox = FALSE)
+```
+
+## Safety features for agent workflows
+
+`SecureSession` includes several features for hardening LLM agent
+deployments:
+
+- **`max_code_length`** (in `$execute()`): Reject code strings longer
+  than a threshold (default 100,000 characters) before parsing.
+- **`max_executions`** (in `$new()`): Limit the total number of
+  `$execute()` calls on a session. Once reached, further calls error
+  immediately.
+- **`pre_execute_hook`** (in `$new()`): A function called before every
+  execution. Return `FALSE` to block it. Useful for content-based
+  filtering.
+- **`sanitize_errors`** (in `$new()`): Strip file paths, PIDs, and
+  hostnames from error messages before they reach the LLM.
+
+``` r
+session <- SecureSession$new(
+  max_executions = 100,
+  pre_execute_hook = function(code) {
+    # Block code that mentions system()
+    !grepl("system\\(", code)
+  },
+  sanitize_errors = TRUE
+)
+```
+
+See
+[`vignette("security-model")`](https://ian-flores.github.io/securer/articles/security-model.md)
+for the full threat model and defense layers.
+
 ## Sandbox
 
 When `sandbox = TRUE`, the child process runs inside platform-native
@@ -197,6 +264,67 @@ Supported limits:
 | `nproc`  | count   | `-u`        | Maximum processes     |
 | `nofile` | count   | `-n`        | Maximum open files    |
 | `stack`  | bytes   | `-s`        | Stack size            |
+
+Default limits applied when `sandbox = TRUE`:
+
+``` r
+default_limits()
+#> $cpu
+#> [1] 60
+#> 
+#> $memory
+#> [1] 536870912
+#> 
+#> $fsize
+#> [1] 52428800
+#> 
+#> $nproc
+#> [1] 50
+#> 
+#> $nofile
+#> [1] 256
+```
+
+## Code pre-validation
+
+[`validate_code()`](https://ian-flores.github.io/securer/reference/validate_code.md)
+checks for syntax errors and dangerous patterns before sending code to
+the child process:
+
+``` r
+# Valid code
+validate_code("1 + 1")
+#> $valid
+#> [1] TRUE
+#> 
+#> $error
+#> NULL
+#> 
+#> $warnings
+#> character(0)
+
+# Syntax error
+validate_code("if (TRUE {")
+#> $valid
+#> [1] FALSE
+#> 
+#> $error
+#> [1] "<text>:1:10: unexpected '{'\n1: if (TRUE {\n             ^"
+#> 
+#> $warnings
+#> character(0)
+
+# Dangerous pattern (advisory warning, not a hard block)
+validate_code("system('ls')")
+#> $valid
+#> [1] TRUE
+#> 
+#> $error
+#> NULL
+#> 
+#> $warnings
+#> [1] "Code contains call to `system()` which may be restricted by the sandbox"
+```
 
 ## Execution timeout
 

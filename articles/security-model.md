@@ -187,13 +187,23 @@ Prevent resource exhaustion attacks. Applied via `ulimit` on Unix and
 Job Objects on Windows.
 
 ``` r
+library(securer)
 # Default limits (applied automatically when sandbox = TRUE):
 default_limits()
-#> $cpu     60          # 60 seconds CPU time
-#> $memory  536870912   # 512 MB virtual memory
-#> $fsize   52428800    # 50 MB max file size
-#> $nproc   50          # 50 child processes
-#> $nofile  256         # 256 open file descriptors
+#> $cpu
+#> [1] 60
+#> 
+#> $memory
+#> [1] 536870912
+#> 
+#> $fsize
+#> [1] 52428800
+#> 
+#> $nproc
+#> [1] 50
+#> 
+#> $nofile
+#> [1] 256
 ```
 
 The wrapper script sets both soft and hard limits (`ulimit -S -H`)
@@ -300,10 +310,18 @@ safe_vars <- c(
   "PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "LC_CTYPE",
   "LC_MESSAGES", "LC_COLLATE", "LC_MONETARY", "LC_NUMERIC", "LC_TIME",
   "SHELL", "TMPDIR", "TZ", "TERM",
-  "R_HOME", "R_LIBS", "R_LIBS_SITE", "R_LIBS_USER",
+  "R_HOME", "R_LIBS_SITE",
   "R_PLATFORM", "R_ARCH"
 )
 ```
+
+`R_LIBS` and `R_LIBS_USER` are **intentionally excluded** from the
+allowlist. These variables can point to attacker-controlled directories,
+allowing malicious packages with `.onLoad` hooks to execute arbitrary
+code in the child process, bypassing sandbox restrictions. The child
+inherits only `R_HOME` and `R_LIBS_SITE` (system-level library paths
+controlled by the R installation). `R_LIBS_USER` is explicitly set to
+`""` to prevent user-level library injection on all platforms.
 
 Everything not on this list is removed. This means:
 
@@ -385,36 +403,47 @@ obtains a file descriptor to the socket.
 
 ### Layer 10: Child runtime hardening
 
-After the child runtime code is injected, key bindings are locked to
-prevent the child from redefining them:
+The child runtime uses a **closure-based design** with a sealed inner
+environment. `.securer_call_tool()` is defined via
+[`local()`](https://rdrr.io/r/base/eval.html), which captures the UDS
+connection in a private enclosing environment that is not directly
+accessible from the global environment. The connection object is stored
+in a sealed `.ipc_store` environment with a custom `$` method that
+blocks direct access.
 
 ``` r
 # In child_runtime_code():
-lockEnvironment(.securer_env, bindings = TRUE)
+# .securer_call_tool is defined as a closure via local({...})
+# The UDS connection is captured in .ipc_store inside the closure:
+.ipc_store <- new.env(parent = emptyenv())
+.ipc_store$.c <- .conn
+lockEnvironment(.ipc_store)
+# ... the function is then locked in the global env:
 lockBinding(".securer_call_tool", globalenv())
-lockBinding(".securer_connect", globalenv())
-lockBinding(".securer_env", globalenv())
 ```
 
-[`lockBinding()`](https://rdrr.io/r/base/bindenv.html) prevents
-reassignment via `<-` or
-[`assign()`](https://rdrr.io/r/base/assign.html).
-[`lockEnvironment()`](https://rdrr.io/r/base/bindenv.html) with
-`bindings = TRUE` prevents modifying `.securer_env$conn` or
-`.securer_env$socket_path`.
+Additionally, [`unlockBinding()`](https://rdrr.io/r/base/bindenv.html)
+is shadowed in the child’s global environment (and in the base namespace
+where possible) to prevent child code from unlocking the binding.
+[`getFromNamespace()`](https://rdrr.io/r/utils/getFromNamespace.html)
+and
+[`getNativeSymbolInfo()`](https://rdrr.io/r/base/getNativeSymbolInfo.html)
+are also blocked via active bindings.
 
 This means the child code cannot:
 
 - Redefine `.securer_call_tool()` to bypass argument validation
-- Modify `.securer_env$conn` to point to a different socket
-- Replace `.securer_connect()` to alter the connection flow
+- Access the raw UDS connection via
+  `environment(.securer_call_tool)$conn`
+- Use [`unlockBinding()`](https://rdrr.io/r/base/bindenv.html) to remove
+  the lock (even via
+  [`base::unlockBinding()`](https://rdrr.io/r/base/bindenv.html))
 
-Note: Tool wrapper functions (e.g., `add()`, `get_weather()`) injected
-by
+Tool wrapper functions (e.g., `add()`, `get_weather()`) injected by
 [`generate_tool_wrappers()`](https://ian-flores.github.io/securer/reference/generate_tool_wrappers.md)
-are **not** locked. Child code can redefine these, but doing so only
-affects the child’s own calling convention. The parent-side tool name
-allowlist and argument validation still apply.
+**are** locked. [`lockBinding()`](https://rdrr.io/r/base/bindenv.html)
+is called for each wrapper after it is injected into the global
+environment, so child code cannot redefine them either.
 
 ## What the sandbox prevents
 
@@ -494,12 +523,14 @@ everything the session can access.
 See Layer 8 above. Regex matching has both false positives and false
 negatives. The OS sandbox is the actual enforcement layer.
 
-### Tool wrapper functions are not locked
+### Tool wrapper functions are locked but `.securer_call_tool()` remains accessible
 
-See Layer 10 above. Child code can redefine wrappers like `add()`, but
-this only affects its own calling convention. The child can already call
-`.securer_call_tool()` directly, so redefining wrappers provides no
-additional capability.
+Tool wrapper functions are now locked via
+[`lockBinding()`](https://rdrr.io/r/base/bindenv.html). However, the
+child can still call `.securer_call_tool()` directly to make arbitrary
+tool calls (subject to parent-side tool name allowlist and argument
+validation). Locking the wrappers prevents accidental redefinition but
+does not restrict tool access beyond what the parent already enforces.
 
 ### Session pooling multiplies the attack surface
 
@@ -521,19 +552,21 @@ Resource limits bound but do not prevent resource use. The defaults (60s
 CPU, 512 MB memory, 50 MB file, 50 processes) may be too generous for
 your use case. See “Tighten resource limits” in Recommendations below.
 
-### `lockBinding` can be bypassed via environments
+### `lockBinding` bypass routes are shadowed but not eliminated
 
-R’s [`lockBinding()`](https://rdrr.io/r/base/bindenv.html) prevents `<-`
-and [`assign()`](https://rdrr.io/r/base/assign.html) on the global
-environment, but does not prevent all forms of modification. For
-example, `unlockBinding(".securer_call_tool", globalenv())` could remove
-the lock. However, `lockEnvironment(.securer_env, bindings = TRUE)` uses
-a stronger mechanism that cannot be unlocked for the `.securer_env`
-environment.
+[`unlockBinding()`](https://rdrr.io/r/base/bindenv.html) is shadowed in
+both the global environment and (where possible) the base namespace.
+[`getFromNamespace()`](https://rdrr.io/r/utils/getFromNamespace.html)
+and
+[`getNativeSymbolInfo()`](https://rdrr.io/r/base/getNativeSymbolInfo.html)
+are blocked via active bindings. However, a sufficiently determined
+attacker may find other reflection paths to recover the original
+[`base::unlockBinding`](https://rdrr.io/r/base/bindenv.html).
 
 The practical impact is low: even if a child redefines
 `.securer_call_tool()`, it can only change how it constructs IPC
-messages. The parent validates all messages independently.
+messages. The parent validates all messages independently
+(defense-in-depth).
 
 ## IPC protocol details
 

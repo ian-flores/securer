@@ -120,7 +120,16 @@ tools <- list(
     fn = function(table, limit) {
       con <- DBI::dbConnect(RSQLite::SQLite(), "data.db")
       on.exit(DBI::dbDisconnect(con))
-      DBI::dbGetQuery(con, sprintf("SELECT * FROM %s LIMIT %d", table, limit))
+      # Allowlist table names to prevent SQL injection -- the LLM
+      # controls the `table` argument, so it must never be interpolated
+      # directly into SQL.
+      allowed <- DBI::dbListTables(con)
+      if (!table %in% allowed) stop("Unknown table: ", table)
+      DBI::dbGetQuery(
+        con,
+        paste("SELECT * FROM", DBI::dbQuoteIdentifier(con, table), "LIMIT ?"),
+        params = list(as.integer(limit))
+      )
     },
     args = list(table = "character", limit = "numeric")),
 

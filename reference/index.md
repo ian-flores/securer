@@ -10,6 +10,8 @@ Primary API for secure code execution
   : SecureSessionPool
 - [`execute_r()`](https://ian-flores.github.io/securer/reference/execute_r.md)
   : Execute R code securely with tool support
+- [`with_secure_session()`](https://ian-flores.github.io/securer/reference/with_secure_session.md)
+  : Execute code with an auto-managed SecureSession
 - [`securer_tool()`](https://ian-flores.github.io/securer/reference/securer_tool.md)
   : Create a tool definition
 
