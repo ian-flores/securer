@@ -30,14 +30,7 @@
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
-<li class="active nav-item dropdown">
-  <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
-  <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="../articles/ellmer-integration.html">Using securer with ellmer</a></li>
-    <li><a class="dropdown-item" href="../articles/getting-started.html">Getting Started with securer</a></li>
-    <li><a class="dropdown-item" href="../articles/security-model.html">Security Model</a></li>
-  </ul>
-</li>
+<li class="active nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -69,6 +62,46 @@
 <p>This document describes the security architecture and threat model of
 the securer package. It is intended for security auditors, deployers
 evaluating risk, and contributors working on the sandboxing code.</p>
+<div class="section level2">
+<h2 id="tldr">TL;DR<a class="anchor" aria-label="anchor" href="#tldr"></a>
+</h2>
+<p>securer protects against LLM-generated R code with 10 defense
+layers:</p>
+<ul>
+<li>
+<strong>OS sandbox</strong> — Seatbelt (macOS) or bubblewrap (Linux)
+blocks filesystem writes and network access</li>
+<li>
+<strong>Resource limits</strong> — ulimit caps on CPU, memory, file
+size, processes, and open files</li>
+<li>
+<strong>Execution timeouts</strong> — wall-clock deadline kills
+runaway code; session auto-recovers</li>
+<li>
+<strong>IPC authentication</strong> — 32-character random token
+validates the child process identity</li>
+<li>
+<strong>Message validation</strong> — size limits, JSON structure
+checks, and tool name allowlist</li>
+<li>
+<strong>Environment sanitization</strong> — only allowlisted env
+vars inherited; API keys and credentials stripped</li>
+<li>
+<strong>Argument validation</strong> — type checks on both sides of
+the trust boundary</li>
+<li>
+<strong>Code pre-validation</strong> — syntax check and dangerous
+pattern warnings before execution</li>
+<li>
+<strong>Socket permissions</strong> — 0700 directory prevents other
+users from accessing the IPC socket</li>
+<li>
+<strong>Runtime hardening</strong> — locked bindings and sealed
+environments prevent internal tampering</li>
+</ul>
+<p>For deployment details, see <code><a href="../articles/deployment.html">vignette("deployment")</a></code>. The
+rest of this document covers the full threat model.</p>
+</div>
 <div class="section level2">
 <h2 id="threat-model">Threat model<a class="anchor" aria-label="anchor" href="#threat-model"></a>
 </h2>
@@ -607,22 +640,6 @@ specific POSIX utilities</td>
 <td><strong>Not blocked</strong></td>
 </tr>
 <tr class="odd">
-<td>Read env vars (API keys)</td>
-<td>Blocked – env sanitized (allowlist)</td>
-<td>Blocked – env sanitized (allowlist)</td>
-<td>Blocked – env sanitized (allowlist)</td>
-</tr>
-<tr class="even">
-<td>Redefine <code>.securer_call_tool</code>
-</td>
-<td>Blocked – <code><a href="https://rdrr.io/r/base/bindenv.html" class="external-link">lockBinding()</a></code>
-</td>
-<td>Blocked – <code><a href="https://rdrr.io/r/base/bindenv.html" class="external-link">lockBinding()</a></code>
-</td>
-<td>Blocked – <code><a href="https://rdrr.io/r/base/bindenv.html" class="external-link">lockBinding()</a></code>
-</td>
-</tr>
-<tr class="odd">
 <td>Write 1 GB file to <code>/tmp</code>
 </td>
 <td>Limited – <code>ulimit -f 50MB</code>
@@ -638,12 +655,6 @@ specific POSIX utilities</td>
 <td>Limited – <code>ulimit -n 256</code>
 </td>
 <td>Not limited (no <code>nofile</code> on Windows)</td>
-</tr>
-<tr class="odd">
-<td>DNS exfiltration</td>
-<td>Blocked – no network</td>
-<td>Blocked – no remote IP</td>
-<td><strong>Not blocked</strong></td>
 </tr>
 </tbody>
 </table>
@@ -835,15 +846,6 @@ server connection in-place, does not return a new object)</li>
 sending a tool call. The parent executes the tool function with full
 host privileges, then writes the result back. The child resumes with the
 return value.</p>
-<pre><code>Child                           Parent
-  |                               |
-  |--- tool_call JSON -----------&gt;|
-  |   (child blocks on read)      |-- validate message
-  |                               |-- validate tool name
-  |                               |-- validate arg names
-  |                               |-- execute tool fn
-  |&lt;-- result JSON ---------------|
-  |   (child resumes)             |</code></pre>
 <p>There is no multiplexing or out-of-order execution. Each tool call is
 a synchronous request/response pair.</p>
 </div>
@@ -871,7 +873,7 @@ parent.</p>
 </h3>
 <p>The defaults (60s CPU, 512 MB memory) are intentionally generous.
 Tighten them:</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  sandbox <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  limits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>cpu <span class="op">=</span> <span class="fl">10</span>, memory <span class="op">=</span> <span class="fl">128</span> <span class="op">*</span> <span class="fl">1024</span> <span class="op">*</span> <span class="fl">1024</span>, nproc <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span>
@@ -880,7 +882,7 @@ Tighten them:</p>
 <div class="section level3">
 <h3 id="use-execution-timeouts-and-tool-call-caps">Use execution timeouts and tool call caps<a class="anchor" aria-label="anchor" href="#use-execution-timeouts-and-tool-call-caps"></a>
 </h3>
-<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="va">llm_code</span>, timeout <span class="op">=</span> <span class="fl">30</span>, max_tool_calls <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span></code></pre></div>
 <p>Timeouts catch cases where <code>ulimit -t</code> does not apply (I/O
 blocking, sleeping). Tool call caps prevent tight-loop abuse.</p>
@@ -889,15 +891,9 @@ blocking, sleeping). Tool call caps prevent tight-loop abuse.</p>
 <h3 id="review-tool-functions-carefully">Review tool functions carefully<a class="anchor" aria-label="anchor" href="#review-tool-functions-carefully"></a>
 </h3>
 <p>Tool functions run on the host with full privileges. Apply least
-privilege:</p>
-<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># BAD: arbitrary SQL</span></span>
-<span><span class="fu"><a href="../reference/securer_tool.html">securer_tool</a></span><span class="op">(</span><span class="st">"query"</span>, <span class="st">"Run SQL"</span>,</span>
-<span>  fn <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">sql</span><span class="op">)</span> <span class="fu">DBI</span><span class="fu">::</span><span class="fu">dbGetQuery</span><span class="op">(</span><span class="va">conn</span>, <span class="va">sql</span><span class="op">)</span>,</span>
-<span>  args <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>sql <span class="op">=</span> <span class="st">"character"</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># BETTER: parameterized query</span></span>
-<span><span class="fu"><a href="../reference/securer_tool.html">securer_tool</a></span><span class="op">(</span><span class="st">"get_user"</span>, <span class="st">"Look up user by ID"</span>,</span>
+privilege — use parameterized queries and validate inputs:</p>
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/securer_tool.html">securer_tool</a></span><span class="op">(</span><span class="st">"get_user"</span>, <span class="st">"Look up user by ID"</span>,</span>
 <span>  fn <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">user_id</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">is.numeric</a></span><span class="op">(</span><span class="va">user_id</span><span class="op">)</span>, <span class="va">user_id</span> <span class="op">&gt;</span> <span class="fl">0</span><span class="op">)</span></span>
 <span>    <span class="fu">DBI</span><span class="fu">::</span><span class="fu">dbGetQuery</span><span class="op">(</span><span class="va">conn</span>, <span class="st">"SELECT name, email FROM users WHERE id = ?"</span>,</span>
@@ -908,7 +904,7 @@ privilege:</p>
 <div class="section level3">
 <h3 id="enable-audit-logging">Enable audit logging<a class="anchor" aria-label="anchor" href="#enable-audit-logging"></a>
 </h3>
-<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>sandbox <span class="op">=</span> <span class="cn">TRUE</span>, audit_log <span class="op">=</span> <span class="st">"/var/log/securer/audit.jsonl"</span><span class="op">)</span></span></code></pre></div>
 <p>Events logged: <code>session_start</code>,
 <code>session_close</code>, <code>execute_start</code>,
@@ -921,13 +917,6 @@ privilege:</p>
 </h3>
 <p>Run the host process inside Docker or WSL2 with bwrap to get the
 filesystem and network restrictions the Windows sandbox lacks.</p>
-</div>
-<div class="section level3">
-<h3 id="verify-sandbox-tooling-at-deploy-time">Verify sandbox tooling at deploy time<a class="anchor" aria-label="anchor" href="#verify-sandbox-tooling-at-deploy-time"></a>
-</h3>
-<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Sys.info.html" class="external-link">Sys.info</a></span><span class="op">(</span><span class="op">)</span><span class="op">[[</span><span class="st">"sysname"</span><span class="op">]</span><span class="op">]</span> <span class="op">==</span> <span class="st">"Linux"</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nchar.html" class="external-link">nzchar</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Sys.which.html" class="external-link">Sys.which</a></span><span class="op">(</span><span class="st">"bwrap"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Sys.info.html" class="external-link">Sys.info</a></span><span class="op">(</span><span class="op">)</span><span class="op">[[</span><span class="st">"sysname"</span><span class="op">]</span><span class="op">]</span> <span class="op">==</span> <span class="st">"Darwin"</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.exists</a></span><span class="op">(</span><span class="st">"/usr/bin/sandbox-exec"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 </div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

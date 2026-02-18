@@ -106,7 +106,7 @@ returns it as a string. Errors are returned as
 the chat loop.
 
 See
-[`vignette("getting-started")`](https://ian-flores.github.io/securer/articles/getting-started.md)
+[`vignette("deployment")`](https://ian-flores.github.io/securer/articles/deployment.md)
 for the full architecture diagram.
 
 ## Adding securer tools
@@ -166,7 +166,7 @@ tool_def <- securer_as_ellmer_tool(
 ```
 
 See
-[`vignette("getting-started")`](https://ian-flores.github.io/securer/articles/getting-started.md)
+[`vignette("deployment")`](https://ian-flores.github.io/securer/articles/deployment.md)
 for details on sandbox modes, resource limits, and timeouts.
 
 ## Using a pre-existing session

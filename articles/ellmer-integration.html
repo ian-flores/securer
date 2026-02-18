@@ -30,14 +30,7 @@
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
-<li class="active nav-item dropdown">
-  <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
-  <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="../articles/ellmer-integration.html">Using securer with ellmer</a></li>
-    <li><a class="dropdown-item" href="../articles/getting-started.html">Getting Started with securer</a></li>
-    <li><a class="dropdown-item" href="../articles/security-model.html">Security Model</a></li>
-  </ul>
-</li>
+<li class="active nav-item"><a class="nav-link" href="../articles/index.html">Articles</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -196,8 +189,8 @@ When the LLM invokes it, securer sends the code to the sandboxed child,
 gets the result, and returns it as a string. Errors are returned as
 <code>ContentToolResult(error = ...)</code> so the LLM can react without
 crashing the chat loop.</p>
-<p>See <code><a href="../articles/getting-started.html">vignette("getting-started")</a></code> for the full
-architecture diagram.</p>
+<p>See <code><a href="../articles/deployment.html">vignette("deployment")</a></code> for the full architecture
+diagram.</p>
 </div>
 <div class="section level2">
 <h2 id="adding-securer-tools">Adding securer tools<a class="anchor" aria-label="anchor" href="#adding-securer-tools"></a>
@@ -252,8 +245,8 @@ through the tools you define.</p>
 <span>  limits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>cpu <span class="op">=</span> <span class="fl">30</span>, memory <span class="op">=</span> <span class="fl">512</span> <span class="op">*</span> <span class="fl">1024</span> <span class="op">*</span> <span class="fl">1024</span><span class="op">)</span>,</span>
 <span>  timeout <span class="op">=</span> <span class="fl">15</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>See <code><a href="../articles/getting-started.html">vignette("getting-started")</a></code> for details on sandbox
-modes, resource limits, and timeouts.</p>
+<p>See <code><a href="../articles/deployment.html">vignette("deployment")</a></code> for details on sandbox modes,
+resource limits, and timeouts.</p>
 </div>
 <div class="section level2">
 <h2 id="using-a-pre-existing-session">Using a pre-existing session<a class="anchor" aria-label="anchor" href="#using-a-pre-existing-session"></a>

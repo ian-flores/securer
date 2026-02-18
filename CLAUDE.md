@@ -42,6 +42,15 @@ dangerous patterns) - `R/audit-log.R` — JSONL file-based audit logging -
 tool integration
 ([`securer_as_ellmer_tool()`](https://ian-flores.github.io/securer/reference/securer_as_ellmer_tool.md))
 
+Vignettes: - `vignettes/quickstart.Rmd` — Installation and first
+examples - `vignettes/sessions-and-tools.Rmd` — Persistent sessions,
+streaming, pooling, audit log - `vignettes/deployment.Rmd` — Sandboxing,
+resource limits, architecture - `vignettes/security-model.Rmd` — Full
+threat model and defense layers (~600 lines) -
+`vignettes/ellmer-integration.Rmd` — ellmer LLM chat integration -
+`vignettes/integration-examples.Rmd` — Shiny, Plumber, batch examples -
+`vignettes/troubleshooting.Rmd` — FAQ and common issues
+
 ## Critical Implementation Details
 
 ### Unix Domain Socket Behavior

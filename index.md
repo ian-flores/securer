@@ -11,6 +11,14 @@ to call back into your application (tool calls), and confidence that the
 code can’t do anything dangerous (sandboxing). securer provides both.
 
 ``` r
+# Simplest usage -- run R code in a sandbox
+execute_r("1 + 1")
+#> [1] 2
+```
+
+For tool calls, define functions the sandboxed code can use:
+
+``` r
 library(securer)
 
 # Your functions become tools the LLM's code can call
@@ -37,6 +45,11 @@ data directly.
 ``` r
 # install.packages("pak")
 pak::pak("ian-flores/securer")
+
+# Verify it works
+library(securer)
+execute_r("1 + 1")
+#> [1] 2
 ```
 
 ## Why securer?
@@ -185,13 +198,21 @@ rather than filing a public issue.
 
 ## Documentation
 
-- [`vignette("getting-started", package = "securer")`](https://ian-flores.github.io/securer/articles/getting-started.md)
-  — full walkthrough
-- [`vignette("ellmer-integration", package = "securer")`](https://ian-flores.github.io/securer/articles/ellmer-integration.md)
-  — using securer with ellmer LLM chats
+- [`vignette("quickstart", package = "securer")`](https://ian-flores.github.io/securer/articles/quickstart.md)
+  – installation and first examples
+- [`vignette("sessions-and-tools", package = "securer")`](https://ian-flores.github.io/securer/articles/sessions-and-tools.md)
+  – persistent sessions, streaming, pooling
+- [`vignette("deployment", package = "securer")`](https://ian-flores.github.io/securer/articles/deployment.md)
+  – sandboxing, resource limits, architecture
 - [`vignette("security-model", package = "securer")`](https://ian-flores.github.io/securer/articles/security-model.md)
-  — security architecture and threat model
-- [pkgdown site](https://ian-flores.github.io/securer/) — API reference
+  – threat model and defense layers
+- [`vignette("ellmer-integration", package = "securer")`](https://ian-flores.github.io/securer/articles/ellmer-integration.md)
+  – using securer with ellmer LLM chats
+- [`vignette("integration-examples", package = "securer")`](https://ian-flores.github.io/securer/articles/integration-examples.md)
+  – Shiny, Plumber, and batch examples
+- [`vignette("troubleshooting", package = "securer")`](https://ian-flores.github.io/securer/articles/troubleshooting.md)
+  – common issues and solutions
+- [pkgdown site](https://ian-flores.github.io/securer/) – API reference
 
 ## License
 

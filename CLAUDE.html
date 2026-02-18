@@ -16,12 +16,7 @@
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="reference/index.html">Reference</a></li>
-<li class="nav-item dropdown">
-  <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
-  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="articles/ellmer-integration.html">Using securer with ellmer</a></li>
-    <li><a class="dropdown-item" href="articles/getting-started.html">Getting Started with securer</a></li>
-    <li><a class="dropdown-item" href="articles/security-model.html">Security Model</a></li>
-  </ul></li>
+<li class="nav-item"><a class="nav-link" href="articles/index.html">Articles</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="search.json"></form></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://github.com/ian-flores/securer"><span class="fa fa-github"></span></a></li>
@@ -61,6 +56,7 @@
 SecureSessionPool (R6)
 └── Pre-warmed pool of SecureSession instances for low-latency execution</code></pre>
 <p>Key files: - <code>R/secure-session.R</code> — Core R6 class, event loop, session lifecycle - <code>R/child-runtime.R</code> — Code string injected into child (<code>.securer_call_tool()</code>) - <code>R/ipc.R</code> — UDS helpers (create, accept, read, write) - <code>R/tool-registry.R</code> — <code><a href="reference/securer_tool.html">securer_tool()</a></code>, validation, wrapper code generation - <code>R/sandbox-macos.R</code> — Seatbelt profile generation + wrapper script - <code>R/sandbox-linux.R</code> — Bubblewrap (bwrap) namespace isolation + wrapper script - <code>R/sandbox-windows.R</code> — Environment-variable-only isolation for Windows - <code>R/rlimits.R</code> — ulimit command generation and validation - <code>R/execute.R</code> — <code><a href="reference/execute_r.html">execute_r()</a></code> convenience function - <code>R/validate.R</code> — Code pre-validation (syntax + dangerous patterns) - <code>R/audit-log.R</code> — JSONL file-based audit logging - <code>R/session-pool.R</code> — SecureSessionPool R6 class - <code>R/ellmer.R</code> — ellmer tool integration (<code><a href="reference/securer_as_ellmer_tool.html">securer_as_ellmer_tool()</a></code>)</p>
+<p>Vignettes: - <code>vignettes/quickstart.Rmd</code> — Installation and first examples - <code>vignettes/sessions-and-tools.Rmd</code> — Persistent sessions, streaming, pooling, audit log - <code>vignettes/deployment.Rmd</code> — Sandboxing, resource limits, architecture - <code>vignettes/security-model.Rmd</code> — Full threat model and defense layers (~600 lines) - <code>vignettes/ellmer-integration.Rmd</code> — ellmer LLM chat integration - <code>vignettes/integration-examples.Rmd</code> — Shiny, Plumber, batch examples - <code>vignettes/troubleshooting.Rmd</code> — FAQ and common issues</p>
 </div>
 <div class="section level2">
 <h2 id="critical-implementation-details">Critical Implementation Details<a class="anchor" aria-label="anchor" href="#critical-implementation-details"></a></h2>

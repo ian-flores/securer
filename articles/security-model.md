@@ -4,6 +4,35 @@ This document describes the security architecture and threat model of
 the securer package. It is intended for security auditors, deployers
 evaluating risk, and contributors working on the sandboxing code.
 
+## TL;DR
+
+securer protects against LLM-generated R code with 10 defense layers:
+
+- **OS sandbox** — Seatbelt (macOS) or bubblewrap (Linux) blocks
+  filesystem writes and network access
+- **Resource limits** — ulimit caps on CPU, memory, file size,
+  processes, and open files
+- **Execution timeouts** — wall-clock deadline kills runaway code;
+  session auto-recovers
+- **IPC authentication** — 32-character random token validates the child
+  process identity
+- **Message validation** — size limits, JSON structure checks, and tool
+  name allowlist
+- **Environment sanitization** — only allowlisted env vars inherited;
+  API keys and credentials stripped
+- **Argument validation** — type checks on both sides of the trust
+  boundary
+- **Code pre-validation** — syntax check and dangerous pattern warnings
+  before execution
+- **Socket permissions** — 0700 directory prevents other users from
+  accessing the IPC socket
+- **Runtime hardening** — locked bindings and sealed environments
+  prevent internal tampering
+
+For deployment details, see
+[`vignette("deployment")`](https://ian-flores.github.io/securer/articles/deployment.md).
+The rest of this document covers the full threat model.
+
 ## Threat model
 
 ### Attacker
@@ -449,21 +478,18 @@ environment, so child code cannot redefine them either.
 
 Concrete outcomes for specific attack scenarios:
 
-| Attack                        | Linux (bwrap)                                                                                                     | macOS (Seatbelt)                                                                                                                                                                                                                                                                                                           | Windows                                                             |
-|-------------------------------|-------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------|
-| Read `/etc/passwd`            | Blocked – not mounted                                                                                             | Allowed – broad `/usr` read includes `/etc` indirectly, but specific `/etc` reads are allowlisted; `/etc/passwd` is not on the allowlist, so it depends on `file-read-metadata` vs `file-read*` rules. In practice: **readable** (metadata allowed globally, and `/etc/passwd` may be accessible via system library paths) | N/A (no `/etc/passwd`)                                              |
-| Read `~/.ssh/id_rsa`          | Blocked – home dir not mounted                                                                                    | Blocked – home dir not in any allowed read subpath                                                                                                                                                                                                                                                                         | **Not blocked**                                                     |
-| Write `~/evil.txt`            | Blocked – root is read-only, home not mounted                                                                     | Blocked – writes only allowed to temp dirs                                                                                                                                                                                                                                                                                 | **Not blocked**                                                     |
-| Outbound HTTP request         | Blocked – no network namespace                                                                                    | Blocked – `(deny network* (remote ip))`                                                                                                                                                                                                                                                                                    | **Not blocked**                                                     |
-| Fork bomb (`repeat fork()`)   | Limited – `ulimit -u 50` caps processes                                                                           | Limited – `ulimit -u 50` caps processes                                                                                                                                                                                                                                                                                    | Limited – Job Object `ActiveProcessLimit`                           |
-| Allocate 10 GB RAM            | Limited – `ulimit -v 512MB`                                                                                       | Limited – `ulimit -v 512MB`                                                                                                                                                                                                                                                                                                | Limited – Job Object `ProcessMemoryLimit`                           |
-| Infinite CPU loop             | Limited – `ulimit -t 60` + wall-clock timeout                                                                     | Limited – `ulimit -t 60` + wall-clock timeout                                                                                                                                                                                                                                                                              | Limited – Job Object `PerProcessUserTimeLimit` + wall-clock timeout |
-| Execute `/usr/bin/python`     | Blocked – not bind-mounted under allowed paths (only `/usr` is mounted, but process exec is limited by namespace) | Blocked – `process-exec` restricted to R binaries and specific POSIX utilities                                                                                                                                                                                                                                             | **Not blocked**                                                     |
-| Read env vars (API keys)      | Blocked – env sanitized (allowlist)                                                                               | Blocked – env sanitized (allowlist)                                                                                                                                                                                                                                                                                        | Blocked – env sanitized (allowlist)                                 |
-| Redefine `.securer_call_tool` | Blocked – [`lockBinding()`](https://rdrr.io/r/base/bindenv.html)                                                  | Blocked – [`lockBinding()`](https://rdrr.io/r/base/bindenv.html)                                                                                                                                                                                                                                                           | Blocked – [`lockBinding()`](https://rdrr.io/r/base/bindenv.html)    |
-| Write 1 GB file to `/tmp`     | Limited – `ulimit -f 50MB`                                                                                        | Limited – `ulimit -f 50MB`                                                                                                                                                                                                                                                                                                 | Not limited (no `fsize` on Windows)                                 |
-| Open 1000 files               | Limited – `ulimit -n 256`                                                                                         | Limited – `ulimit -n 256`                                                                                                                                                                                                                                                                                                  | Not limited (no `nofile` on Windows)                                |
-| DNS exfiltration              | Blocked – no network                                                                                              | Blocked – no remote IP                                                                                                                                                                                                                                                                                                     | **Not blocked**                                                     |
+| Attack                      | Linux (bwrap)                                                                                                     | macOS (Seatbelt)                                                                                                                                                                                                                                                                                                           | Windows                                                             |
+|-----------------------------|-------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------|
+| Read `/etc/passwd`          | Blocked – not mounted                                                                                             | Allowed – broad `/usr` read includes `/etc` indirectly, but specific `/etc` reads are allowlisted; `/etc/passwd` is not on the allowlist, so it depends on `file-read-metadata` vs `file-read*` rules. In practice: **readable** (metadata allowed globally, and `/etc/passwd` may be accessible via system library paths) | N/A (no `/etc/passwd`)                                              |
+| Read `~/.ssh/id_rsa`        | Blocked – home dir not mounted                                                                                    | Blocked – home dir not in any allowed read subpath                                                                                                                                                                                                                                                                         | **Not blocked**                                                     |
+| Write `~/evil.txt`          | Blocked – root is read-only, home not mounted                                                                     | Blocked – writes only allowed to temp dirs                                                                                                                                                                                                                                                                                 | **Not blocked**                                                     |
+| Outbound HTTP request       | Blocked – no network namespace                                                                                    | Blocked – `(deny network* (remote ip))`                                                                                                                                                                                                                                                                                    | **Not blocked**                                                     |
+| Fork bomb (`repeat fork()`) | Limited – `ulimit -u 50` caps processes                                                                           | Limited – `ulimit -u 50` caps processes                                                                                                                                                                                                                                                                                    | Limited – Job Object `ActiveProcessLimit`                           |
+| Allocate 10 GB RAM          | Limited – `ulimit -v 512MB`                                                                                       | Limited – `ulimit -v 512MB`                                                                                                                                                                                                                                                                                                | Limited – Job Object `ProcessMemoryLimit`                           |
+| Infinite CPU loop           | Limited – `ulimit -t 60` + wall-clock timeout                                                                     | Limited – `ulimit -t 60` + wall-clock timeout                                                                                                                                                                                                                                                                              | Limited – Job Object `PerProcessUserTimeLimit` + wall-clock timeout |
+| Execute `/usr/bin/python`   | Blocked – not bind-mounted under allowed paths (only `/usr` is mounted, but process exec is limited by namespace) | Blocked – `process-exec` restricted to R binaries and specific POSIX utilities                                                                                                                                                                                                                                             | **Not blocked**                                                     |
+| Write 1 GB file to `/tmp`   | Limited – `ulimit -f 50MB`                                                                                        | Limited – `ulimit -f 50MB`                                                                                                                                                                                                                                                                                                 | Not limited (no `fsize` on Windows)                                 |
+| Open 1000 files             | Limited – `ulimit -n 256`                                                                                         | Limited – `ulimit -n 256`                                                                                                                                                                                                                                                                                                  | Not limited (no `nofile` on Windows)                                |
 
 ## Known limitations
 
@@ -628,16 +654,6 @@ sending a tool call. The parent executes the tool function with full
 host privileges, then writes the result back. The child resumes with the
 return value.
 
-    Child                           Parent
-      |                               |
-      |--- tool_call JSON ----------->|
-      |   (child blocks on read)      |-- validate message
-      |                               |-- validate tool name
-      |                               |-- validate arg names
-      |                               |-- execute tool fn
-      |<-- result JSON ---------------|
-      |   (child resumes)             |
-
 There is no multiplexing or out-of-order execution. Each tool call is a
 synchronous request/response pair.
 
@@ -679,15 +695,9 @@ sleeping). Tool call caps prevent tight-loop abuse.
 ### Review tool functions carefully
 
 Tool functions run on the host with full privileges. Apply least
-privilege:
+privilege — use parameterized queries and validate inputs:
 
 ``` r
-# BAD: arbitrary SQL
-securer_tool("query", "Run SQL",
-  fn = function(sql) DBI::dbGetQuery(conn, sql),
-  args = list(sql = "character"))
-
-# BETTER: parameterized query
 securer_tool("get_user", "Look up user by ID",
   fn = function(user_id) {
     stopifnot(is.numeric(user_id), user_id > 0)
@@ -711,10 +721,3 @@ Events logged: `session_start`, `session_close`, `execute_start`,
 
 Run the host process inside Docker or WSL2 with bwrap to get the
 filesystem and network restrictions the Windows sandbox lacks.
-
-### Verify sandbox tooling at deploy time
-
-``` r
-if (Sys.info()[["sysname"]] == "Linux") stopifnot(nzchar(Sys.which("bwrap")))
-if (Sys.info()[["sysname"]] == "Darwin") stopifnot(file.exists("/usr/bin/sandbox-exec"))
-```
