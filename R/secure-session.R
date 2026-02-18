@@ -522,9 +522,12 @@ SecureSession <- R6::R6Class("SecureSession",
       }
 
       # Start callr session
+      # Use a generous wait_timeout (default is 3000ms which can be
+      # too short on slow CI runners, especially Windows with antivirus)
       private$session <- callr::r_session$new(
         options = session_opts,
-        wait = TRUE
+        wait = TRUE,
+        wait_timeout = 10000
       )
       # Store the child PID as a plain integer for the GC finalizer
       # (R6 objects and external pointers are unsafe to access during GC).
