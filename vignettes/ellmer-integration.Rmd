@@ -115,7 +115,7 @@ invokes it, securer sends the code to the sandboxed child, gets the result, and
 returns it as a string. Errors are returned as `ContentToolResult(error = ...)`
 so the LLM can react without crashing the chat loop.
 
-See `vignette("getting-started")` for the full architecture diagram.
+See `vignette("deployment")` for the full architecture diagram.
 
 ## Adding securer tools
 
@@ -172,7 +172,7 @@ tool_def <- securer_as_ellmer_tool(
 )
 ```
 
-See `vignette("getting-started")` for details on sandbox modes, resource limits,
+See `vignette("deployment")` for details on sandbox modes, resource limits,
 and timeouts.
 
 ## Using a pre-existing session

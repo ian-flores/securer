@@ -39,6 +39,15 @@ Key files:
 - `R/session-pool.R` — SecureSessionPool R6 class
 - `R/ellmer.R` — ellmer tool integration (`securer_as_ellmer_tool()`)
 
+Vignettes:
+- `vignettes/quickstart.Rmd` — Installation and first examples
+- `vignettes/sessions-and-tools.Rmd` — Persistent sessions, streaming, pooling, audit log
+- `vignettes/deployment.Rmd` — Sandboxing, resource limits, architecture
+- `vignettes/security-model.Rmd` — Full threat model and defense layers (~600 lines)
+- `vignettes/ellmer-integration.Rmd` — ellmer LLM chat integration
+- `vignettes/integration-examples.Rmd` — Shiny, Plumber, batch examples
+- `vignettes/troubleshooting.Rmd` — FAQ and common issues
+
 ## Critical Implementation Details
 
 ### Unix Domain Socket Behavior

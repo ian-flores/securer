@@ -16,6 +16,14 @@
 When an LLM generates R code, you need two things: a way for that code to call back into your application (tool calls), and confidence that the code can't do anything dangerous (sandboxing). securer provides both.
 
 ```r
+# Simplest usage -- run R code in a sandbox
+execute_r("1 + 1")
+#> [1] 2
+```
+
+For tool calls, define functions the sandboxed code can use:
+
+```r
 library(securer)
 
 # Your functions become tools the LLM's code can call
@@ -39,6 +47,11 @@ The child R process is sandboxed at the OS level. Tool functions execute on the 
 ```r
 # install.packages("pak")
 pak::pak("ian-flores/securer")
+
+# Verify it works
+library(securer)
+execute_r("1 + 1")
+#> [1] 2
 ```
 
 ## Why securer?
@@ -177,10 +190,14 @@ To report security vulnerabilities, please email the maintainer directly rather 
 
 ## Documentation
 
-- `vignette("getting-started", package = "securer")` — full walkthrough
-- `vignette("ellmer-integration", package = "securer")` — using securer with ellmer LLM chats
-- `vignette("security-model", package = "securer")` — security architecture and threat model
-- [pkgdown site](https://ian-flores.github.io/securer/) — API reference
+- `vignette("quickstart", package = "securer")` -- installation and first examples
+- `vignette("sessions-and-tools", package = "securer")` -- persistent sessions, streaming, pooling
+- `vignette("deployment", package = "securer")` -- sandboxing, resource limits, architecture
+- `vignette("security-model", package = "securer")` -- threat model and defense layers
+- `vignette("ellmer-integration", package = "securer")` -- using securer with ellmer LLM chats
+- `vignette("integration-examples", package = "securer")` -- Shiny, Plumber, and batch examples
+- `vignette("troubleshooting", package = "securer")` -- common issues and solutions
+- [pkgdown site](https://ian-flores.github.io/securer/) -- API reference
 
 ## License
 
