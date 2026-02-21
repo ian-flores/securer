@@ -1,8 +1,10 @@
 # securer
 
-> \[!NOTE\] **Beta release (0.1.0).** The core API is stabilizing but
-> may still change. Feedback and bug reports welcome at [GitHub
-> Issues](https://github.com/ian-flores/securer/issues).
+> \[!CAUTION\] **Alpha software.** This package is part of a broader
+> effort by [Ian Flores Siaca](https://github.com/ian-flores) to develop
+> proper AI infrastructure for the R ecosystem. It is under active
+> development and should **not** be used in production until an official
+> release is published. APIs may change without notice.
 
 **Let LLMs write R code that calls your functions — safely.**
 
