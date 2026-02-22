@@ -182,6 +182,28 @@ characters are truncated.
 
 ## Session pooling
 
+### Why session pooling?
+
+Creating a `SecureSession` starts a new R child process, sets up the sandbox,
+and establishes the IPC socket. This takes roughly 0.5--1 second per session.
+For workloads that serve many short-lived requests --- such as a Plumber API or
+a multi-user Shiny app --- creating and tearing down a session for every request
+adds significant latency. Session pooling solves this by pre-warming a fixed
+number of sessions at startup and reusing them across requests, eliminating
+repeated startup costs and keeping response times low.
+
+### Session pool lifecycle
+
+```
+ Initialize          Acquire            Execute           Release
++-------------+   +-------------+   +-------------+   +-------------+
+| Pre-warm N  |-->| Caller gets |-->| Run code in |-->| Return to   |
+| sessions at |   | idle session|   | acquired    |   | idle pool   |
+| startup     |   | from pool   |   | session     |   | (or restart |
+|             |   |             |   |             |   |  if dead)   |
++-------------+   +-------------+   +-------------+   +-------------+
+```
+
 `SecureSessionPool` pre-warms multiple sessions for low-latency execution:
 
 ```{r}

@@ -20,6 +20,31 @@ Each example is self-contained and can be adapted to your own project. All code
 chunks use `eval = FALSE` --- copy them into your application and adjust as
 needed.
 
+### Where securer fits
+
+```
+ Shiny / Plumber / Batch script
++------------------------------+
+|  Application layer           |     User requests or code snippets
+|  (UI, routes, lapply)        |     arrive here.
++---------|--------------------+
+          |
+          v
++------------------------------+
+|  securer                     |     SecureSession or SecureSessionPool
+|  - Sandbox (Seatbelt/bwrap) |     manages child R processes with
+|  - IPC (Unix domain socket)  |     OS-level isolation.
+|  - Resource limits (ulimit)  |
++---------|--------------------+
+          |
+          v
++------------------------------+
+|  Sandboxed R child           |     Code executes here. Tool calls
+|  - eval(user code)           |     pause execution and are fulfilled
+|  - tool call -> host -> back |     by the host via IPC.
++------------------------------+
+```
+
 ## Shiny
 
 A minimal Shiny app that lets users type R code and execute it inside a
