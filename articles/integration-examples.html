@@ -63,13 +63,37 @@
 frameworks. Each example is self-contained and can be adapted to your
 own project. All code chunks use <code>eval = FALSE</code> — copy them
 into your application and adjust as needed.</p>
+<div class="section level3">
+<h3 id="where-securer-fits">Where securer fits<a class="anchor" aria-label="anchor" href="#where-securer-fits"></a>
+</h3>
+<pre><code> Shiny / Plumber / Batch script
++------------------------------+
+|  Application layer           |     User requests or code snippets
+|  (UI, routes, lapply)        |     arrive here.
++---------|--------------------+
+          |
+          v
++------------------------------+
+|  securer                     |     SecureSession or SecureSessionPool
+|  - Sandbox (Seatbelt/bwrap) |     manages child R processes with
+|  - IPC (Unix domain socket)  |     OS-level isolation.
+|  - Resource limits (ulimit)  |
++---------|--------------------+
+          |
+          v
++------------------------------+
+|  Sandboxed R child           |     Code executes here. Tool calls
+|  - eval(user code)           |     pause execution and are fulfilled
+|  - tool call -&gt; host -&gt; back |     by the host via IPC.
++------------------------------+</code></pre>
+</div>
 <div class="section level2">
 <h2 id="shiny">Shiny<a class="anchor" aria-label="anchor" href="#shiny"></a>
 </h2>
 <p>A minimal Shiny app that lets users type R code and execute it inside
 a sandboxed session. The <code>SecureSession</code> is created once when
 the Shiny session starts and closed when the user disconnects.</p>
-<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://shiny.posit.co/" class="external-link">shiny</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ian-flores.github.io/securer/">securer</a></span><span class="op">)</span></span>
 <span></span>
@@ -130,7 +154,7 @@ session, executes, and returns it to the pool automatically.</p>
 <p>A REST API that accepts R code via POST and executes it in a
 sandboxed pool. The pool is created once at startup and shared across
 all requests.</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># plumber.R</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://www.rplumber.io" class="external-link">plumber</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ian-flores.github.io/securer/">securer</a></span><span class="op">)</span></span>
@@ -143,7 +167,7 @@ all requests.</p>
 <span>  sandbox <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  reset_between_uses <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co">#* Execute R code in a sandboxed session</span></span>
 <span><span class="co">#* @param code Character string of R code</span></span>
 <span><span class="co">#* @post /execute</span></span>
@@ -164,7 +188,7 @@ all requests.</p>
 <span>    <span class="op">}</span></span>
 <span>  <span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Start the API</span></span>
 <span><span class="va">pr</span> <span class="op">&lt;-</span> <span class="fu">plumb</span><span class="op">(</span><span class="st">"plumber.R"</span><span class="op">)</span></span>
 <span><span class="va">pr</span><span class="op">$</span><span class="fu">run</span><span class="op">(</span>host <span class="op">=</span> <span class="st">"0.0.0.0"</span>, port <span class="op">=</span> <span class="fl">8080</span><span class="op">)</span></span></code></pre></div>
@@ -192,7 +216,7 @@ strips file paths and PIDs.</li>
 pool. The pool manages a fixed number of sessions — <code>lapply</code>
 iterates sequentially but each execution reuses a pre-warmed process,
 avoiding repeated startup costs.</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ian-flores.github.io/securer/">securer</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Code snippets to evaluate</span></span>
@@ -203,7 +227,7 @@ avoiding repeated startup costs.</p>
 <span>  <span class="st">"paste('hello', 'world')"</span>,</span>
 <span>  <span class="st">"sum(rnorm(1000))"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pool</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSessionPool.html">SecureSessionPool</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>size <span class="op">=</span> <span class="fl">2</span>, sandbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">results</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">snippets</span>, <span class="kw">function</span><span class="op">(</span><span class="va">code</span><span class="op">)</span> <span class="op">{</span></span>
@@ -219,7 +243,7 @@ avoiding repeated startup costs.</p>
 <span><span class="op">}</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">pool</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Collect into a data frame for inspection</span></span>
 <span><span class="va">outcome</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  code  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply</a></span><span class="op">(</span><span class="va">results</span>, <span class="va">`[[`</span>, <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">character</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span>, <span class="st">"code"</span><span class="op">)</span>,</span>

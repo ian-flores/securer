@@ -230,9 +230,31 @@ fields longer than 10,000 characters are truncated.</p>
 <div class="section level2">
 <h2 id="session-pooling">Session pooling<a class="anchor" aria-label="anchor" href="#session-pooling"></a>
 </h2>
+<div class="section level3">
+<h3 id="why-session-pooling">Why session pooling?<a class="anchor" aria-label="anchor" href="#why-session-pooling"></a>
+</h3>
+<p>Creating a <code>SecureSession</code> starts a new R child process,
+sets up the sandbox, and establishes the IPC socket. This takes roughly
+0.5–1 second per session. For workloads that serve many short-lived
+requests — such as a Plumber API or a multi-user Shiny app — creating
+and tearing down a session for every request adds significant latency.
+Session pooling solves this by pre-warming a fixed number of sessions at
+startup and reusing them across requests, eliminating repeated startup
+costs and keeping response times low.</p>
+</div>
+<div class="section level3">
+<h3 id="session-pool-lifecycle">Session pool lifecycle<a class="anchor" aria-label="anchor" href="#session-pool-lifecycle"></a>
+</h3>
+<pre><code> Initialize          Acquire            Execute           Release
++-------------+   +-------------+   +-------------+   +-------------+
+| Pre-warm N  |--&gt;| Caller gets |--&gt;| Run code in |--&gt;| Return to   |
+| sessions at |   | idle session|   | acquired    |   | idle pool   |
+| startup     |   | from pool   |   | session     |   | (or restart |
+|             |   |             |   |             |   |  if dead)   |
++-------------+   +-------------+   +-------------+   +-------------+</code></pre>
 <p><code>SecureSessionPool</code> pre-warms multiple sessions for
 low-latency execution:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pool</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSessionPool.html">SecureSessionPool</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>size <span class="op">=</span> <span class="fl">4</span>, sandbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">pool</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">"1 + 1"</span><span class="op">)</span></span>
@@ -242,7 +264,7 @@ low-latency execution:</p>
 <span><span class="va">pool</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 <p>Set <code>reset_between_uses = TRUE</code> to restart sessions after
 each execution, preventing state leakage between callers:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pool</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSessionPool.html">SecureSessionPool</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  size <span class="op">=</span> <span class="fl">2</span>,</span>
 <span>  sandbox <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -257,6 +279,7 @@ each execution, preventing state leakage between callers:</p>
 <p>Dead sessions are automatically restarted on acquire. The pool is
 <strong>not</strong> thread-safe — create separate instances when using
 <code>parallel</code> or <code>future</code>.</p>
+</div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

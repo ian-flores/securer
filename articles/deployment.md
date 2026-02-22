@@ -8,6 +8,18 @@ accessing the filesystem, network, or other processes beyond what R
 needs to function. Each platform uses a different mechanism, described
 below.
 
+### Sandbox lifecycle
+
+The lifecycle of a sandboxed execution follows five stages:
+
+     Create           Configure         Execute          Collect          Cleanup
+    +-----------+   +------------+   +------------+   +-----------+   +-----------+
+    | Start R   |-->| Apply      |-->| Run code   |-->| Return    |-->| Kill      |
+    | child     |   | sandbox +  |   | in child;  |   | result +  |   | child or  |
+    | process   |   | resource   |   | handle IPC |   | output to |   | reuse for |
+    |           |   | limits     |   | tool calls |   | host      |   | next call |
+    +-----------+   +------------+   +------------+   +-----------+   +-----------+
+
 ## macOS (Seatbelt)
 
 Uses `sandbox-exec` with a generated Seatbelt profile:

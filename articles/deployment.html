@@ -67,6 +67,18 @@ platform-native OS-level restrictions. The sandbox prevents
 LLM-generated code from accessing the filesystem, network, or other
 processes beyond what R needs to function. Each platform uses a
 different mechanism, described below.</p>
+<div class="section level3">
+<h3 id="sandbox-lifecycle">Sandbox lifecycle<a class="anchor" aria-label="anchor" href="#sandbox-lifecycle"></a>
+</h3>
+<p>The lifecycle of a sandboxed execution follows five stages:</p>
+<pre><code> Create           Configure         Execute          Collect          Cleanup
++-----------+   +------------+   +------------+   +-----------+   +-----------+
+| Start R   |--&gt;| Apply      |--&gt;| Run code   |--&gt;| Return    |--&gt;| Kill      |
+| child     |   | sandbox +  |   | in child;  |   | result +  |   | child or  |
+| process   |   | resource   |   | handle IPC |   | output to |   | reuse for |
+|           |   | limits     |   | tool calls |   | host      |   | next call |
++-----------+   +------------+   +------------+   +-----------+   +-----------+</code></pre>
+</div>
 </div>
 <div class="section level2">
 <h2 id="macos-seatbelt">macOS (Seatbelt)<a class="anchor" aria-label="anchor" href="#macos-seatbelt"></a>
@@ -80,7 +92,7 @@ packages)</li>
 <li>All remote network access is blocked (TCP/UDP)</li>
 <li>Unix domain sockets are allowed (needed for IPC with the host)</li>
 </ul>
-<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>sandbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Computation works normally:</span></span>
@@ -122,7 +134,7 @@ filesystem or network restrictions. A warning is issued.</p>
 </h2>
 <p>Apply <code>ulimit</code>-based caps to the child process. These work
 with or without the sandbox:</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/execute_r.html">execute_r</a></span><span class="op">(</span><span class="st">"1 + 1"</span>, limits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>cpu <span class="op">=</span> <span class="fl">10</span>, memory <span class="op">=</span> <span class="fl">256</span> <span class="op">*</span> <span class="fl">1024</span> <span class="op">*</span> <span class="fl">1024</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <p>Supported limits:</p>
 <table class="table">
@@ -172,7 +184,7 @@ with or without the sandbox:</p>
 </tbody>
 </table>
 <p>Default limits applied when <code>sandbox = TRUE</code>:</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/default_limits.html">default_limits</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
@@ -180,7 +192,7 @@ with or without the sandbox:</p>
 </h2>
 <p><code><a href="../reference/validate_code.html">validate_code()</a></code> checks for syntax errors and dangerous
 patterns before sending code to the child process:</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Valid code</span></span>
 <span><span class="fu"><a href="../reference/validate_code.html">validate_code</a></span><span class="op">(</span><span class="st">"1 + 1"</span><span class="op">)</span></span>
 <span></span>
@@ -196,7 +208,7 @@ patterns before sending code to the child process:</p>
 <p>Before deploying, verify that sandbox tooling is available on your
 target platform. Missing tools cause a fallback to unsandboxed execution
 (or an error if <code>sandbox_strict = TRUE</code>):</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Sys.info.html" class="external-link">Sys.info</a></span><span class="op">(</span><span class="op">)</span><span class="op">[[</span><span class="st">"sysname"</span><span class="op">]</span><span class="op">]</span> <span class="op">==</span> <span class="st">"Linux"</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nchar.html" class="external-link">nzchar</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Sys.which.html" class="external-link">Sys.which</a></span><span class="op">(</span><span class="st">"bwrap"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Sys.info.html" class="external-link">Sys.info</a></span><span class="op">(</span><span class="op">)</span><span class="op">[[</span><span class="st">"sysname"</span><span class="op">]</span><span class="op">]</span> <span class="op">==</span> <span class="st">"Darwin"</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.exists</a></span><span class="op">(</span><span class="st">"/usr/bin/sandbox-exec"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 </div>
@@ -211,7 +223,7 @@ instead of silently running without protection.</p>
 When <code>TRUE</code> and <code>sandbox = TRUE</code>, the session will
 stop with an informative error if the OS-level sandbox cannot be set
 up:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Error if sandbox not available (recommended for production)</span></span>
 <span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>sandbox <span class="op">=</span> <span class="cn">TRUE</span>, sandbox_strict <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
 <p>When <code>FALSE</code> (the default), the existing behavior is
