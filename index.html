@@ -78,9 +78,72 @@
 <span><span class="st">'</span>, tools <span class="op">=</span> <span class="va">tools</span>, sandbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
 <p>The child R process is sandboxed at the OS level. Tool functions execute on the host side, outside the sandbox, with full access to your resources. The LLM’s code never touches your filesystem, network, or data directly.</p>
 <div class="section level2">
+<h2 id="part-of-the-secure-r-dev-ecosystem">Part of the secure-r-dev Ecosystem<a class="anchor" aria-label="anchor" href="#part-of-the-secure-r-dev-ecosystem"></a>
+</h2>
+<p>securer is part of a 7-package ecosystem for building governed AI agents in R:</p>
+<pre><code>                    ┌────────────────┐
+                    │ &gt;&gt;&gt; securer &lt;&lt;&lt; │
+                    └───────┬────────┘
+          ┌─────────────────┼─────────────────┐
+          │                 │                  │
+   ┌──────▼──────┐  ┌──────▼──────┐  ┌───────▼────────┐
+   │ securetools  │  │ secureguard │  │ securecontext   │
+   └──────┬───────┘  └──────┬──────┘  └───────┬────────┘
+          └─────────────────┼─────────────────┘
+                    ┌───────▼──────┐
+                    │   orchestr   │
+                    └───────┬──────┘
+          ┌─────────────────┼─────────────────┐
+          │                                   │
+   ┌──────▼──────┐                     ┌──────▼──────┐
+   │ securetrace  │                    │ securebench  │
+   └─────────────┘                     └─────────────┘</code></pre>
+<p>securer sits at the top of the stack, providing the sandboxed R execution engine that other packages build on. securetools adds pre-built tool definitions, secureguard adds guardrails, and orchestr wires agents into workflows.</p>
+<table class="table">
+<colgroup>
+<col width="60%">
+<col width="40%">
+</colgroup>
+<thead><tr class="header">
+<th>Package</th>
+<th>Role</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td><a href="https://github.com/ian-flores/securer" class="external-link">securer</a></td>
+<td>Sandboxed R execution with tool-call IPC</td>
+</tr>
+<tr class="even">
+<td><a href="https://github.com/ian-flores/securetools" class="external-link">securetools</a></td>
+<td>Pre-built security-hardened tool definitions</td>
+</tr>
+<tr class="odd">
+<td><a href="https://github.com/ian-flores/secureguard" class="external-link">secureguard</a></td>
+<td>Input/code/output guardrails (injection, PII, secrets)</td>
+</tr>
+<tr class="even">
+<td><a href="https://github.com/ian-flores/orchestr" class="external-link">orchestr</a></td>
+<td>Graph-based agent orchestration</td>
+</tr>
+<tr class="odd">
+<td><a href="https://github.com/ian-flores/securecontext" class="external-link">securecontext</a></td>
+<td>Document chunking, embeddings, RAG retrieval</td>
+</tr>
+<tr class="even">
+<td><a href="https://github.com/ian-flores/securetrace" class="external-link">securetrace</a></td>
+<td>Structured tracing, token/cost accounting, JSONL export</td>
+</tr>
+<tr class="odd">
+<td><a href="https://github.com/ian-flores/securebench" class="external-link">securebench</a></td>
+<td>Guardrail benchmarking with precision/recall/F1 metrics</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># install.packages("pak")</span></span>
 <span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"ian-flores/securer"</span><span class="op">)</span></span>
 <span></span>
@@ -155,7 +218,7 @@
 <h3 id="persistent-sessions">Persistent Sessions<a class="anchor" aria-label="anchor" href="#persistent-sessions"></a>
 </h3>
 <p>Reuse a session across multiple executions to avoid startup overhead:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>tools <span class="op">=</span> <span class="va">tools</span>, sandbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">'query_db("iris", 3)'</span><span class="op">)</span></span>
@@ -167,7 +230,7 @@
 <h3 id="session-pooling">Session Pooling<a class="anchor" aria-label="anchor" href="#session-pooling"></a>
 </h3>
 <p>Pre-warm multiple sessions for low-latency concurrent execution:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pool</span> <span class="op">&lt;-</span> <span class="va"><a href="reference/SecureSessionPool.html">SecureSessionPool</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>size <span class="op">=</span> <span class="fl">4</span>, tools <span class="op">=</span> <span class="va">tools</span>, sandbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">pool</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">'query_db("iris", 3)'</span><span class="op">)</span></span>
@@ -178,7 +241,7 @@
 <h3 id="resource-limits">Resource Limits<a class="anchor" aria-label="anchor" href="#resource-limits"></a>
 </h3>
 <p>Constrain CPU, memory, file size, and more. Works with or without sandbox mode on all platforms:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/execute_r.html">execute_r</a></span><span class="op">(</span><span class="st">"1 + 1"</span>,</span>
 <span>  limits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>cpu <span class="op">=</span> <span class="fl">10</span>, memory <span class="op">=</span> <span class="fl">256</span> <span class="op">*</span> <span class="fl">1024</span> <span class="op">*</span> <span class="fl">1024</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
@@ -187,7 +250,7 @@
 <h3 id="execution-timeouts">Execution Timeouts<a class="anchor" aria-label="anchor" href="#execution-timeouts"></a>
 </h3>
 <p>Kill long-running code automatically. The session recovers and is reusable:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">"Sys.sleep(100)"</span>, timeout <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span>
 <span><span class="co"># Error: Execution timed out after 5 seconds</span></span>
@@ -197,14 +260,14 @@
 <h3 id="code-pre-validation">Code Pre-Validation<a class="anchor" aria-label="anchor" href="#code-pre-validation"></a>
 </h3>
 <p>Catch syntax errors before sending code to the child process:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">"if (TRUE {"</span><span class="op">)</span>  <span class="co"># immediate error, no child round-trip</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="ellmer-integration">ellmer Integration<a class="anchor" aria-label="anchor" href="#ellmer-integration"></a>
 </h3>
 <p>Use securer as a code execution tool in <a href="https://ellmer.tidyverse.org/" class="external-link">ellmer</a> LLM chats:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ellmer.tidyverse.org" class="external-link">ellmer</a></span><span class="op">)</span></span>
 <span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="fu"><a href="reference/securer_as_ellmer_tool.html">securer_as_ellmer_tool</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
@@ -214,14 +277,14 @@
 <h3 id="audit-logging">Audit Logging<a class="anchor" aria-label="anchor" href="#audit-logging"></a>
 </h3>
 <p>Write structured JSONL logs of all session events for compliance and debugging:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>audit_log <span class="op">=</span> <span class="st">"session.jsonl"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="verbose-logging">Verbose Logging<a class="anchor" aria-label="anchor" href="#verbose-logging"></a>
 </h3>
 <p>Debug session behavior with human-readable <code><a href="https://rdrr.io/r/base/message.html" class="external-link">message()</a></code> output:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="co"># [securer] Session started (sandbox=FALSE, pid=1234)</span></span>
 <span><span class="co"># [securer] Tool call: query_db(table="iris", limit=3)</span></span>
