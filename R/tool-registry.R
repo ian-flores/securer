@@ -1,7 +1,7 @@
 #' @name securer_tool
 #' @title securer_tool S7 class
 #' @description S7 class for tool definitions.
-#' @exportClass securer_tool
+#' @export
 securer_tool_class <- new_class("securer_tool", properties = list(
   name = class_character,
   description = class_character,
