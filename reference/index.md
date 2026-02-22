@@ -12,8 +12,9 @@ Primary API for secure code execution
   : Execute R code securely with tool support
 - [`with_secure_session()`](https://ian-flores.github.io/securer/reference/with_secure_session.md)
   : Execute code with an auto-managed SecureSession
-- [`securer_tool()`](https://ian-flores.github.io/securer/reference/securer_tool.md)
-  : Create a tool definition
+- [`securer_tool_class()`](https://ian-flores.github.io/securer/reference/securer_tool.md)
+  [`securer_tool()`](https://ian-flores.github.io/securer/reference/securer_tool.md)
+  : securer_tool S7 class
 
 ## Validation & Logging
 

@@ -1,4 +1,6 @@
-# Create a tool definition
+# securer_tool S7 class
+
+S7 class for tool definitions.
 
 Defines a named tool with a function implementation and typed argument
 metadata. Tool objects are passed to
@@ -11,6 +13,13 @@ name and the parent process executes the actual function.
 ## Usage
 
 ``` r
+securer_tool_class(
+  name = character(0),
+  description = character(0),
+  fn = function() NULL,
+  args = list()
+)
+
 securer_tool(name, description, fn, args = list())
 ```
 
@@ -36,7 +45,7 @@ securer_tool(name, description, fn, args = list())
 
 ## Value
 
-A `securer_tool` object (a list with class `"securer_tool"`).
+A `securer_tool` object.
 
 ## Examples
 
@@ -46,7 +55,7 @@ tool <- securer_tool(
   fn = function(a, b) a + b,
   args = list(a = "numeric", b = "numeric")
 )
-tool$name
+tool@name
 #> [1] "add"
 # "add"
 ```
