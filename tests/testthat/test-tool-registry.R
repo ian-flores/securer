@@ -7,10 +7,10 @@ test_that("securer_tool() creates valid tool objects", {
     function(a, b) a + b,
     args = list(a = "numeric", b = "numeric")
   )
-  expect_s3_class(tool, "securer_tool")
-  expect_equal(tool$name, "add")
-  expect_equal(tool$description, "Add two numbers")
-  expect_true(is.function(tool$fn))
+  expect_true(S7::S7_inherits(tool, securer_tool_class))
+  expect_equal(tool@name, "add")
+  expect_equal(tool@description, "Add two numbers")
+  expect_true(is.function(tool@fn))
 })
 
 test_that("securer_tool() validates inputs", {

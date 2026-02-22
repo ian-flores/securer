@@ -2,8 +2,16 @@
 % Please edit documentation in R/tool-registry.R
 \name{securer_tool}
 \alias{securer_tool}
-\title{Create a tool definition}
+\alias{securer_tool_class}
+\title{securer_tool S7 class}
 \usage{
+securer_tool_class(
+  name = character(0),
+  description = character(0),
+  fn = function() NULL,
+  args = list()
+)
+
 securer_tool(name, description, fn, args = list())
 }
 \arguments{
@@ -18,9 +26,11 @@ securer_tool(name, description, fn, args = list())
 in the child process with the correct formal arguments.}
 }
 \value{
-A \code{securer_tool} object (a list with class \code{"securer_tool"}).
+A \code{securer_tool} object.
 }
 \description{
+S7 class for tool definitions.
+
 Defines a named tool with a function implementation and typed argument
 metadata. Tool objects are passed to \link{SecureSession} or \code{\link[=execute_r]{execute_r()}} so
 that code running in the sandboxed child process can call the tool by name
@@ -32,7 +42,7 @@ tool <- securer_tool(
   fn = function(a, b) a + b,
   args = list(a = "numeric", b = "numeric")
 )
-tool$name
+tool@name
 # "add"
 
 }

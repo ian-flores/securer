@@ -3,7 +3,7 @@ Title: Secure R Code Execution with Tool-Call IPC
 Version: 0.1.0
 Authors@R:
     person("Ian", "Flores Siaca", email = "iflores.siaca@hey.com", role = c("aut", "cre"))
-Depends: R (>= 4.0.0)
+Depends: R (>= 4.1.0)
 Description: Provides sandboxed execution of R code with a bidirectional
     tool-call protocol over Unix domain sockets. Wraps a 'callr' session
     inside an OS-level sandbox (Seatbelt on macOS, bubblewrap on Linux,
@@ -23,9 +23,10 @@ Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 Imports:
     callr (>= 3.7.0),
+    jsonlite,
     processx (>= 3.8.0),
     R6,
-    jsonlite
+    S7
 Suggests:
     covr,
     ellmer (>= 0.3.0),

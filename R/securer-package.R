@@ -14,6 +14,7 @@
 "_PACKAGE"
 
 ## usethis namespace: start
+#' @import S7
 #' @importFrom R6 R6Class
 #' @importFrom jsonlite toJSON fromJSON
 #' @importFrom callr r_session r_session_options

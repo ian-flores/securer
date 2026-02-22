@@ -1,3 +1,14 @@
+#' @name securer_tool
+#' @title securer_tool S7 class
+#' @description S7 class for tool definitions.
+#' @exportClass securer_tool
+securer_tool_class <- new_class("securer_tool", properties = list(
+  name = class_character,
+  description = class_character,
+  fn = class_function,
+  args = class_list
+))
+
 #' Create a tool definition
 #'
 #' Defines a named tool with a function implementation and typed argument
@@ -11,7 +22,7 @@
 #' @param args Named list mapping argument names to type strings
 #'   (e.g. `list(city = "character")`). Used to generate wrapper functions
 #'   in the child process with the correct formal arguments.
-#' @return A `securer_tool` object (a list with class `"securer_tool"`).
+#' @return A `securer_tool` object.
 #'
 #' @examples
 #' tool <- securer_tool(
@@ -19,7 +30,7 @@
 #'   fn = function(a, b) a + b,
 #'   args = list(a = "numeric", b = "numeric")
 #' )
-#' tool$name
+#' tool@name
 #' # "add"
 #'
 #' @export
@@ -50,10 +61,7 @@ securer_tool <- function(name, description, fn, args = list()) {
     }
   }
 
-  structure(
-    list(name = name, description = description, fn = fn, args = args),
-    class = "securer_tool"
-  )
+  securer_tool_class(name = name, description = description, fn = fn, args = args)
 }
 
 #' Validate a list of tools
@@ -98,13 +106,13 @@ validate_tools <- function(tools) {
 
   # Otherwise expect securer_tool objects
   for (tool in tools) {
-    if (!inherits(tool, "securer_tool")) {
+    if (!S7_inherits(tool, securer_tool_class)) {
       stop("Each tool must be created with securer_tool()", call. = FALSE)
     }
   }
 
   # Check for duplicate names
-  names_vec <- vapply(tools, function(t) t$name, character(1))
+  names_vec <- vapply(tools, function(t) t@name, character(1))
   if (anyDuplicated(names_vec)) {
     stop(
       "Duplicate tool names: ",
@@ -117,10 +125,10 @@ validate_tools <- function(tools) {
   # For tools with args = list() (explicitly no arguments),
   # store character(0) — not NULL — so the parent can distinguish
   # "no metadata" (legacy) from "zero args allowed" (T4 fix).
-  fns <- lapply(tools, function(t) t$fn)
+  fns <- lapply(tools, function(t) t@fn)
   names(fns) <- names_vec
   arg_meta <- lapply(tools, function(t) {
-    nm <- names(t$args)
+    nm <- names(t@args)
     if (is.null(nm)) character(0) else nm
   })
   names(arg_meta) <- names_vec
@@ -140,7 +148,7 @@ generate_tool_wrappers <- function(tools) {
   if (length(tools) == 0) return("")
 
   code_parts <- vapply(tools, function(tool) {
-    arg_names <- names(tool$args)
+    arg_names <- names(tool@args)
     if (length(arg_names) == 0) {
       # No arguments: generate a zero-argument wrapper (T4 fix).
       # Using function() instead of function(...) ensures the child
@@ -154,21 +162,21 @@ generate_tool_wrappers <- function(tools) {
         ", ",
         paste(paste0(arg_names, " = ", arg_names), collapse = ", ")
       )
-      validation_code <- generate_type_checks(tool$name, tool$args)
+      validation_code <- generate_type_checks(tool@name, tool@args)
     }
     if (nzchar(validation_code)) {
       fn_code <- sprintf(
         '%s <- function(%s) {\n%s\n  .securer_call_tool("%s"%s)\n}',
-        tool$name, formals_str, validation_code, tool$name, call_args
+        tool@name, formals_str, validation_code, tool@name, call_args
       )
     } else {
       fn_code <- sprintf(
         '%s <- function(%s) .securer_call_tool("%s"%s)',
-        tool$name, formals_str, tool$name, call_args
+        tool@name, formals_str, tool@name, call_args
       )
     }
     # Lock the binding so child code cannot overwrite the tool wrapper
-    paste0(fn_code, "\n", sprintf('lockBinding("%s", globalenv())', tool$name))
+    paste0(fn_code, "\n", sprintf('lockBinding("%s", globalenv())', tool@name))
   }, character(1))
 
   paste(code_parts, collapse = "\n")

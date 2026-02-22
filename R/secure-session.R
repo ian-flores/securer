@@ -293,11 +293,11 @@ SecureSession <- R6::R6Class("SecureSession",
     tools = function() {
       if (length(private$raw_tools) == 0) return(list())
       # If tools are securer_tool objects, return structured info
-      if (inherits(private$raw_tools[[1]], "securer_tool")) {
+      if (S7_inherits(private$raw_tools[[1]], securer_tool_class)) {
         result <- lapply(private$raw_tools, function(tool) {
-          list(name = tool$name, args = tool$args)
+          list(name = tool@name, args = tool@args)
         })
-        names(result) <- vapply(private$raw_tools, function(t) t$name,
+        names(result) <- vapply(private$raw_tools, function(t) t@name,
                                 character(1))
         return(result)
       }
@@ -587,7 +587,7 @@ SecureSession <- R6::R6Class("SecureSession",
       # functions into the child's global env so user code can call them
       # by name instead of using .securer_call_tool() directly.
       if (length(private$raw_tools) > 0 &&
-          inherits(private$raw_tools[[1]], "securer_tool")) {
+          S7_inherits(private$raw_tools[[1]], securer_tool_class)) {
         wrapper_code <- generate_tool_wrappers(private$raw_tools)
         if (nzchar(wrapper_code)) {
           private$session$call(function(code) {
