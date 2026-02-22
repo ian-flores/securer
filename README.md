@@ -42,6 +42,42 @@ result <- execute_r('
 
 The child R process is sandboxed at the OS level. Tool functions execute on the host side, outside the sandbox, with full access to your resources. The LLM's code never touches your filesystem, network, or data directly.
 
+## Part of the secure-r-dev Ecosystem
+
+securer is part of a 7-package ecosystem for building governed AI agents in R:
+
+```
+                    ┌────────────────┐
+                    │ >>> securer <<< │
+                    └───────┬────────┘
+          ┌─────────────────┼─────────────────┐
+          │                 │                  │
+   ┌──────▼──────┐  ┌──────▼──────┐  ┌───────▼────────┐
+   │ securetools  │  │ secureguard │  │ securecontext   │
+   └──────┬───────┘  └──────┬──────┘  └───────┬────────┘
+          └─────────────────┼─────────────────┘
+                    ┌───────▼──────┐
+                    │   orchestr   │
+                    └───────┬──────┘
+          ┌─────────────────┼─────────────────┐
+          │                                   │
+   ┌──────▼──────┐                     ┌──────▼──────┐
+   │ securetrace  │                    │ securebench  │
+   └─────────────┘                     └─────────────┘
+```
+
+securer sits at the top of the stack, providing the sandboxed R execution engine that other packages build on. securetools adds pre-built tool definitions, secureguard adds guardrails, and orchestr wires agents into workflows.
+
+| Package | Role |
+|---------|------|
+| [securer](https://github.com/ian-flores/securer) | Sandboxed R execution with tool-call IPC |
+| [securetools](https://github.com/ian-flores/securetools) | Pre-built security-hardened tool definitions |
+| [secureguard](https://github.com/ian-flores/secureguard) | Input/code/output guardrails (injection, PII, secrets) |
+| [orchestr](https://github.com/ian-flores/orchestr) | Graph-based agent orchestration |
+| [securecontext](https://github.com/ian-flores/securecontext) | Document chunking, embeddings, RAG retrieval |
+| [securetrace](https://github.com/ian-flores/securetrace) | Structured tracing, token/cost accounting, JSONL export |
+| [securebench](https://github.com/ian-flores/securebench) | Guardrail benchmarking with precision/recall/F1 metrics |
+
 ## Installation
 
 ```r
