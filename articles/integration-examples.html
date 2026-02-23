@@ -97,19 +97,19 @@ the Shiny session starts and closed when the user disconnects.</p>
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://shiny.posit.co/" class="external-link">shiny</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ian-flores.github.io/securer/">securer</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">ui</span> <span class="op">&lt;-</span> <span class="fu">fluidPage</span><span class="op">(</span></span>
-<span>  <span class="fu">titlePanel</span><span class="op">(</span><span class="st">"Secure R Executor"</span><span class="op">)</span>,</span>
-<span>  <span class="fu">sidebarLayout</span><span class="op">(</span></span>
-<span>    <span class="fu">sidebarPanel</span><span class="op">(</span></span>
-<span>      <span class="fu">textAreaInput</span><span class="op">(</span></span>
+<span><span class="va">ui</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/fluidPage.html" class="external-link">fluidPage</a></span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/titlePanel.html" class="external-link">titlePanel</a></span><span class="op">(</span><span class="st">"Secure R Executor"</span><span class="op">)</span>,</span>
+<span>  <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/sidebarLayout.html" class="external-link">sidebarLayout</a></span><span class="op">(</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/sidebarLayout.html" class="external-link">sidebarPanel</a></span><span class="op">(</span></span>
+<span>      <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/textAreaInput.html" class="external-link">textAreaInput</a></span><span class="op">(</span></span>
 <span>        <span class="st">"code"</span>, <span class="st">"R Code"</span>,</span>
 <span>        value <span class="op">=</span> <span class="st">"1 + 1"</span>,</span>
 <span>        rows <span class="op">=</span> <span class="fl">8</span></span>
 <span>      <span class="op">)</span>,</span>
-<span>      <span class="fu">actionButton</span><span class="op">(</span><span class="st">"run"</span>, <span class="st">"Run Code"</span><span class="op">)</span></span>
+<span>      <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/actionButton.html" class="external-link">actionButton</a></span><span class="op">(</span><span class="st">"run"</span>, <span class="st">"Run Code"</span><span class="op">)</span></span>
 <span>    <span class="op">)</span>,</span>
-<span>    <span class="fu">mainPanel</span><span class="op">(</span></span>
-<span>      <span class="fu">verbatimTextOutput</span><span class="op">(</span><span class="st">"result"</span><span class="op">)</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/sidebarLayout.html" class="external-link">mainPanel</a></span><span class="op">(</span></span>
+<span>      <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/textOutput.html" class="external-link">verbatimTextOutput</a></span><span class="op">(</span><span class="st">"result"</span><span class="op">)</span></span>
 <span>    <span class="op">)</span></span>
 <span>  <span class="op">)</span></span>
 <span><span class="op">)</span></span>
@@ -124,9 +124,9 @@ the Shiny session starts and closed when the user disconnects.</p>
 <span>    <span class="va">secure</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span>
 <span>  <span class="op">}</span><span class="op">)</span></span>
 <span></span>
-<span>  <span class="va">result_val</span> <span class="op">&lt;-</span> <span class="fu">reactiveVal</span><span class="op">(</span><span class="st">"Enter code and click Run."</span><span class="op">)</span></span>
+<span>  <span class="va">result_val</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/reactiveVal.html" class="external-link">reactiveVal</a></span><span class="op">(</span><span class="st">"Enter code and click Run."</span><span class="op">)</span></span>
 <span></span>
-<span>  <span class="fu">observeEvent</span><span class="op">(</span><span class="va">input</span><span class="op">$</span><span class="va">run</span>, <span class="op">{</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/observeEvent.html" class="external-link">observeEvent</a></span><span class="op">(</span><span class="va">input</span><span class="op">$</span><span class="va">run</span>, <span class="op">{</span></span>
 <span>    <span class="fu">result_val</span><span class="op">(</span></span>
 <span>      <span class="kw"><a href="https://rdrr.io/r/base/conditions.html" class="external-link">tryCatch</a></span><span class="op">(</span></span>
 <span>        <span class="op">{</span></span>
@@ -138,10 +138,10 @@ the Shiny session starts and closed when the user disconnects.</p>
 <span>    <span class="op">)</span></span>
 <span>  <span class="op">}</span><span class="op">)</span></span>
 <span></span>
-<span>  <span class="va">output</span><span class="op">$</span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu">renderText</span><span class="op">(</span><span class="fu">result_val</span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="va">output</span><span class="op">$</span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/shiny/man/renderPrint.html" class="external-link">renderText</a></span><span class="op">(</span><span class="fu">result_val</span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span></span>
-<span><span class="fu">shinyApp</span><span class="op">(</span><span class="va">ui</span>, <span class="va">server</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu"><a href="https://rdrr.io/pkg/shiny/man/shinyApp.html" class="external-link">shinyApp</a></span><span class="op">(</span><span class="va">ui</span>, <span class="va">server</span><span class="op">)</span></span></code></pre></div>
 <p>For multi-user apps that handle many concurrent visitors, consider
 using <code>SecureSessionPool</code> instead of creating one
 <code>SecureSession</code> per Shiny session. A single pool can be
@@ -190,7 +190,7 @@ all requests.</p>
 <span><span class="op">}</span></span></code></pre></div>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Start the API</span></span>
-<span><span class="va">pr</span> <span class="op">&lt;-</span> <span class="fu">plumb</span><span class="op">(</span><span class="st">"plumber.R"</span><span class="op">)</span></span>
+<span><span class="va">pr</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://www.rplumber.io/reference/plumb.html" class="external-link">plumb</a></span><span class="op">(</span><span class="st">"plumber.R"</span><span class="op">)</span></span>
 <span><span class="va">pr</span><span class="op">$</span><span class="fu">run</span><span class="op">(</span>host <span class="op">=</span> <span class="st">"0.0.0.0"</span>, port <span class="op">=</span> <span class="fl">8080</span><span class="op">)</span></span></code></pre></div>
 <p><strong>API hardening tips:</strong></p>
 <ul>

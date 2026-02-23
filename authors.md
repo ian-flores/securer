@@ -2,7 +2,7 @@
 
 ## Authors
 
-- **Ian Flores Siaca**. Author, maintainer.
+- **Ian Flores Siaca**. Author, maintainer, copyright holder.
 
 ## Citation
 

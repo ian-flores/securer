@@ -28,4 +28,5 @@ Useful links:
 
 ## Author
 
-**Maintainer**: Ian Flores Siaca <iflores.siaca@hey.com>
+**Maintainer**: Ian Flores Siaca <iflores.siaca@hey.com> \[copyright
+holder\]
