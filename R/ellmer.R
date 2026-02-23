@@ -54,8 +54,7 @@ securer_as_ellmer_tool <- function(session = NULL,
                                    timeout = 30) {
   if (!requireNamespace("ellmer", quietly = TRUE)) {
     stop(
-      "Package 'ellmer' is required for securer_as_ellmer_tool(). ",
-      "Install it with: install.packages('ellmer')",
+      "Package 'ellmer' is required for securer_as_ellmer_tool().",
       call. = FALSE
     )
   }

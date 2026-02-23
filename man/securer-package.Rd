@@ -27,7 +27,7 @@ Useful links:
 
 }
 \author{
-\strong{Maintainer}: Ian Flores Siaca \email{iflores.siaca@hey.com}
+\strong{Maintainer}: Ian Flores Siaca \email{iflores.siaca@hey.com} [copyright holder]
 
 }
 \keyword{internal}

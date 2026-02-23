@@ -2,12 +2,12 @@ Package: securer
 Title: Secure R Code Execution with Tool-Call IPC
 Version: 0.1.0
 Authors@R:
-    person("Ian", "Flores Siaca", email = "iflores.siaca@hey.com", role = c("aut", "cre"))
+    person("Ian", "Flores Siaca", email = "iflores.siaca@hey.com", role = c("aut", "cre", "cph"))
 Depends: R (>= 4.1.0)
 Description: Provides sandboxed execution of R code with a bidirectional
     tool-call protocol over Unix domain sockets. Wraps a 'callr' session
     inside an OS-level sandbox (Seatbelt on macOS, bubblewrap on Linux,
-    environment isolation on Windows) so that large language model (LLM)
+    environment isolation on Windows) so that Large Language Model (LLM)
     generated code can compute results and call host-side tools without
     accessing the filesystem, network, or credentials.
 License: MIT + file LICENSE
@@ -29,9 +29,15 @@ Imports:
     S7
 Suggests:
     covr,
+    DBI,
     ellmer (>= 0.3.0),
+    httr,
     knitr,
+    pak,
+    plumber,
     rmarkdown,
+    RSQLite,
+    shiny,
     spelling,
     testthat (>= 3.0.0)
 VignetteBuilder: knitr
