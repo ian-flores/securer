@@ -26,3 +26,4 @@ covr-report.html
 
 # Generated vignette HTML (source is .Rmd)
 vignettes/*.html
+.claude/
