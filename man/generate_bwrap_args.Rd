@@ -18,6 +18,7 @@ A character vector of bwrap CLI arguments
 Creates a character vector of \code{bwrap} arguments that:
 \itemize{
 \item Isolates all namespaces (PID, net, user, mount, UTS, IPC)
+\item Drops all Linux capabilities (\verb{--cap-drop ALL})
 \item Bind-mounts system libraries and R read-only
 \item Provides a clean writable \verb{/tmp} with the UDS socket overlaid
 \item Blocks all network access via namespace isolation

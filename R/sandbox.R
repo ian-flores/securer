@@ -16,6 +16,13 @@
 #' @keywords internal
 build_sandbox_config <- function(socket_path, r_home = R.home(),
                                  limits = NULL) {
+  # Docker detection: container provides isolation, skip bwrap
+
+  if (file.exists("/.dockerenv") ||
+      identical(Sys.getenv("SECURER_SANDBOX_MODE"), "docker")) {
+    return(build_sandbox_docker(socket_path, r_home, limits = limits))
+  }
+
   os <- tolower(Sys.info()[["sysname"]])
   switch(os,
     darwin  = build_sandbox_macos(socket_path, r_home, limits = limits),

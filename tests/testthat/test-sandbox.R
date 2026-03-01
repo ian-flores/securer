@@ -251,6 +251,9 @@ test_that("generate_bwrap_args returns expected flags", {
   expect_true("--unshare-all" %in% args)
   expect_true("--die-with-parent" %in% args)
   expect_true("--new-session" %in% args)
+  expect_true("--cap-drop" %in% args)
+  cap_idx <- which(args == "--cap-drop")
+  expect_equal(args[cap_idx + 1], "ALL")
   expect_true(any(grepl("/tmp", args)))
 })
 
@@ -962,5 +965,71 @@ test_that("File size limit restricts large writes", {
       tf <- tempfile()
       writeBin(raw(5 * 1024 * 1024), tf)
     ')
+  )
+})
+
+# ── Docker sandbox tests ──────────────────────────────────────────────
+
+test_that("Docker detection via SECURER_SANDBOX_MODE env var", {
+  withr::local_envvar(SECURER_SANDBOX_MODE = "docker")
+
+  socket_path <- tempfile("test_sock_", fileext = ".sock")
+  config <- build_sandbox_config(socket_path, R.home())
+  on.exit({
+    if (!is.null(config$wrapper)) unlink(config$wrapper)
+  })
+
+  expect_true(!is.null(config$wrapper))
+  expect_true(file.exists(config$wrapper))
+  expect_null(config$profile_path)
+})
+
+test_that("Docker sandbox config has expected structure", {
+  socket_path <- tempfile("test_sock_", fileext = ".sock")
+  config <- build_sandbox_docker(socket_path, R.home())
+  on.exit({
+    if (!is.null(config$wrapper)) unlink(config$wrapper)
+  })
+
+  expect_true(!is.null(config$wrapper))
+  expect_true(file.exists(config$wrapper))
+  expect_null(config$profile_path)
+
+  # Wrapper should be executable and contain R exec
+  wrapper_lines <- readLines(config$wrapper)
+  expect_true(any(grepl("#!/bin/sh", wrapper_lines)))
+  expect_true(any(grepl("^exec", wrapper_lines)))
+  expect_true(any(grepl(file.path(R.home(), "bin", "R"), wrapper_lines, fixed = TRUE)))
+})
+
+test_that("Docker sandbox wrapper includes ulimit when limits provided", {
+  socket_path <- tempfile("test_sock_", fileext = ".sock")
+  limits <- list(cpu = 30, memory = 512 * 1024 * 1024)
+  config <- build_sandbox_docker(socket_path, R.home(), limits = limits)
+  on.exit(unlink(config$wrapper))
+
+  wrapper_lines <- readLines(config$wrapper)
+  expect_true(any(grepl("ulimit -S -H -t 30", wrapper_lines)))
+  expect_true(any(grepl("ulimit -S -H -v 524288", wrapper_lines)))
+})
+
+test_that("Docker sandbox wrapper has no ulimit when limits is NULL", {
+  socket_path <- tempfile("test_sock_", fileext = ".sock")
+  config <- build_sandbox_docker(socket_path, R.home())
+  on.exit(unlink(config$wrapper))
+
+  wrapper_lines <- readLines(config$wrapper)
+  expect_false(any(grepl("ulimit", wrapper_lines)))
+})
+
+test_that("build_sandbox_linux errors when bwrap exists but namespaces fail", {
+  skip_on_os(c("windows", "mac"))
+  skip_if(!nzchar(Sys.which("bwrap")), "bwrap not installed")
+  skip_if(bwrap_works(), "bwrap namespaces work; cannot test failure path")
+
+  # bwrap is on PATH but can't create namespaces (e.g., Docker)
+  expect_error(
+    build_sandbox_linux("/tmp/test.sock", R.home()),
+    "namespace creation failed"
   )
 })

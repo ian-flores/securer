@@ -3,6 +3,7 @@
 #' Creates a character vector of `bwrap` arguments that:
 #' \itemize{
 #'   \item Isolates all namespaces (PID, net, user, mount, UTS, IPC)
+#'   \item Drops all Linux capabilities (`--cap-drop ALL`)
 #'   \item Bind-mounts system libraries and R read-only
 #'   \item Provides a clean writable `/tmp` with the UDS socket overlaid
 #'   \item Blocks all network access via namespace isolation
@@ -20,6 +21,7 @@ generate_bwrap_args <- function(socket_path, r_home) {
     "--unshare-all",
     "--die-with-parent",
     "--new-session",
+    "--cap-drop", "ALL",
 
     # -- System libraries (read-only) -----------------------------------------
     "--ro-bind", "/usr", "/usr",
@@ -54,6 +56,8 @@ generate_bwrap_args <- function(socket_path, r_home) {
     "--tmpfs", "/proc/self/environ",
     "--tmpfs", "/proc/self/maps",
     "--tmpfs", "/proc/self/fd",
+    "--tmpfs", "/proc/self/fdinfo",
+    "--tmpfs", "/proc/self/mountinfo",
 
     # -- Writable temp (clean) -------------------------------------------------
     "--tmpfs", "/tmp",
@@ -103,6 +107,33 @@ build_sandbox_linux <- function(socket_path, r_home, limits = NULL) {
       call. = FALSE
     )
     return(build_sandbox_fallback(socket_path, r_home))
+  }
+
+  # Runtime check: verify bwrap can actually create namespaces.
+
+  # Inside Docker (or other containers without CAP_SYS_ADMIN / unprivileged
+
+  # user namespaces), bwrap exists on PATH but --unshare-all fails.
+  ns_test <- tryCatch(
+    processx::run(
+      bwrap_path,
+      c("--unshare-all", "--ro-bind", "/usr", "/usr",
+        "--dev", "/dev", "--proc", "/proc",
+        "--", "/usr/bin/true"),
+      timeout = 5,
+      error_on_status = FALSE
+    ),
+    error = function(e) list(status = 1)
+  )
+  if (ns_test$status != 0) {
+    stop(
+      "bwrap found at ", bwrap_path, " but namespace creation failed ",
+      "(--unshare-all returned non-zero). This commonly happens inside ",
+      "Docker containers or environments without unprivileged user ",
+      "namespaces. Set SECURER_SANDBOX_MODE=docker to use container ",
+      "isolation instead, or install bwrap with namespace support.",
+      call. = FALSE
+    )
   }
 
   bwrap_args <- generate_bwrap_args(socket_path, r_home)
