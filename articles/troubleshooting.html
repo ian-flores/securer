@@ -60,10 +60,8 @@
     
     
 <div class="section level2">
-<h2 id="common-issues-and-solutions">Common Issues and Solutions<a class="anchor" aria-label="anchor" href="#common-issues-and-solutions"></a>
+<h2 id="common-issues-and-solutions">Common issues and solutions<a class="anchor" aria-label="anchor" href="#common-issues-and-solutions"></a>
 </h2>
-<p>This vignette covers the most frequently encountered problems when
-using securer and how to resolve them.</p>
 <div class="section level3">
 <h3 id="bwrap-no-such-file-or-directory-sandbox-exec-not-found">“bwrap: No such file or directory” / “sandbox-exec not found”<a class="anchor" aria-label="anchor" href="#bwrap-no-such-file-or-directory-sandbox-exec-not-found"></a>
 </h3>
@@ -79,7 +77,7 @@ available.</p>
 <span><span class="co"># Use sandbox_strict = TRUE to get a hard error instead of a silent fallback</span></span>
 <span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>sandbox <span class="op">=</span> <span class="cn">TRUE</span>, sandbox_strict <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
 <p>If you want the session to proceed without sandboxing when tools are
-missing, leave <code>sandbox_strict = FALSE</code> (the default) —
+missing, leave <code>sandbox_strict = FALSE</code> (the default);
 securer will emit a warning and continue unsandboxed.</p>
 </div>
 <div class="section level3">
@@ -117,7 +115,7 @@ receives an external signal.</p>
 <div class="section level3">
 <h3 id="windows-sandbox-limitations">Windows sandbox limitations<a class="anchor" aria-label="anchor" href="#windows-sandbox-limitations"></a>
 </h3>
-<p>On Windows, securer provides environment isolation only — environment
+<p>On Windows, securer provides environment isolation only: environment
 variables are sanitized (<code>HOME</code>, <code>TMPDIR</code>,
 <code>R_LIBS_USER</code>) and resource limits are applied via Job
 Objects. There are <strong>no</strong> filesystem or network

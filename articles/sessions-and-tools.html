@@ -94,10 +94,10 @@ executions:</p>
 <span><span class="op">}</span>, sandbox <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="safety-features-for-agent-workflows">Safety features for agent workflows<a class="anchor" aria-label="anchor" href="#safety-features-for-agent-workflows"></a>
+<h2 id="agent-safety-options">Agent safety options<a class="anchor" aria-label="anchor" href="#agent-safety-options"></a>
 </h2>
-<p><code>SecureSession</code> includes features for hardening LLM agent
-deployments:</p>
+<p><code>SecureSession</code> has several options for hardening LLM
+agent deployments:</p>
 <ul>
 <li>
 <strong><code>max_code_length</code></strong>
@@ -233,14 +233,11 @@ fields longer than 10,000 characters are truncated.</p>
 <div class="section level3">
 <h3 id="why-session-pooling">Why session pooling?<a class="anchor" aria-label="anchor" href="#why-session-pooling"></a>
 </h3>
-<p>Creating a <code>SecureSession</code> starts a new R child process,
-sets up the sandbox, and establishes the IPC socket. This takes roughly
-0.5–1 second per session. For workloads that serve many short-lived
-requests — such as a Plumber API or a multi-user Shiny app — creating
-and tearing down a session for every request adds significant latency.
-Session pooling solves this by pre-warming a fixed number of sessions at
-startup and reusing them across requests, eliminating repeated startup
-costs and keeping response times low.</p>
+<p>Creating a <code>SecureSession</code> starts a child R process, sets
+up the sandbox, and establishes the IPC socket. This takes 0.5–1 second.
+For Plumber APIs or multi-user Shiny apps, that per-request overhead
+adds up fast. Session pooling pre-warms a fixed number of sessions at
+startup and reuses them across requests.</p>
 </div>
 <div class="section level3">
 <h3 id="session-pool-lifecycle">Session pool lifecycle<a class="anchor" aria-label="anchor" href="#session-pool-lifecycle"></a>
@@ -277,7 +274,7 @@ each execution, preventing state leakage between callers:</p>
 <span></span>
 <span><span class="va">pool</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 <p>Dead sessions are automatically restarted on acquire. The pool is
-<strong>not</strong> thread-safe — create separate instances when using
+<strong>not</strong> thread-safe; create separate instances when using
 <code>parallel</code> or <code>future</code>.</p>
 </div>
 </div>

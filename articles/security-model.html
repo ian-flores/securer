@@ -59,8 +59,7 @@
 
     
     
-<p>This document describes the security architecture and threat model of
-the securer package. It is intended for security auditors, deployers
+<p>securer’s security architecture targets security auditors, deployers
 evaluating risk, and contributors working on the sandboxing code.</p>
 <div class="section level2">
 <h2 id="tldr">TL;DR<a class="anchor" aria-label="anchor" href="#tldr"></a>
@@ -69,34 +68,34 @@ evaluating risk, and contributors working on the sandboxing code.</p>
 layers:</p>
 <ul>
 <li>
-<strong>OS sandbox</strong> — Seatbelt (macOS) or bubblewrap (Linux)
+<strong>OS sandbox</strong>: Seatbelt (macOS) or bubblewrap (Linux)
 blocks filesystem writes and network access</li>
 <li>
-<strong>Resource limits</strong> — ulimit caps on CPU, memory, file
+<strong>Resource limits</strong>: ulimit caps on CPU, memory, file
 size, processes, and open files</li>
 <li>
-<strong>Execution timeouts</strong> — wall-clock deadline kills
+<strong>Execution timeouts</strong>: wall-clock deadline kills
 runaway code; session auto-recovers</li>
 <li>
-<strong>IPC authentication</strong> — 32-character random token
+<strong>IPC authentication</strong>: 32-character random token
 validates the child process identity</li>
 <li>
-<strong>Message validation</strong> — size limits, JSON structure
+<strong>Message validation</strong>: size limits, JSON structure
 checks, and tool name allowlist</li>
 <li>
-<strong>Environment sanitization</strong> — only allowlisted env
-vars inherited; API keys and credentials stripped</li>
+<strong>Environment sanitization</strong>: only allowlisted env vars
+inherited; API keys and credentials stripped</li>
 <li>
-<strong>Argument validation</strong> — type checks on both sides of
+<strong>Argument validation</strong>: type checks on both sides of
 the trust boundary</li>
 <li>
-<strong>Code pre-validation</strong> — syntax check and dangerous
+<strong>Code pre-validation</strong>: syntax check and dangerous
 pattern warnings before execution</li>
 <li>
-<strong>Socket permissions</strong> — 0700 directory prevents other
+<strong>Socket permissions</strong>: 0700 directory prevents other
 users from accessing the IPC socket</li>
 <li>
-<strong>Runtime hardening</strong> — locked bindings and sealed
+<strong>Runtime hardening</strong>: locked bindings and sealed
 environments prevent internal tampering</li>
 </ul>
 <p>For deployment details, see <code><a href="../articles/deployment.html">vignette("deployment")</a></code>. The
@@ -120,17 +119,17 @@ network access, process execution, and resource exhaustion.</p>
 </h3>
 <ul>
 <li>
-<strong>Host filesystem</strong> – prevent reading sensitive files
+<strong>Host filesystem</strong>: prevent reading sensitive files
 (SSH keys, credentials, application data) and writing to arbitrary
 locations</li>
 <li>
-<strong>Network</strong> – prevent the child from making HTTP
+<strong>Network</strong>: prevent the child from making HTTP
 requests, exfiltrating data, or connecting to internal services</li>
 <li>
-<strong>Other processes</strong> – prevent the child from signaling,
+<strong>Other processes</strong>: prevent the child from signaling,
 debugging, or interfering with other processes on the host</li>
 <li>
-<strong>Host resources</strong> – prevent CPU exhaustion, memory
+<strong>Host resources</strong>: prevent CPU exhaustion, memory
 exhaustion, fork bombs, and disk-filling attacks</li>
 </ul>
 </div>
@@ -167,9 +166,8 @@ executing.</p>
 <div class="section level2">
 <h2 id="defense-layers">Defense layers<a class="anchor" aria-label="anchor" href="#defense-layers"></a>
 </h2>
-<p>securer uses defense in depth. No single layer is sufficient; they
-are designed to be redundant so that a bypass in one layer is caught by
-another.</p>
+<p>securer uses defense in depth. No single layer is sufficient; each is
+redundant so that a bypass in one layer is caught by another.</p>
 <div class="section level3">
 <h3 id="layer-1-os-level-sandbox">Layer 1: OS-level sandbox<a class="anchor" aria-label="anchor" href="#layer-1-os-level-sandbox"></a>
 </h3>
@@ -439,15 +437,15 @@ user-level library injection on all platforms.</p>
 <p>Everything not on this list is removed. This means:</p>
 <ul>
 <li>
-<code>AWS_ACCESS_KEY_ID</code>, <code>AWS_SECRET_ACCESS_KEY</code> –
+<code>AWS_ACCESS_KEY_ID</code>, <code>AWS_SECRET_ACCESS_KEY</code>:
 not inherited</li>
 <li>
-<code>GITHUB_TOKEN</code>, <code>OPENAI_API_KEY</code> – not
+<code>GITHUB_TOKEN</code>, <code>OPENAI_API_KEY</code>: not
 inherited</li>
 <li>
-<code>DATABASE_URL</code>, <code>REDIS_URL</code> – not
+<code>DATABASE_URL</code>, <code>REDIS_URL</code>: not
 inherited</li>
-<li>Any custom <code>SECRET_*</code> or <code>API_*</code> variables –
+<li>Any custom <code>SECRET_*</code> or <code>API_*</code> variables:
 not inherited</li>
 </ul>
 <p>Two securer-specific variables are added: <code>SECURER_SOCKET</code>
@@ -531,11 +529,10 @@ that blocks direct access.</p>
 <span><span class="fu"><a href="https://rdrr.io/r/base/bindenv.html" class="external-link">lockEnvironment</a></span><span class="op">(</span><span class="va">.ipc_store</span><span class="op">)</span></span>
 <span><span class="co"># ... the function is then locked in the global env:</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/bindenv.html" class="external-link">lockBinding</a></span><span class="op">(</span><span class="st">".securer_call_tool"</span>, <span class="fu"><a href="https://rdrr.io/r/base/environment.html" class="external-link">globalenv</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<p>Additionally, <code><a href="https://rdrr.io/r/base/bindenv.html" class="external-link">unlockBinding()</a></code> is shadowed in the child’s
-global environment (and in the base namespace where possible) to prevent
-child code from unlocking the binding. <code><a href="https://rdrr.io/r/utils/getFromNamespace.html" class="external-link">getFromNamespace()</a></code>
-and <code><a href="https://rdrr.io/r/base/getNativeSymbolInfo.html" class="external-link">getNativeSymbolInfo()</a></code> are also blocked via active
-bindings.</p>
+<p><code><a href="https://rdrr.io/r/base/bindenv.html" class="external-link">unlockBinding()</a></code> is also shadowed in the child’s global
+environment (and in the base namespace where possible) to prevent child
+code from unlocking the binding. <code><a href="https://rdrr.io/r/utils/getFromNamespace.html" class="external-link">getFromNamespace()</a></code> and
+<code><a href="https://rdrr.io/r/base/getNativeSymbolInfo.html" class="external-link">getNativeSymbolInfo()</a></code> are blocked via active bindings.</p>
 <p>This means the child code cannot:</p>
 <ul>
 <li>Redefine <code>.securer_call_tool()</code> to bypass argument
@@ -713,7 +710,7 @@ user count against it.</p>
 Unix domain socket. The socket is protected by filesystem permissions
 (0700 directory) and the authentication token, but the data is not
 encrypted in transit. On a compromised host where an attacker has the
-same UID, they could potentially read IPC traffic.</p>
+same UID, they could read IPC traffic.</p>
 <p><strong>Mitigation</strong>: The socket directory has 0700
 permissions and a random name. The authentication token prevents
 unauthorized connections. If the host is compromised at the UID level,
@@ -820,8 +817,8 @@ child connects.</li>
 <li>Child runtime code connects to the socket path from
 <code>SECURER_SOCKET</code> env var</li>
 <li>Parent accepts the connection
-(<code><a href="http://processx.r-lib.org/reference/processx_sockets.html" class="external-link">processx::conn_accept_unix_socket()</a></code> – transitions the
-server connection in-place, does not return a new object)</li>
+(<code><a href="http://processx.r-lib.org/reference/processx_sockets.html" class="external-link">processx::conn_accept_unix_socket()</a></code>, which transitions the
+server connection in-place and does not return a new object)</li>
 <li>Child sends the authentication token (from
 <code>SECURER_TOKEN</code> env var)</li>
 <li>Parent validates the token; rejects on mismatch</li>

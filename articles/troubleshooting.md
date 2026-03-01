@@ -1,9 +1,6 @@
 # Troubleshooting
 
-## Common Issues and Solutions
-
-This vignette covers the most frequently encountered problems when using
-securer and how to resolve them.
+## Common issues and solutions
 
 ### “bwrap: No such file or directory” / “sandbox-exec not found”
 
@@ -21,8 +18,8 @@ session <- SecureSession$new(sandbox = TRUE, sandbox_strict = TRUE)
 ```
 
 If you want the session to proceed without sandboxing when tools are
-missing, leave `sandbox_strict = FALSE` (the default) — securer will
-emit a warning and continue unsandboxed.
+missing, leave `sandbox_strict = FALSE` (the default); securer will emit
+a warning and continue unsandboxed.
 
 ### “Socket connection timed out”
 
@@ -60,7 +57,7 @@ session <- SecureSession$new(sandbox = TRUE)
 
 ### Windows sandbox limitations
 
-On Windows, securer provides environment isolation only — environment
+On Windows, securer provides environment isolation only: environment
 variables are sanitized (`HOME`, `TMPDIR`, `R_LIBS_USER`) and resource
 limits are applied via Job Objects. There are **no** filesystem or
 network restrictions.

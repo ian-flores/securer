@@ -40,9 +40,9 @@ result <- with_secure_session(function(session) {
 }, sandbox = FALSE)
 ```
 
-## Safety features for agent workflows
+## Agent safety options
 
-`SecureSession` includes features for hardening LLM agent deployments:
+`SecureSession` has several options for hardening LLM agent deployments:
 
 - **`max_code_length`** (`$execute()`): Reject code exceeding a
   character limit (default 100,000).
@@ -179,14 +179,11 @@ The log file is created with `0600` permissions. Code fields longer than
 
 ### Why session pooling?
 
-Creating a `SecureSession` starts a new R child process, sets up the
-sandbox, and establishes the IPC socket. This takes roughly 0.5–1 second
-per session. For workloads that serve many short-lived requests — such
-as a Plumber API or a multi-user Shiny app — creating and tearing down a
-session for every request adds significant latency. Session pooling
-solves this by pre-warming a fixed number of sessions at startup and
-reusing them across requests, eliminating repeated startup costs and
-keeping response times low.
+Creating a `SecureSession` starts a child R process, sets up the
+sandbox, and establishes the IPC socket. This takes 0.5–1 second. For
+Plumber APIs or multi-user Shiny apps, that per-request overhead adds up
+fast. Session pooling pre-warms a fixed number of sessions at startup
+and reuses them across requests.
 
 ### Session pool lifecycle
 
@@ -229,5 +226,5 @@ pool$close()
 ```
 
 Dead sessions are automatically restarted on acquire. The pool is
-**not** thread-safe — create separate instances when using `parallel` or
+**not** thread-safe; create separate instances when using `parallel` or
 `future`.

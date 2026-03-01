@@ -67,9 +67,9 @@ for chatting with LLMs. securer integrates with ellmer’s tool-use system
 so an LLM can execute R code in a sandboxed child process. The LLM
 writes code, securer runs it safely, and the result flows back into the
 conversation.</p>
-<p><code><a href="../reference/securer_as_ellmer_tool.html">securer_as_ellmer_tool()</a></code> is the bridge between the two
-packages. It wraps a <code>SecureSession</code> as an ellmer tool
-definition that you register on a chat object.</p>
+<p><code><a href="../reference/securer_as_ellmer_tool.html">securer_as_ellmer_tool()</a></code> connects the two packages. It
+wraps a <code>SecureSession</code> as an ellmer tool definition that you
+register on a chat object.</p>
 </div>
 <div class="section level2">
 <h2 id="quick-start">Quick start<a class="anchor" aria-label="anchor" href="#quick-start"></a>
@@ -81,11 +81,11 @@ definition that you register on a chat object.</p>
 <span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="fu"><a href="../reference/securer_as_ellmer_tool.html">securer_as_ellmer_tool</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">chat</span><span class="op">$</span><span class="fu">chat</span><span class="op">(</span><span class="st">"What is the sum of the first 100 prime numbers?"</span><span class="op">)</span></span></code></pre></div>
-<p>That’s it. The LLM receives a tool called <code>execute_r_code</code>
-that accepts a <code>code</code> string. When the model decides to use
-it, securer runs the code in a sandboxed child process and returns the
-result. The sandbox blocks filesystem writes and network access — the
-LLM can compute but not exfiltrate.</p>
+<p>The LLM receives a tool called <code>execute_r_code</code> that
+accepts a <code>code</code> string. When the model decides to use it,
+securer runs the code in a sandboxed child process and returns the
+result. The sandbox blocks filesystem writes and network access. The LLM
+can compute but not exfiltrate.</p>
 </div>
 <div class="section level2">
 <h2 id="why-securer-a-real-supply-chain-attack">Why securer? A real supply chain attack<a class="anchor" aria-label="anchor" href="#why-securer-a-real-supply-chain-attack"></a>
@@ -175,9 +175,8 @@ POSTs them to an attacker-controlled server.</p>
 </tr>
 </tbody>
 </table>
-<p>These are independent defense layers. Even if one is bypassed, the
-others still protect you. See <code><a href="../articles/security-model.html">vignette("security-model")</a></code>
-for the full threat model.</p>
+<p>These are independent defense layers. See
+<code><a href="../articles/security-model.html">vignette("security-model")</a></code> for the full threat model.</p>
 </div>
 <div class="section level2">
 <h2 id="how-it-works">How it works<a class="anchor" aria-label="anchor" href="#how-it-works"></a>
@@ -195,8 +194,7 @@ diagram.</p>
 <div class="section level2">
 <h2 id="adding-securer-tools">Adding securer tools<a class="anchor" aria-label="anchor" href="#adding-securer-tools"></a>
 </h2>
-<p>The real power comes from giving the LLM access to your own
-functions. Define securer tools and pass them in:</p>
+<p>You can expose your own functions to the LLM as securer tools:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">tools</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="../reference/securer_tool.html">securer_tool</a></span><span class="op">(</span><span class="st">"query_db"</span>, <span class="st">"Query a database table by name"</span>,</span>
@@ -333,7 +331,7 @@ or explain the error.</p>
 <div class="section level2">
 <h2 id="using-with-other-llm-providers">Using with other LLM providers<a class="anchor" aria-label="anchor" href="#using-with-other-llm-providers"></a>
 </h2>
-<p>The tool definition is provider-agnostic — any ellmer backend with
+<p>The tool definition is provider-agnostic. Any ellmer backend with
 tool-use support works:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span><span class="op">)</span></span>

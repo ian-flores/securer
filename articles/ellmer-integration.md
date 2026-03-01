@@ -8,8 +8,8 @@ can execute R code in a sandboxed child process. The LLM writes code,
 securer runs it safely, and the result flows back into the conversation.
 
 [`securer_as_ellmer_tool()`](https://ian-flores.github.io/securer/reference/securer_as_ellmer_tool.md)
-is the bridge between the two packages. It wraps a `SecureSession` as an
-ellmer tool definition that you register on a chat object.
+connects the two packages. It wraps a `SecureSession` as an ellmer tool
+definition that you register on a chat object.
 
 ## Quick start
 
@@ -22,10 +22,10 @@ chat$register_tool(securer_as_ellmer_tool())
 chat$chat("What is the sum of the first 100 prime numbers?")
 ```
 
-That’s it. The LLM receives a tool called `execute_r_code` that accepts
-a `code` string. When the model decides to use it, securer runs the code
-in a sandboxed child process and returns the result. The sandbox blocks
-filesystem writes and network access — the LLM can compute but not
+The LLM receives a tool called `execute_r_code` that accepts a `code`
+string. When the model decides to use it, securer runs the code in a
+sandboxed child process and returns the result. The sandbox blocks
+filesystem writes and network access. The LLM can compute but not
 exfiltrate.
 
 ## Why securer? A real supply chain attack
@@ -90,8 +90,7 @@ session$close()
 | `httr::POST(...)`                     | Data exfiltrated      | Network denied        |
 | `Sys.getenv("AWS_SECRET_ACCESS_KEY")` | Key value returned    | Empty (env sanitized) |
 
-These are independent defense layers. Even if one is bypassed, the
-others still protect you. See
+These are independent defense layers. See
 [`vignette("security-model")`](https://ian-flores.github.io/securer/articles/security-model.md)
 for the full threat model.
 
@@ -111,8 +110,7 @@ for the full architecture diagram.
 
 ## Adding securer tools
 
-The real power comes from giving the LLM access to your own functions.
-Define securer tools and pass them in:
+You can expose your own functions to the LLM as securer tools:
 
 ``` r
 tools <- list(
@@ -252,7 +250,7 @@ chat$chat("Create a scatter plot of price vs quantity")
 
 ## Using with other LLM providers
 
-The tool definition is provider-agnostic — any ellmer backend with
+The tool definition is provider-agnostic. Any ellmer backend with
 tool-use support works:
 
 ``` r
