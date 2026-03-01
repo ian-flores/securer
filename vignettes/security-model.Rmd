@@ -16,24 +16,23 @@ knitr::opts_chunk$set(
 can_eval <- requireNamespace("securer", quietly = TRUE)
 ```
 
-This document describes the security architecture and threat model of the securer
-package. It is intended for security auditors, deployers evaluating risk, and
-contributors working on the sandboxing code.
+securer's security architecture targets security auditors, deployers evaluating
+risk, and contributors working on the sandboxing code.
 
 ## TL;DR
 
 securer protects against LLM-generated R code with 10 defense layers:
 
-- **OS sandbox** --- Seatbelt (macOS) or bubblewrap (Linux) blocks filesystem writes and network access
-- **Resource limits** --- ulimit caps on CPU, memory, file size, processes, and open files
-- **Execution timeouts** --- wall-clock deadline kills runaway code; session auto-recovers
-- **IPC authentication** --- 32-character random token validates the child process identity
-- **Message validation** --- size limits, JSON structure checks, and tool name allowlist
-- **Environment sanitization** --- only allowlisted env vars inherited; API keys and credentials stripped
-- **Argument validation** --- type checks on both sides of the trust boundary
-- **Code pre-validation** --- syntax check and dangerous pattern warnings before execution
-- **Socket permissions** --- 0700 directory prevents other users from accessing the IPC socket
-- **Runtime hardening** --- locked bindings and sealed environments prevent internal tampering
+- **OS sandbox**: Seatbelt (macOS) or bubblewrap (Linux) blocks filesystem writes and network access
+- **Resource limits**: ulimit caps on CPU, memory, file size, processes, and open files
+- **Execution timeouts**: wall-clock deadline kills runaway code; session auto-recovers
+- **IPC authentication**: 32-character random token validates the child process identity
+- **Message validation**: size limits, JSON structure checks, and tool name allowlist
+- **Environment sanitization**: only allowlisted env vars inherited; API keys and credentials stripped
+- **Argument validation**: type checks on both sides of the trust boundary
+- **Code pre-validation**: syntax check and dangerous pattern warnings before execution
+- **Socket permissions**: 0700 directory prevents other users from accessing the IPC socket
+- **Runtime hardening**: locked bindings and sealed environments prevent internal tampering
 
 For deployment details, see `vignette("deployment")`. The rest of this document covers the full threat model.
 
@@ -49,13 +48,13 @@ including file I/O, network access, process execution, and resource exhaustion.
 
 ### What we are protecting
 
-- **Host filesystem** -- prevent reading sensitive files (SSH keys, credentials,
+- **Host filesystem**: prevent reading sensitive files (SSH keys, credentials,
   application data) and writing to arbitrary locations
-- **Network** -- prevent the child from making HTTP requests, exfiltrating data,
+- **Network**: prevent the child from making HTTP requests, exfiltrating data,
   or connecting to internal services
-- **Other processes** -- prevent the child from signaling, debugging, or
+- **Other processes**: prevent the child from signaling, debugging, or
   interfering with other processes on the host
-- **Host resources** -- prevent CPU exhaustion, memory exhaustion, fork bombs,
+- **Host resources**: prevent CPU exhaustion, memory exhaustion, fork bombs,
   and disk-filling attacks
 
 ### Trust boundaries
@@ -90,8 +89,7 @@ which the parent validates before executing.
 
 ## Defense layers
 
-securer uses defense in depth. No single layer is sufficient; they are designed
-to be redundant so that a bypass in one layer is caught by another.
+securer uses defense in depth. No single layer is sufficient; each is redundant so that a bypass in one layer is caught by another.
 
 ### Layer 1: OS-level sandbox
 
@@ -331,10 +329,10 @@ on all platforms.
 
 Everything not on this list is removed. This means:
 
-- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` -- not inherited
-- `GITHUB_TOKEN`, `OPENAI_API_KEY` -- not inherited
-- `DATABASE_URL`, `REDIS_URL` -- not inherited
-- Any custom `SECRET_*` or `API_*` variables -- not inherited
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`: not inherited
+- `GITHUB_TOKEN`, `OPENAI_API_KEY`: not inherited
+- `DATABASE_URL`, `REDIS_URL`: not inherited
+- Any custom `SECRET_*` or `API_*` variables: not inherited
 
 Two securer-specific variables are added: `SECURER_SOCKET` (socket path) and
 `SECURER_TOKEN` (authentication token).
@@ -413,9 +411,9 @@ lockEnvironment(.ipc_store)
 lockBinding(".securer_call_tool", globalenv())
 ```
 
-Additionally, `unlockBinding()` is shadowed in the child's global environment
+`unlockBinding()` is also shadowed in the child's global environment
 (and in the base namespace where possible) to prevent child code from unlocking
-the binding.  `getFromNamespace()` and `getNativeSymbolInfo()` are also blocked
+the binding.  `getFromNamespace()` and `getNativeSymbolInfo()` are blocked
 via active bindings.
 
 This means the child code cannot:
@@ -490,7 +488,7 @@ same user count against it.
 Communication between parent and child uses plaintext JSON over the Unix domain
 socket. The socket is protected by filesystem permissions (0700 directory) and
 the authentication token, but the data is not encrypted in transit. On a
-compromised host where an attacker has the same UID, they could potentially
+compromised host where an attacker has the same UID, they could
 read IPC traffic.
 
 **Mitigation**: The socket directory has 0700 permissions and a random name.
@@ -561,8 +559,8 @@ messages independently (defense-in-depth).
 1. Parent creates server socket at `/tmp/securer_XXXXX/ipc.sock`
 2. Parent starts child process (via `callr::r_session$new()`)
 3. Child runtime code connects to the socket path from `SECURER_SOCKET` env var
-4. Parent accepts the connection (`processx::conn_accept_unix_socket()` --
-   transitions the server connection in-place, does not return a new object)
+4. Parent accepts the connection (`processx::conn_accept_unix_socket()`,
+   which transitions the server connection in-place and does not return a new object)
 5. Child sends the authentication token (from `SECURER_TOKEN` env var)
 6. Parent validates the token; rejects on mismatch
 
