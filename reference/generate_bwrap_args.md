@@ -4,6 +4,8 @@ Creates a character vector of `bwrap` arguments that:
 
 - Isolates all namespaces (PID, net, user, mount, UTS, IPC)
 
+- Drops all Linux capabilities (`--cap-drop ALL`)
+
 - Bind-mounts system libraries and R read-only
 
 - Provides a clean writable `/tmp` with the UDS socket overlaid
