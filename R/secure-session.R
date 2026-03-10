@@ -225,19 +225,37 @@ SecureSession <- R6::R6Class("SecureSession",
       private$executing <- TRUE
       private$execution_count <- private$execution_count + 1L
       on.exit(private$executing <- FALSE)
-      if (private$sanitize_errors) {
-        tryCatch(
+
+      # The actual execution, with optional tracing
+      .do_execute <- function() {
+        if (private$sanitize_errors) {
+          tryCatch(
+            private$run_with_tools(
+              code, timeout, output_handler, max_tool_calls, max_output_lines
+            ),
+            error = function(e) {
+              stop(sanitize_error_message(conditionMessage(e)), call. = FALSE)
+            }
+          )
+        } else {
           private$run_with_tools(
             code, timeout, output_handler, max_tool_calls, max_output_lines
-          ),
-          error = function(e) {
-            stop(sanitize_error_message(conditionMessage(e)), call. = FALSE)
-          }
-        )
+          )
+        }
+      }
+
+      if (.trace_active()) {
+        securetrace::with_span("securer.execute", type = "custom", {
+          result <- .do_execute()
+          .span_event("execute.complete", list(
+            code_length = nchar(code),
+            sandbox = private$sandbox_enabled,
+            tool_count = length(private$tool_fns)
+          ))
+          result
+        })
       } else {
-        private$run_with_tools(
-          code, timeout, output_handler, max_tool_calls, max_output_lines
-        )
+        .do_execute()
       }
     },
 
@@ -816,16 +834,35 @@ SecureSession <- R6::R6Class("SecureSession",
                 tool = tool_name, args = tool_args)
 
               tool_start <- Sys.time()
-              response <- tryCatch({
-                if (is.null(private$tool_fns[[tool_name]])) {
-                  list(error = paste0("Unknown tool: ", tool_name))
-                } else {
-                  result <- do.call(private$tool_fns[[tool_name]], tool_args)
-                  list(value = result)
-                }
-              }, error = function(e) {
-                list(error = sanitize_error_message(conditionMessage(e)))
-              })
+              .do_tool_call <- function() {
+                tryCatch({
+                  if (is.null(private$tool_fns[[tool_name]])) {
+                    list(error = paste0("Unknown tool: ", tool_name))
+                  } else {
+                    result <- do.call(private$tool_fns[[tool_name]], tool_args)
+                    list(value = result)
+                  }
+                }, error = function(e) {
+                  list(error = sanitize_error_message(conditionMessage(e)))
+                })
+              }
+
+              if (.trace_active()) {
+                response <- securetrace::with_span(
+                  paste0("securer.tool.", tool_name),
+                  type = "tool",
+                  {
+                    resp <- .do_tool_call()
+                    .span_event("tool.complete", list(
+                      tool = tool_name,
+                      error = !is.null(resp$error)
+                    ))
+                    resp
+                  }
+                )
+              } else {
+                response <- .do_tool_call()
+              }
 
               # Log the tool result
               if (private$verbose) {

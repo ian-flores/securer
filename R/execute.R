@@ -53,7 +53,19 @@ execute_r <- function(code, tools = list(), timeout = 30, sandbox = TRUE,
                                sandbox_strict = sandbox_strict,
                                audit_log = audit_log)
   on.exit(session$close())
-  session$execute(code, timeout = timeout, validate = validate)
+
+  if (.trace_active()) {
+    securetrace::with_span("securer.execute_r", type = "custom", {
+      result <- session$execute(code, timeout = timeout, validate = validate)
+      .span_event("execute.complete", list(
+        code_length = nchar(code),
+        sandbox = sandbox
+      ))
+      result
+    })
+  } else {
+    session$execute(code, timeout = timeout, validate = validate)
+  }
 }
 
 
@@ -97,5 +109,16 @@ execute_r <- function(code, tools = list(), timeout = 30, sandbox = TRUE,
 with_secure_session <- function(fn, tools = list(), sandbox = TRUE, ...) {
   session <- SecureSession$new(tools = tools, sandbox = sandbox, ...)
   on.exit(session$close(), add = TRUE)
-  fn(session)
+
+  if (.trace_active()) {
+    securetrace::with_span("securer.with_secure_session", type = "custom", {
+      result <- fn(session)
+      .span_event("session.complete", list(
+        sandbox = sandbox
+      ))
+      result
+    })
+  } else {
+    fn(session)
+  }
 }
