@@ -289,7 +289,7 @@ Code validation and audit logging
 
 LLM framework adapters
 
-- [`securer_as_ellmer_tool()`](https://ian-flores.github.io/securer/reference/securer_as_ellmer_tool.md)
+- [`as_ellmer_tool()`](https://ian-flores.github.io/securer/reference/as_ellmer_tool.md)
   : Create an ellmer tool for secure R code execution
 
 ## Sandbox

@@ -40,7 +40,7 @@ convenience function - `R/validate.R` — Code pre-validation (syntax +
 dangerous patterns) - `R/audit-log.R` — JSONL file-based audit logging -
 `R/session-pool.R` — SecureSessionPool R6 class - `R/ellmer.R` — ellmer
 tool integration
-([`securer_as_ellmer_tool()`](https://ian-flores.github.io/securer/reference/securer_as_ellmer_tool.md))
+([`securer_as_ellmer_tool()`](https://ian-flores.github.io/securer/reference/as_ellmer_tool.md))
 
 Vignettes: - `vignettes/quickstart.Rmd` — Installation and first
 examples - `vignettes/sessions-and-tools.Rmd` — Persistent sessions,
@@ -144,7 +144,7 @@ sessions are auto-restarted on acquire.
 
 ### ellmer Integration
 
-[`securer_as_ellmer_tool()`](https://ian-flores.github.io/securer/reference/securer_as_ellmer_tool.md)
+[`securer_as_ellmer_tool()`](https://ian-flores.github.io/securer/reference/as_ellmer_tool.md)
 wraps a SecureSession as an
 [`ellmer::tool()`](https://ellmer.tidyverse.org/reference/tool.html)
 definition. Errors are returned as `ContentToolResult(error=...)` so

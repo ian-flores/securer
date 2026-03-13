@@ -92,7 +92,7 @@ Initial release.
 
 ### Integrations
 
-- [`securer_as_ellmer_tool()`](https://ian-flores.github.io/securer/reference/securer_as_ellmer_tool.md)
+- [`securer_as_ellmer_tool()`](https://ian-flores.github.io/securer/reference/as_ellmer_tool.md)
   for using securer as a code execution tool in ellmer LLM chats. Error
   messages sanitized before returning to the LLM (strips file paths,
   PIDs, hostnames, and stack traces).

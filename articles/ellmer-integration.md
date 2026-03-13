@@ -7,7 +7,7 @@ with LLMs. securer integrates with ellmer’s tool-use system so an LLM
 can execute R code in a sandboxed child process. The LLM writes code,
 securer runs it safely, and the result flows back into the conversation.
 
-[`securer_as_ellmer_tool()`](https://ian-flores.github.io/securer/reference/securer_as_ellmer_tool.md)
+[`securer_as_ellmer_tool()`](https://ian-flores.github.io/securer/reference/as_ellmer_tool.md)
 connects the two packages. It wraps a `SecureSession` as an ellmer tool
 definition that you register on a chat object.
 
@@ -96,7 +96,7 @@ for the full threat model.
 
 ## How it works
 
-[`securer_as_ellmer_tool()`](https://ian-flores.github.io/securer/reference/securer_as_ellmer_tool.md)
+[`securer_as_ellmer_tool()`](https://ian-flores.github.io/securer/reference/as_ellmer_tool.md)
 creates a `SecureSession` (or uses one you provide) and returns an
 ellmer `ToolDef` with a single `code` argument. When the LLM invokes it,
 securer sends the code to the sandboxed child, gets the result, and
@@ -151,7 +151,7 @@ LLM can only interact with your data through the tools you define.
 
 ## Configuring the session
 
-[`securer_as_ellmer_tool()`](https://ian-flores.github.io/securer/reference/securer_as_ellmer_tool.md)
+[`securer_as_ellmer_tool()`](https://ian-flores.github.io/securer/reference/as_ellmer_tool.md)
 accepts the same options as `SecureSession`:
 
 ``` r
