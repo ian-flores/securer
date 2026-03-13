@@ -110,12 +110,22 @@ SecureSession <- R6::R6Class("SecureSession",
       private$sandbox_enabled <- sandbox
       private$sandbox_strict <- sandbox_strict
       if (!is.null(max_executions)) {
-        stopifnot(is.numeric(max_executions), length(max_executions) == 1,
-                  max_executions > 0)
+        if (!is.numeric(max_executions) || length(max_executions) != 1 ||
+            max_executions <= 0) {
+          cli::cli_abort(
+            "{.arg max_executions} must be a single positive number, not {.val {max_executions}}.",
+            call = NULL
+          )
+        }
         private$max_executions <- as.integer(max_executions)
       }
       if (!is.null(pre_execute_hook)) {
-        stopifnot(is.function(pre_execute_hook))
+        if (!is.function(pre_execute_hook)) {
+          cli::cli_abort(
+            "{.arg pre_execute_hook} must be a function, not {.cls {class(pre_execute_hook)}}.",
+            call = NULL
+          )
+        }
         private$pre_execute_hook <- pre_execute_hook
       }
       private$sanitize_errors <- isTRUE(sanitize_errors)
@@ -161,25 +171,22 @@ SecureSession <- R6::R6Class("SecureSession",
                        max_code_length = 100000L,
                        max_output_lines = NULL) {
       if (is.null(private$session) || !private$session$is_alive()) {
-        stop("Session is not running", call. = FALSE)
+        cli::cli_abort("Session is not running.", call = NULL)
       }
       if (private$executing) {
-        stop(
-          "SecureSession does not support concurrent execute() calls; ",
-          "wait for the current execution to complete",
-          call. = FALSE
+        cli::cli_abort(
+          "{.cls SecureSession} does not support concurrent {.fn execute} calls;
+           wait for the current execution to complete.",
+          call = NULL
         )
       }
 
       # --- Execution counter check ---
       if (!is.null(private$max_executions) &&
           private$execution_count >= private$max_executions) {
-        stop(
-          sprintf(
-            "Maximum executions (%d) reached for this session",
-            private$max_executions
-          ),
-          call. = FALSE
+        cli::cli_abort(
+          "Maximum executions ({.val {private$max_executions}}) reached for this session.",
+          call = NULL
         )
       }
 
@@ -188,37 +195,38 @@ SecureSession <- R6::R6Class("SecureSession",
         hook_result <- tryCatch(
           private$pre_execute_hook(code),
           error = function(e) {
-            stop(
-              "pre_execute_hook error: ", conditionMessage(e),
-              call. = FALSE
+            cli::cli_abort(
+              "{.arg pre_execute_hook} error: {conditionMessage(e)}",
+              call = NULL
             )
           }
         )
         if (identical(hook_result, FALSE)) {
-          stop("Execution blocked by pre_execute_hook", call. = FALSE)
+          cli::cli_abort("Execution blocked by {.arg pre_execute_hook}.", call = NULL)
         }
       }
 
       # --- Code length check ---
       if (!is.null(max_code_length) && nchar(code) > max_code_length) {
-        stop(
-          sprintf(
-            "Code too long (%d chars, max %d)",
-            nchar(code), as.integer(max_code_length)
-          ),
-          call. = FALSE
+        cli::cli_abort(
+          "Code too long ({.val {nchar(code)}} chars, max {.val {as.integer(max_code_length)}}).",
+          call = NULL
         )
       }
 
       if (!is.null(output_handler) && !is.function(output_handler)) {
-        stop("`output_handler` must be a function or NULL", call. = FALSE)
+        cli::cli_abort(
+          "{.arg output_handler} must be a function or {.val NULL}, not {.cls {class(output_handler)}}.",
+          call = NULL
+        )
       }
       if (isTRUE(validate)) {
         check <- validate_code(code)
         if (!check$valid) {
-          stop(
-            "Code has a syntax error and was not executed:\n", check$error,
-            call. = FALSE
+          cli::cli_abort(
+            c("Code has a syntax error and was not executed:",
+              "x" = "{check$error}"),
+            call = NULL
           )
         }
       }
@@ -300,7 +308,15 @@ SecureSession <- R6::R6Class("SecureSession",
     #' @param ... Ignored.
     #' @return Invisible self.
     print = function(...) {
-      cat(self$format(), "\n")
+      status <- if (self$is_alive()) "running" else "stopped"
+      sandbox_mode <- if (private$sandbox_enabled) "enabled" else "disabled"
+      n_tools <- length(private$tool_fns)
+      cli::cli_text("<{.cls SecureSession}>")
+      cli::cli_ul(c(
+        "Status: {status}",
+        "Tool count: {n_tools}",
+        "Sandbox: {sandbox_mode}"
+      ))
       invisible(self)
     },
 
@@ -333,9 +349,9 @@ SecureSession <- R6::R6Class("SecureSession",
     #' @return Invisible self.
     restart = function() {
       if (private$executing) {
-        stop(
-          "Cannot restart while an execution is in progress",
-          call. = FALSE
+        cli::cli_abort(
+          "Cannot restart while an execution is in progress.",
+          call = NULL
         )
       }
       private$log("Restarting session")

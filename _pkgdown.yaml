@@ -31,6 +31,7 @@ reference:
   - title: Integrations
     desc: LLM framework adapters
     contents:
+      - as_ellmer_tool
       - securer_as_ellmer_tool
 
   - title: Sandbox

@@ -27,7 +27,7 @@
 #'
 #' # Basic usage: LLM can execute R code in a sandbox
 #' chat <- chat_openai()
-#' chat$register_tool(securer_as_ellmer_tool())
+#' chat$register_tool(as_ellmer_tool())
 #' chat$chat("What is the mean of the numbers 1 through 100?")
 #'
 #' # With custom tools available inside the sandbox
@@ -36,26 +36,26 @@
 #'     fn = function(name) get(name, "package:datasets"),
 #'     args = list(name = "character"))
 #' )
-#' chat$register_tool(securer_as_ellmer_tool(tools = tools))
+#' chat$register_tool(as_ellmer_tool(tools = tools))
 #' chat$chat("Load the mtcars dataset and compute the mean mpg.")
 #'
 #' # With a pre-existing session
 #' session <- SecureSession$new(sandbox = TRUE)
-#' chat$register_tool(securer_as_ellmer_tool(session = session))
+#' chat$register_tool(as_ellmer_tool(session = session))
 #' # ... use chat ...
 #' session$close()
 #' }
 #'
 #' @export
-securer_as_ellmer_tool <- function(session = NULL,
-                                   tools = list(),
-                                   sandbox = TRUE,
-                                   limits = NULL,
-                                   timeout = 30) {
+as_ellmer_tool <- function(session = NULL,
+                           tools = list(),
+                           sandbox = TRUE,
+                           limits = NULL,
+                           timeout = 30) {
   if (!requireNamespace("ellmer", quietly = TRUE)) {
-    stop(
-      "Package 'ellmer' is required for securer_as_ellmer_tool().",
-      call. = FALSE
+    cli::cli_abort(
+      "Package {.pkg ellmer} is required for {.fn as_ellmer_tool}.",
+      call = NULL
     )
   }
 
@@ -79,7 +79,7 @@ securer_as_ellmer_tool <- function(session = NULL,
   execute_fn <- function(code) {
     if (!session$is_alive()) {
       return(ellmer::ContentToolResult(
-        error = "SecureSession is no longer alive. Create a new tool with securer_as_ellmer_tool()."
+        error = "SecureSession is no longer alive. Create a new tool with as_ellmer_tool()."
       ))
     }
     tryCatch(
@@ -110,6 +110,28 @@ securer_as_ellmer_tool <- function(session = NULL,
         "A string containing valid R code to execute."
       )
     )
+  )
+}
+
+#' @rdname as_ellmer_tool
+#' @usage NULL
+#' @export
+securer_as_ellmer_tool <- function(session = NULL,
+                                   tools = list(),
+                                   sandbox = TRUE,
+                                   limits = NULL,
+                                   timeout = 30) {
+  lifecycle::deprecate_warn(
+    "0.2.0",
+    "securer_as_ellmer_tool()",
+    "as_ellmer_tool()"
+  )
+  as_ellmer_tool(
+    session = session,
+    tools = tools,
+    sandbox = sandbox,
+    limits = limits,
+    timeout = timeout
   )
 }
 

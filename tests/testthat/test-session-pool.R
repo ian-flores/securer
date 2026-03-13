@@ -198,8 +198,8 @@ test_that("pool print() outputs format string", {
   pool <- SecureSessionPool$new(size = 2, sandbox = FALSE)
   on.exit(pool$close())
 
-  out <- capture.output(print(pool))
-  expect_match(out, "SecureSessionPool")
+  out <- capture.output(print(pool), type = "message")
+  expect_match(paste(out, collapse = "\n"), "SecureSessionPool")
 })
 
 # --- acquire_timeout tests (R8) ---

@@ -1,8 +1,8 @@
-test_that("securer_as_ellmer_tool() requires ellmer", {
+test_that("as_ellmer_tool() requires ellmer", {
   # Pure unit test — no child process spawned, only checks API surface.
   skip_if_not_installed("ellmer")
 
-  tool_def <- securer_as_ellmer_tool(sandbox = FALSE)
+  tool_def <- as_ellmer_tool(sandbox = FALSE)
   expect_s3_class(tool_def, "S7_object")
   expect_true(is.function(tool_def))
 })
@@ -11,16 +11,26 @@ test_that("ellmer tool has correct name and description", {
   # Pure unit test — no child process spawned.
   skip_if_not_installed("ellmer")
 
-  tool_def <- securer_as_ellmer_tool(sandbox = FALSE)
+  tool_def <- as_ellmer_tool(sandbox = FALSE)
   expect_equal(tool_def@name, "execute_r_code")
   expect_match(tool_def@description, "Execute R code")
+})
+
+test_that("securer_as_ellmer_tool() is deprecated wrapper", {
+  skip_if_not_installed("ellmer")
+
+  lifecycle::expect_deprecated(
+    tool_def <- securer_as_ellmer_tool(sandbox = FALSE)
+  )
+  expect_s3_class(tool_def, "S7_object")
+  expect_true(is.function(tool_def))
 })
 
 test_that("ellmer tool executes simple code", {
   skip_if_no_session()
   skip_if_not_installed("ellmer")
 
-  tool_def <- securer_as_ellmer_tool(sandbox = FALSE, timeout = 10)
+  tool_def <- as_ellmer_tool(sandbox = FALSE, timeout = 10)
   result <- tool_def(code = "1 + 1")
   expect_equal(result, "2")
 })
@@ -29,7 +39,7 @@ test_that("ellmer tool executes code returning a vector", {
   skip_if_no_session()
   skip_if_not_installed("ellmer")
 
-  tool_def <- securer_as_ellmer_tool(sandbox = FALSE, timeout = 10)
+  tool_def <- as_ellmer_tool(sandbox = FALSE, timeout = 10)
   result <- tool_def(code = "c(1, 2, 3)")
   expect_match(result, "1 2 3")
 })
@@ -38,7 +48,7 @@ test_that("ellmer tool returns error as ContentToolResult on failure", {
   skip_if_no_session()
   skip_if_not_installed("ellmer")
 
-  tool_def <- securer_as_ellmer_tool(sandbox = FALSE, timeout = 10)
+  tool_def <- as_ellmer_tool(sandbox = FALSE, timeout = 10)
   result <- tool_def(code = "stop('test error')")
   expect_s3_class(result, "S7_object")
   expect_false(is.null(result@error))
@@ -54,7 +64,7 @@ test_that("ellmer tool works with securer tools", {
       fn = function(a, b) a + b,
       args = list(a = "numeric", b = "numeric"))
   )
-  tool_def <- securer_as_ellmer_tool(tools = tools, sandbox = FALSE, timeout = 10)
+  tool_def <- as_ellmer_tool(tools = tools, sandbox = FALSE, timeout = 10)
   result <- tool_def(code = "add(10, 20)")
   expect_equal(result, "30")
 })
@@ -66,7 +76,7 @@ test_that("ellmer tool works with pre-existing session", {
   session <- SecureSession$new(sandbox = FALSE)
   on.exit(session$close())
 
-  tool_def <- securer_as_ellmer_tool(session = session, timeout = 10)
+  tool_def <- as_ellmer_tool(session = session, timeout = 10)
   result <- tool_def(code = "42")
   expect_equal(result, "42")
 
@@ -78,7 +88,7 @@ test_that("ellmer tool handles timeout", {
   skip_if_no_session()
   skip_if_not_installed("ellmer")
 
-  tool_def <- securer_as_ellmer_tool(sandbox = FALSE, timeout = 1)
+  tool_def <- as_ellmer_tool(sandbox = FALSE, timeout = 1)
   result <- tool_def(code = "Sys.sleep(60)")
   expect_s3_class(result, "S7_object")
   expect_false(is.null(result@error))
@@ -89,7 +99,7 @@ test_that("ellmer tool handles invisible results", {
   skip_if_no_session()
   skip_if_not_installed("ellmer")
 
-  tool_def <- securer_as_ellmer_tool(sandbox = FALSE, timeout = 10)
+  tool_def <- as_ellmer_tool(sandbox = FALSE, timeout = 10)
   result <- tool_def(code = "invisible(42)")
   expect_equal(result, "42")
 })
@@ -98,7 +108,7 @@ test_that("ellmer tool returns data frame results", {
   skip_if_no_session()
   skip_if_not_installed("ellmer")
 
-  tool_def <- securer_as_ellmer_tool(sandbox = FALSE, timeout = 10)
+  tool_def <- as_ellmer_tool(sandbox = FALSE, timeout = 10)
   result <- tool_def(code = "data.frame(x = 1:3, y = letters[1:3])")
   expect_match(result, "x")
   expect_match(result, "y")
@@ -117,7 +127,7 @@ test_that("dead session returns error ContentToolResult instead of throwing", {
   skip_if_not_installed("ellmer")
 
   session <- SecureSession$new(sandbox = FALSE)
-  tool_def <- securer_as_ellmer_tool(session = session, timeout = 10)
+  tool_def <- as_ellmer_tool(session = session, timeout = 10)
 
   # Kill the session before calling the tool
   session$close()
@@ -239,7 +249,7 @@ test_that("ellmer tool sanitizes file paths in errors", {
   skip_if_no_session()
   skip_if_not_installed("ellmer")
 
-  tool_def <- securer_as_ellmer_tool(sandbox = FALSE, timeout = 10)
+  tool_def <- as_ellmer_tool(sandbox = FALSE, timeout = 10)
   # Use stop() to emit a path directly since callr may strip paths from
   # native R errors like readRDS()
   result <- tool_def(code = "stop('cannot open /Users/secret/data.rds')")
@@ -256,7 +266,7 @@ test_that("ellmer tool sanitizes PIDs in errors", {
   skip_if_no_session()
   skip_if_not_installed("ellmer")
 
-  tool_def <- securer_as_ellmer_tool(sandbox = FALSE, timeout = 10)
+  tool_def <- as_ellmer_tool(sandbox = FALSE, timeout = 10)
   # Force an error with a PID-like message
   result <- tool_def(code = "stop('process 99999 crashed at PID 12345')")
   expect_false(grepl("99999", result@error))

@@ -15,6 +15,8 @@
 
 ## usethis namespace: start
 #' @import S7
+#' @importFrom cli cli_abort cli_text cli_ul
+#' @importFrom lifecycle deprecate_warn
 #' @importFrom R6 R6Class
 #' @importFrom jsonlite toJSON fromJSON
 #' @importFrom callr r_session r_session_options

@@ -75,7 +75,7 @@ test_that("concurrent execute() is rejected", {
 
   expect_error(
     session$execute("1"),
-    "does not support concurrent execute"
+    "does not support concurrent"
   )
 
   # Reset the flag and confirm normal execution resumes
@@ -635,8 +635,8 @@ test_that("print() outputs format string", {
   session <- SecureSession$new()
   on.exit(session$close())
 
-  out <- capture.output(print(session))
-  expect_match(out, "SecureSession")
+  out <- capture.output(print(session), type = "message")
+  expect_match(paste(out, collapse = "\n"), "SecureSession")
 })
 
 # --- $tools() accessor tests ---
@@ -923,7 +923,7 @@ test_that("pre_execute_hook can block execution", {
   # Code mentioning system is blocked
   expect_error(
     session$execute('system("whoami")'),
-    "Execution blocked by pre_execute_hook"
+    "Execution blocked by"
   )
 })
 

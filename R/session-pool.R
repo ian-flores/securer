@@ -43,10 +43,16 @@ SecureSessionPool <- R6::R6Class("SecureSessionPool",
                           reset_between_uses = FALSE) {
       size <- as.integer(size)
       if (size < 1L) {
-        stop("Pool size must be at least 1", call. = FALSE)
+        cli::cli_abort(
+          "{.arg size} must be at least {.val {1L}}, not {.val {size}}.",
+          call = NULL
+        )
       }
       if (size > 100L) {
-        stop("Pool size must not exceed 100", call. = FALSE)
+        cli::cli_abort(
+          "{.arg size} must not exceed {.val {100L}}, got {.val {size}}.",
+          call = NULL
+        )
       }
 
       private$pool_tools <- tools
@@ -78,7 +84,7 @@ SecureSessionPool <- R6::R6Class("SecureSessionPool",
     #' @return The result of evaluating the code.
     execute = function(code, timeout = NULL, acquire_timeout = NULL) {
       if (private$closed) {
-        stop("Pool is closed", call. = FALSE)
+        cli::cli_abort("Pool is closed.", call = NULL)
       }
 
       idx <- private$acquire()
@@ -93,7 +99,7 @@ SecureSessionPool <- R6::R6Class("SecureSessionPool",
       }
 
       if (is.null(idx)) {
-        stop("All sessions are busy", call. = FALSE)
+        cli::cli_abort("All sessions are busy.", call = NULL)
       }
 
       # Ensure session is returned to pool even on error
@@ -150,7 +156,19 @@ SecureSessionPool <- R6::R6Class("SecureSessionPool",
     #' @param ... Ignored.
     #' @return Invisible self.
     print = function(...) {
-      cat(self$format(), "\n")
+      if (private$closed) {
+        cli::cli_text("<{.cls SecureSessionPool}> [closed]")
+      } else {
+        n_total <- length(private$sessions)
+        n_busy <- sum(private$busy)
+        n_idle <- n_total - n_busy
+        cli::cli_text("<{.cls SecureSessionPool}>")
+        cli::cli_ul(c(
+          "Pool size: {n_total}",
+          "Active: {n_busy}",
+          "Idle: {n_idle}"
+        ))
+      }
       invisible(self)
     },
 

@@ -9,6 +9,24 @@ securer_tool_class <- new_class("securer_tool", properties = list(
   args = class_list
 ))
 
+method(format, securer_tool_class) <- function(x, ...) {
+  desc <- x@description
+  if (nchar(desc) > 60) {
+    desc <- paste0(substr(desc, 1, 57), "...")
+  }
+  n_args <- length(x@args)
+  arg_label <- if (n_args == 1) "1 arg" else paste0(n_args, " args")
+  paste0("<securer_tool>\n",
+         "  Name: ", x@name, "\n",
+         "  Description: ", desc, "\n",
+         "  Args: ", arg_label)
+}
+
+method(print, securer_tool_class) <- function(x, ...) {
+  cat(format(x, ...), "\n")
+  invisible(x)
+}
+
 #' Create a tool definition
 #'
 #' Defines a named tool with a function implementation and typed argument
@@ -35,17 +53,38 @@ securer_tool_class <- new_class("securer_tool", properties = list(
 #'
 #' @export
 securer_tool <- function(name, description, fn, args = list()) {
-  stopifnot(
-    is.character(name), nchar(name) > 0,
-    is.character(description),
-    is.function(fn),
-    is.list(args)
-  )
+  if (!is.character(name) || !nzchar(name)) {
+    cli::cli_abort(
+      "{.arg name} must be a non-empty string, not {.cls {class(name)}}.",
+      call = NULL
+    )
+  }
+  if (!is.character(description)) {
+    cli::cli_abort(
+      "{.arg description} must be a character string, not {.cls {class(description)}}.",
+      call = NULL
+    )
+  }
+  if (!is.function(fn)) {
+    cli::cli_abort(
+      "{.arg fn} must be a function, not {.cls {class(fn)}}.",
+      call = NULL
+    )
+  }
+  if (!is.list(args)) {
+    cli::cli_abort(
+      "{.arg args} must be a list, not {.cls {class(args)}}.",
+      call = NULL
+    )
+  }
 
   # Validate tool name is a valid R identifier (prevents code injection
   # since names are interpolated into eval'd code strings)
   if (!grepl("^[A-Za-z.][A-Za-z0-9_.]*$", name)) {
-    stop("Tool name must be a valid R identifier: ", sQuote(name), call. = FALSE)
+    cli::cli_abort(
+      "Tool name must be a valid R identifier, not {.val {name}}.",
+      call = NULL
+    )
   }
 
   # Validate argument names are valid R identifiers
@@ -53,10 +92,9 @@ securer_tool <- function(name, description, fn, args = list()) {
   if (length(arg_names) > 0) {
     bad <- arg_names[!grepl("^[A-Za-z.][A-Za-z0-9_.]*$", arg_names)]
     if (length(bad) > 0) {
-      stop(
-        "Argument names must be valid R identifiers: ",
-        paste(sQuote(bad), collapse = ", "),
-        call. = FALSE
+      cli::cli_abort(
+        "Argument names must be valid R identifiers: {.val {bad}}.",
+        call = NULL
       )
     }
   }
@@ -93,10 +131,9 @@ validate_tools <- function(tools) {
     tool_names <- names(tools)
     bad_names <- tool_names[!grepl("^[A-Za-z.][A-Za-z0-9_.]*$", tool_names)]
     if (length(bad_names) > 0) {
-      stop(
-        "Legacy tool names must be valid R identifiers: ",
-        paste(sQuote(bad_names), collapse = ", "),
-        call. = FALSE
+      cli::cli_abort(
+        "Legacy tool names must be valid R identifiers: {.val {bad_names}}.",
+        call = NULL
       )
     }
     # No arg metadata available for legacy tools
@@ -107,17 +144,20 @@ validate_tools <- function(tools) {
   # Otherwise expect securer_tool objects
   for (tool in tools) {
     if (!S7_inherits(tool, securer_tool_class)) {
-      stop("Each tool must be created with securer_tool()", call. = FALSE)
+      cli::cli_abort(
+        "Each tool must be created with {.fn securer_tool}.",
+        call = NULL
+      )
     }
   }
 
   # Check for duplicate names
   names_vec <- vapply(tools, function(t) t@name, character(1))
   if (anyDuplicated(names_vec)) {
-    stop(
-      "Duplicate tool names: ",
-      paste(names_vec[duplicated(names_vec)], collapse = ", "),
-      call. = FALSE
+    dups <- unique(names_vec[duplicated(names_vec)])
+    cli::cli_abort(
+      "Duplicate tool names: {.val {dups}}.",
+      call = NULL
     )
   }
 
