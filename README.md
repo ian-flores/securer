@@ -67,6 +67,8 @@ securer is part of a 7-package ecosystem for building governed AI agents in R:
 
 securer sits at the top of the stack, providing the sandboxed R execution engine that other packages build on. securetools adds pre-built tool definitions, secureguard adds guardrails, and orchestr wires agents into workflows.
 
+> **OS caveat:** the sandbox diagram above assumes macOS or Linux. On Windows, securer provides environment isolation and Job Object resource limits only — no filesystem or network restrictions. For parity with Unix, run securer inside a Linux container (see the `docker-spawn` backend below) or a Linux VM.
+
 | Package | Role |
 |---------|------|
 | [securer](https://github.com/ian-flores/securer) | Sandboxed R execution with tool-call IPC |
@@ -214,8 +216,9 @@ session <- SecureSession$new(verbose = TRUE)
 | **Linux** | bubblewrap (`bwrap`) | Yes | Yes | Yes (ulimit) |
 | **macOS** | Seatbelt (`sandbox-exec`) | Yes | Yes | Yes (ulimit) |
 | **Windows** | Job Objects + env isolation | No | No | Yes (memory, CPU, process count) |
+| **docker-spawn** (any host) | Fresh container per session | Yes (`--network=none`) | Yes (container FS) | Yes (`--memory`, `--cpus`, ulimit) |
 
-All platforms support tool call IPC, execution timeouts, and code pre-validation.
+All platforms support tool call IPC, execution timeouts, and code pre-validation. The `docker-spawn` backend is opt-in (`SECURER_SANDBOX_MODE=docker-spawn`) and requires the `docker` CLI plus a reachable daemon. See `inst/docker/Dockerfile` for a reference image.
 
 ## Security
 

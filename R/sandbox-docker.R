@@ -1,12 +1,16 @@
-#' Build Docker sandbox configuration
+#' Build in-container Docker sandbox configuration
 #'
-#' When running inside a Docker container, the container itself provides
-#' filesystem and network isolation.  This builder skips bubblewrap (which
-#' requires namespace support that Docker typically doesn't expose) and
-#' applies only resource limits (`ulimit`) via a wrapper script.
+#' Used when the securer session is *already running inside* a Docker
+#' container.  The container itself provides filesystem and network
+#' isolation, so this builder skips bubblewrap (which requires namespace
+#' support Docker typically doesn't expose) and applies only resource
+#' limits (`ulimit`) via a wrapper script.
 #'
-#' Docker mode is activated automatically when `/.dockerenv` exists, or
-#' manually by setting `SECURER_SANDBOX_MODE=docker`.
+#' This is **not** the same as [build_sandbox_docker_spawn()], which
+#' *spawns* a fresh container for each child session.  This backend is
+#' activated automatically when `/.dockerenv` exists, or manually by
+#' setting `SECURER_SANDBOX_MODE=docker`.  The container-spawning backend
+#' is activated by `SECURER_SANDBOX_MODE=docker-spawn`.
 #'
 #' @param socket_path Path to the UDS socket
 #' @param r_home      Path to the R installation

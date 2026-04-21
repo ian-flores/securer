@@ -1,13 +1,14 @@
 Package: securer
 Title: Secure R Code Execution with Tool-Call IPC
-Version: 0.1.0
+Version: 0.2.0
 Authors@R:
     person("Ian", "Flores Siaca", email = "iflores.siaca@hey.com", role = c("aut", "cre", "cph"))
 Depends: R (>= 4.1.0)
 Description: Provides sandboxed execution of R code with a bidirectional
     tool-call protocol over Unix domain sockets. Wraps a 'callr' session
     inside an OS-level sandbox (Seatbelt on macOS, bubblewrap on Linux,
-    environment isolation on Windows) so that Large Language Model (LLM)
+    environment isolation on Windows, or a fresh Docker container via the
+    opt-in docker-spawn backend) so that Large Language Model (LLM)
     generated code can compute results and call host-side tools without
     accessing the filesystem, network, or credentials.
 License: MIT + file LICENSE
@@ -16,7 +17,7 @@ URL: https://ian-flores.github.io/securer/,
 BugReports: https://github.com/ian-flores/securer/issues
 SystemRequirements: bubblewrap (bwrap, Linux, optional), sandbox-exec
     (macOS, included with OS, optional), PowerShell (Windows, included with
-    OS, optional)
+    OS, optional), docker (any host, optional for docker-spawn backend)
 Language: en-US
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

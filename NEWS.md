@@ -1,3 +1,23 @@
+# securer 0.2.0
+
+## New Features
+
+* **`docker-spawn` sandbox backend.** Spawns the child R process inside a
+  fresh `docker run` container per session, with `--network=none`, memory
+  and CPU caps, and a bind-mount of the UDS socket directory.  Opt in via
+  `SECURER_SANDBOX_MODE=docker-spawn`; gated at runtime on a reachable
+  docker daemon.  Image is configurable via `SECURER_DOCKER_IMAGE`
+  (default `rocker/r-base:latest`).  See `inst/docker/Dockerfile` for a
+  reference image.
+
+## Documentation
+
+* Added an OS-caveat footnote to the ecosystem diagram in the README
+  flagging that sandbox strength varies by platform and suggesting
+  `docker-spawn` or a Linux VM for Windows hosts.
+* Clarified the existing in-container Docker backend docstring to
+  distinguish it from the new container-spawning mode.
+
 # securer 0.1.0
 
 Initial release.

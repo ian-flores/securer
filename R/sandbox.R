@@ -16,8 +16,14 @@
 #' @keywords internal
 build_sandbox_config <- function(socket_path, r_home = R.home(),
                                  limits = NULL) {
-  # Docker detection: container provides isolation, skip bwrap
+  # Explicit docker-spawn mode: launch a fresh container per session.
+  if (identical(Sys.getenv("SECURER_SANDBOX_MODE"), "docker-spawn") &&
+      is_docker_spawn_available()) {
+    return(build_sandbox_docker_spawn(socket_path, r_home, limits = limits))
+  }
 
+  # In-container detection: the session itself is already in docker, so the
+  # container provides filesystem/network isolation and we skip bwrap.
   if (file.exists("/.dockerenv") ||
       identical(Sys.getenv("SECURER_SANDBOX_MODE"), "docker")) {
     return(build_sandbox_docker(socket_path, r_home, limits = limits))
