@@ -11,8 +11,8 @@
 <script src="deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Secure R Code Execution with Tool-Call IPC">
-<meta name="description" content="Provides sandboxed execution of R code with a bidirectional tool-call protocol over Unix domain sockets. Wraps a callr session inside an OS-level sandbox (Seatbelt on macOS, bubblewrap on Linux, environment isolation on Windows) so that Large Language Model (LLM) generated code can compute results and call host-side tools without accessing the filesystem, network, or credentials.">
-<meta property="og:description" content="Provides sandboxed execution of R code with a bidirectional tool-call protocol over Unix domain sockets. Wraps a callr session inside an OS-level sandbox (Seatbelt on macOS, bubblewrap on Linux, environment isolation on Windows) so that Large Language Model (LLM) generated code can compute results and call host-side tools without accessing the filesystem, network, or credentials.">
+<meta name="description" content="Provides sandboxed execution of R code with a bidirectional tool-call protocol over Unix domain sockets. Wraps a callr session inside an OS-level sandbox (Seatbelt on macOS, bubblewrap on Linux, environment isolation on Windows, or a fresh Docker container via the opt-in docker-spawn backend) so that Large Language Model (LLM) generated code can compute results and call host-side tools without accessing the filesystem, network, or credentials.">
+<meta property="og:description" content="Provides sandboxed execution of R code with a bidirectional tool-call protocol over Unix domain sockets. Wraps a callr session inside an OS-level sandbox (Seatbelt on macOS, bubblewrap on Linux, environment isolation on Windows, or a fresh Docker container via the opt-in docker-spawn backend) so that Large Language Model (LLM) generated code can compute results and call host-side tools without accessing the filesystem, network, or credentials.">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="index.html">securer</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -99,6 +99,9 @@
    │ securetrace  │                    │ securebench  │
    └─────────────┘                     └─────────────┘</code></pre>
 <p>securer sits at the top of the stack, providing the sandboxed R execution engine that other packages build on. securetools adds pre-built tool definitions, secureguard adds guardrails, and orchestr wires agents into workflows.</p>
+<blockquote>
+<p><strong>OS caveat:</strong> the sandbox diagram above assumes macOS or Linux. On Windows, securer provides environment isolation and Job Object resource limits only — no filesystem or network restrictions. For parity with Unix, run securer inside a Linux container (see the <code>docker-spawn</code> backend below) or a Linux VM.</p>
+</blockquote>
 <table class="table">
 <colgroup>
 <col width="60%">
@@ -331,9 +334,17 @@
 <td>No</td>
 <td>Yes (memory, CPU, process count)</td>
 </tr>
+<tr class="even">
+<td>
+<strong>docker-spawn</strong> (any host)</td>
+<td>Fresh container per session</td>
+<td>Yes (<code>--network=none</code>)</td>
+<td>Yes (container FS)</td>
+<td>Yes (<code>--memory</code>, <code>--cpus</code>, ulimit)</td>
+</tr>
 </tbody>
 </table>
-<p>All platforms support tool call IPC, execution timeouts, and code pre-validation.</p>
+<p>All platforms support tool call IPC, execution timeouts, and code pre-validation. The <code>docker-spawn</code> backend is opt-in (<code>SECURER_SANDBOX_MODE=docker-spawn</code>) and requires the <code>docker</code> CLI plus a reachable daemon. See <code>inst/docker/Dockerfile</code> for a reference image.</p>
 </div>
 <div class="section level2">
 <h2 id="security">Security<a class="anchor" aria-label="anchor" href="#security"></a>

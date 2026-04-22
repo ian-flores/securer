@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">securer</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -32,6 +32,19 @@
       <small>Source: <a href="https://github.com/ian-flores/securer/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.2.0" id="securer-020">securer 0.2.0<a class="anchor" aria-label="anchor" href="#securer-020"></a></h2>
+<div class="section level3">
+<h3 id="new-features-0-2-0">New Features<a class="anchor" aria-label="anchor" href="#new-features-0-2-0"></a></h3>
+<ul><li>
+<strong><code>docker-spawn</code> sandbox backend.</strong> Spawns the child R process inside a fresh <code>docker run</code> container per session, with <code>--network=none</code>, memory and CPU caps, and a bind-mount of the UDS socket directory. Opt in via <code>SECURER_SANDBOX_MODE=docker-spawn</code>; gated at runtime on a reachable docker daemon. Image is configurable via <code>SECURER_DOCKER_IMAGE</code> (default <code>rocker/r-base:latest</code>). See <code>inst/docker/Dockerfile</code> for a reference image.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="documentation-0-2-0">Documentation<a class="anchor" aria-label="anchor" href="#documentation-0-2-0"></a></h3>
+<ul><li>Added an OS-caveat footnote to the ecosystem diagram in the README flagging that sandbox strength varies by platform and suggesting <code>docker-spawn</code> or a Linux VM for Windows hosts.</li>
+<li>Clarified the existing in-container Docker backend docstring to distinguish it from the new container-spawning mode.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.1.0" id="securer-010">securer 0.1.0<a class="anchor" aria-label="anchor" href="#securer-010"></a></h2>
 <p>Initial release.</p>
