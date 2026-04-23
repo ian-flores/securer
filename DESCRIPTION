@@ -46,7 +46,7 @@ Suggests:
     testthat (>= 3.0.0),
     withr
 Remotes:
-    ian-flores/securetrace@v0.2.1
+    ian-flores/securetrace
 VignetteBuilder: knitr
 Config/testthat/edition: 3
 Config/Needs/website: pkgdown
