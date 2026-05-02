@@ -2,13 +2,12 @@
 
 <!-- badges: start -->
 [![R-CMD-check](https://github.com/ian-flores/securer/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/ian-flores/securer/actions/workflows/R-CMD-check.yaml)
-[![Codecov test coverage](https://codecov.io/gh/ian-flores/securer/graph/badge.svg)](https://codecov.io/gh/ian-flores/securer)
+[![Codecov test coverage](https://codecov.io/gh/ian-flores/securer/graph/badge.svg)](https://app.codecov.io/gh/ian-flores/securer)
 [![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
-[![pkgdown](https://github.com/ian-flores/securer/actions/workflows/pkgdown.yml/badge.svg)](https://ian-flores.github.io/securer/)
+[![pkgdown](https://github.com/ian-flores/securer/actions/workflows/pkgdown.yaml/badge.svg)](https://ian-flores.github.io/securer/)
 <!-- badges: end -->
 
-> [!NOTE]
-> Experimental release. APIs may change before the 1.0 stabilization; track the lifecycle badge above for the current tier.
+> **Note:** Experimental release. APIs may change before the 1.0 stabilization — track the lifecycle badge above for the current tier.
 
 **Let LLMs write R code that calls your functions — safely.**
 
@@ -225,6 +224,10 @@ All platforms support tool call IPC, execution timeouts, and code pre-validation
 securer implements defense-in-depth with multiple layers: OS-level sandboxing, authenticated IPC, resource limits, environment sanitization, and input validation. For a detailed threat model and security architecture, see `vignette("security-model", package = "securer")`.
 
 To report security vulnerabilities, please email the maintainer directly rather than filing a public issue.
+
+## Contributing
+
+Contributions are welcome! Please [file an issue](https://github.com/ian-flores/securer/issues) or submit a pull request on GitHub.
 
 ## Documentation
 
