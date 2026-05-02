@@ -102,6 +102,7 @@ profile is generated dynamically by
 with a **deny-default** policy:
 
 ``` r
+
 # The generated profile starts with:
 # (version 1)
 # (deny default)
@@ -148,6 +149,7 @@ The child runs inside `bwrap --unshare-all`, which creates isolated PID,
 network, user, mount, UTS, and IPC namespaces:
 
 ``` r
+
 # Key bwrap arguments:
 # --unshare-all        isolate all namespaces
 # --die-with-parent    kill child if parent dies
@@ -214,6 +216,7 @@ Prevent resource exhaustion attacks. Applied via `ulimit` on Unix and
 Job Objects on Windows.
 
 ``` r
+
 library(securer)
 # Default limits (applied automatically when sandbox = TRUE):
 default_limits()
@@ -237,6 +240,7 @@ The wrapper script sets both soft and hard limits (`ulimit -S -H`)
 before `exec`-ing R, so the child cannot raise them:
 
 ``` r
+
 # Generated wrapper script (Unix):
 # #!/bin/sh
 # ulimit -S -H -t 60       # CPU seconds
@@ -258,6 +262,7 @@ Wall-clock deadline enforced in the parent’s event loop. Unlike
 child is blocked on I/O or sleeping:
 
 ``` r
+
 session$execute("Sys.sleep(3600)", timeout = 10)
 #> Error: Execution timed out after 10 seconds
 ```
@@ -278,6 +283,7 @@ generates this token at session creation and passes it to the child via
 the `SECURER_TOKEN` environment variable.
 
 ``` r
+
 # Parent generates token:
 private$ipc_token <- paste0(
   sample(c(letters, LETTERS, 0:9), 32, replace = TRUE),
@@ -321,6 +327,7 @@ Every message from the child is validated before processing:
     raises an error and halts execution.
 
 ``` r
+
 session$execute("while(TRUE) add(1, 1)", max_tool_calls = 100)
 #> Error: Maximum tool calls (100) exceeded
 ```
@@ -332,6 +339,7 @@ variables. All others are set to `NA` (which callr interprets as “remove
 from child environment”):
 
 ``` r
+
 # Allowlisted variables:
 safe_vars <- c(
   "PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "LC_CTYPE",
@@ -375,6 +383,7 @@ generated wrapper includes runtime type checks that run before the IPC
 call:
 
 ``` r
+
 # Generated wrapper for a tool with typed args:
 add <- function(a, b) {
   if (!is.numeric(a)) stop("Tool 'add': argument 'a' must be numeric, got ",
@@ -419,6 +428,7 @@ The socket directory (`/tmp/securer_XXXXX/`) is created with mode
 `0700`:
 
 ``` r
+
 dir.create(private$socket_dir, mode = "0700")
 ```
 
@@ -439,6 +449,7 @@ in a sealed `.ipc_store` environment with a custom `$` method that
 blocks direct access.
 
 ``` r
+
 # In child_runtime_code():
 # .securer_call_tool is defined as a closure via local({...})
 # The UDS connection is captured in .ipc_store inside the closure:
@@ -476,18 +487,18 @@ environment, so child code cannot redefine them either.
 
 Concrete outcomes for specific attack scenarios:
 
-| Attack                      | Linux (bwrap)                                                                                                     | macOS (Seatbelt)                                                                                                                                                                                                                                                                                                           | Windows                                                             |
-|-----------------------------|-------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------|
-| Read `/etc/passwd`          | Blocked – not mounted                                                                                             | Allowed – broad `/usr` read includes `/etc` indirectly, but specific `/etc` reads are allowlisted; `/etc/passwd` is not on the allowlist, so it depends on `file-read-metadata` vs `file-read*` rules. In practice: **readable** (metadata allowed globally, and `/etc/passwd` may be accessible via system library paths) | N/A (no `/etc/passwd`)                                              |
-| Read `~/.ssh/id_rsa`        | Blocked – home dir not mounted                                                                                    | Blocked – home dir not in any allowed read subpath                                                                                                                                                                                                                                                                         | **Not blocked**                                                     |
-| Write `~/evil.txt`          | Blocked – root is read-only, home not mounted                                                                     | Blocked – writes only allowed to temp dirs                                                                                                                                                                                                                                                                                 | **Not blocked**                                                     |
-| Outbound HTTP request       | Blocked – no network namespace                                                                                    | Blocked – `(deny network* (remote ip))`                                                                                                                                                                                                                                                                                    | **Not blocked**                                                     |
-| Fork bomb (`repeat fork()`) | Limited – `ulimit -u 50` caps processes                                                                           | Limited – `ulimit -u 50` caps processes                                                                                                                                                                                                                                                                                    | Limited – Job Object `ActiveProcessLimit`                           |
-| Allocate 10 GB RAM          | Limited – `ulimit -v 512MB`                                                                                       | Limited – `ulimit -v 512MB`                                                                                                                                                                                                                                                                                                | Limited – Job Object `ProcessMemoryLimit`                           |
-| Infinite CPU loop           | Limited – `ulimit -t 60` + wall-clock timeout                                                                     | Limited – `ulimit -t 60` + wall-clock timeout                                                                                                                                                                                                                                                                              | Limited – Job Object `PerProcessUserTimeLimit` + wall-clock timeout |
-| Execute `/usr/bin/python`   | Blocked – not bind-mounted under allowed paths (only `/usr` is mounted, but process exec is limited by namespace) | Blocked – `process-exec` restricted to R binaries and specific POSIX utilities                                                                                                                                                                                                                                             | **Not blocked**                                                     |
-| Write 1 GB file to `/tmp`   | Limited – `ulimit -f 50MB`                                                                                        | Limited – `ulimit -f 50MB`                                                                                                                                                                                                                                                                                                 | Not limited (no `fsize` on Windows)                                 |
-| Open 1000 files             | Limited – `ulimit -n 256`                                                                                         | Limited – `ulimit -n 256`                                                                                                                                                                                                                                                                                                  | Not limited (no `nofile` on Windows)                                |
+| Attack | Linux (bwrap) | macOS (Seatbelt) | Windows |
+|----|----|----|----|
+| Read `/etc/passwd` | Blocked – not mounted | Allowed – broad `/usr` read includes `/etc` indirectly, but specific `/etc` reads are allowlisted; `/etc/passwd` is not on the allowlist, so it depends on `file-read-metadata` vs `file-read*` rules. In practice: **readable** (metadata allowed globally, and `/etc/passwd` may be accessible via system library paths) | N/A (no `/etc/passwd`) |
+| Read `~/.ssh/id_rsa` | Blocked – home dir not mounted | Blocked – home dir not in any allowed read subpath | **Not blocked** |
+| Write `~/evil.txt` | Blocked – root is read-only, home not mounted | Blocked – writes only allowed to temp dirs | **Not blocked** |
+| Outbound HTTP request | Blocked – no network namespace | Blocked – `(deny network* (remote ip))` | **Not blocked** |
+| Fork bomb (`repeat fork()`) | Limited – `ulimit -u 50` caps processes | Limited – `ulimit -u 50` caps processes | Limited – Job Object `ActiveProcessLimit` |
+| Allocate 10 GB RAM | Limited – `ulimit -v 512MB` | Limited – `ulimit -v 512MB` | Limited – Job Object `ProcessMemoryLimit` |
+| Infinite CPU loop | Limited – `ulimit -t 60` + wall-clock timeout | Limited – `ulimit -t 60` + wall-clock timeout | Limited – Job Object `PerProcessUserTimeLimit` + wall-clock timeout |
+| Execute `/usr/bin/python` | Blocked – not bind-mounted under allowed paths (only `/usr` is mounted, but process exec is limited by namespace) | Blocked – `process-exec` restricted to R binaries and specific POSIX utilities | **Not blocked** |
+| Write 1 GB file to `/tmp` | Limited – `ulimit -f 50MB` | Limited – `ulimit -f 50MB` | Not limited (no `fsize` on Windows) |
+| Open 1000 files | Limited – `ulimit -n 256` | Limited – `ulimit -n 256` | Not limited (no `nofile` on Windows) |
 
 ## Known limitations
 
@@ -675,6 +686,7 @@ The defaults (60s CPU, 512 MB memory) are intentionally generous.
 Tighten them:
 
 ``` r
+
 session <- SecureSession$new(
   sandbox = TRUE,
   limits = list(cpu = 10, memory = 128 * 1024 * 1024, nproc = 10)
@@ -684,6 +696,7 @@ session <- SecureSession$new(
 ### Use execution timeouts and tool call caps
 
 ``` r
+
 session$execute(llm_code, timeout = 30, max_tool_calls = 50)
 ```
 
@@ -696,6 +709,7 @@ Tool functions run on the host with full privileges. Apply least
 privilege — use parameterized queries and validate inputs:
 
 ``` r
+
 securer_tool("get_user", "Look up user by ID",
   fn = function(user_id) {
     stopifnot(is.numeric(user_id), user_id > 0)
@@ -708,6 +722,7 @@ securer_tool("get_user", "Look up user by ID",
 ### Enable audit logging
 
 ``` r
+
 session <- SecureSession$new(sandbox = TRUE, audit_log = "/var/log/securer/audit.jsonl")
 ```
 

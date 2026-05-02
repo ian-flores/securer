@@ -13,12 +13,14 @@ filesystem.
 ## Installation
 
 ``` r
+
 pak::pak("ian-flores/securer")
 ```
 
 Verify the installation:
 
 ``` r
+
 library(securer)
 execute_r("1 + 1")
 #> [1] 2
@@ -32,6 +34,7 @@ It creates a session, runs the code, and tears everything down
 automatically:
 
 ``` r
+
 library(securer)
 
 execute_r("1 + 1")
@@ -52,6 +55,7 @@ Tools let sandboxed code call functions on the host. Define them with
 [`securer_tool()`](https://ian-flores.github.io/securer/reference/securer_tool.md):
 
 ``` r
+
 add_tool <- securer_tool(
   name = "add",
   description = "Add two numbers",
@@ -70,13 +74,13 @@ Each tool has four components:
 
 ### Supported type annotations
 
-| Type string    | Check function                                                 |
-|----------------|----------------------------------------------------------------|
-| `"numeric"`    | [`is.numeric()`](https://rdrr.io/r/base/numeric.html)          |
-| `"character"`  | [`is.character()`](https://rdrr.io/r/base/character.html)      |
-| `"logical"`    | [`is.logical()`](https://rdrr.io/r/base/logical.html)          |
-| `"integer"`    | [`is.integer()`](https://rdrr.io/r/base/integer.html)          |
-| `"list"`       | [`is.list()`](https://rdrr.io/r/base/list.html)                |
+| Type string | Check function |
+|----|----|
+| `"numeric"` | [`is.numeric()`](https://rdrr.io/r/base/numeric.html) |
+| `"character"` | [`is.character()`](https://rdrr.io/r/base/character.html) |
+| `"logical"` | [`is.logical()`](https://rdrr.io/r/base/logical.html) |
+| `"integer"` | [`is.integer()`](https://rdrr.io/r/base/integer.html) |
+| `"list"` | [`is.list()`](https://rdrr.io/r/base/list.html) |
 | `"data.frame"` | [`is.data.frame()`](https://rdrr.io/r/base/as.data.frame.html) |
 
 Type annotations are optional. Arguments without type annotations skip
@@ -88,6 +92,7 @@ Pass tools as a list to
 [`execute_r()`](https://ian-flores.github.io/securer/reference/execute_r.md):
 
 ``` r
+
 tools <- list(
   securer_tool("add", "Add two numbers",
     fn = function(a, b) a + b,

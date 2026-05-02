@@ -1,7 +1,7 @@
 # securer
 
-> \[!NOTE\] Experimental release. APIs may change before the 1.0
-> stabilization; track the lifecycle badge above for the current tier.
+> **Note:** Experimental release. APIs may change before the 1.0
+> stabilization — track the lifecycle badge above for the current tier.
 
 **Let LLMs write R code that calls your functions — safely.**
 
@@ -10,6 +10,7 @@ to call back into your application (tool calls), and confidence that the
 code can’t do anything dangerous (sandboxing). securer provides both.
 
 ``` r
+
 # Simplest usage -- run R code in a sandbox
 execute_r("1 + 1")
 #> [1] 2
@@ -18,6 +19,7 @@ execute_r("1 + 1")
 For tool calls, define functions the sandboxed code can use:
 
 ``` r
+
 library(securer)
 
 # Your functions become tools the LLM's code can call
@@ -73,19 +75,20 @@ wires agents into workflows.
 > parity with Unix, run securer inside a Linux container (see the
 > `docker-spawn` backend below) or a Linux VM.
 
-| Package                                                      | Role                                                    |
-|--------------------------------------------------------------|---------------------------------------------------------|
-| [securer](https://github.com/ian-flores/securer)             | Sandboxed R execution with tool-call IPC                |
-| [securetools](https://github.com/ian-flores/securetools)     | Pre-built security-hardened tool definitions            |
-| [secureguard](https://github.com/ian-flores/secureguard)     | Input/code/output guardrails (injection, PII, secrets)  |
-| [orchestr](https://github.com/ian-flores/orchestr)           | Graph-based agent orchestration                         |
-| [securecontext](https://github.com/ian-flores/securecontext) | Document chunking, embeddings, RAG retrieval            |
-| [securetrace](https://github.com/ian-flores/securetrace)     | Structured tracing, token/cost accounting, JSONL export |
-| [securebench](https://github.com/ian-flores/securebench)     | Guardrail benchmarking with precision/recall/F1 metrics |
+| Package | Role |
+|----|----|
+| [securer](https://github.com/ian-flores/securer) | Sandboxed R execution with tool-call IPC |
+| [securetools](https://github.com/ian-flores/securetools) | Pre-built security-hardened tool definitions |
+| [secureguard](https://github.com/ian-flores/secureguard) | Input/code/output guardrails (injection, PII, secrets) |
+| [orchestr](https://github.com/ian-flores/orchestr) | Graph-based agent orchestration |
+| [securecontext](https://github.com/ian-flores/securecontext) | Document chunking, embeddings, RAG retrieval |
+| [securetrace](https://github.com/ian-flores/securetrace) | Structured tracing, token/cost accounting, JSONL export |
+| [securebench](https://github.com/ian-flores/securebench) | Guardrail benchmarking with precision/recall/F1 metrics |
 
 ## Installation
 
 ``` r
+
 # install.packages("pak")
 pak::pak("ian-flores/securer")
 
@@ -97,14 +100,14 @@ execute_r("1 + 1")
 
 ## Why securer?
 
-| Problem                                    | How securer solves it                                                      |
-|--------------------------------------------|----------------------------------------------------------------------------|
-| LLM code could access the filesystem       | OS sandbox blocks writes; reads restricted to R libraries                  |
-| LLM code could make network requests       | Network access blocked via namespace isolation (Linux) or Seatbelt (macOS) |
+| Problem | How securer solves it |
+|----|----|
+| LLM code could access the filesystem | OS sandbox blocks writes; reads restricted to R libraries |
+| LLM code could make network requests | Network access blocked via namespace isolation (Linux) or Seatbelt (macOS) |
 | LLM code needs to call your APIs/databases | Register tool functions that execute on the host side, outside the sandbox |
-| LLM code could run forever                 | Execution timeouts with automatic session recovery                         |
-| LLM code could consume all memory          | Resource limits via ulimit (Linux/macOS) and Job Objects (Windows)         |
-| LLM code has syntax errors                 | Pre-validation catches parse errors before execution                       |
+| LLM code could run forever | Execution timeouts with automatic session recovery |
+| LLM code could consume all memory | Resource limits via ulimit (Linux/macOS) and Job Objects (Windows) |
+| LLM code has syntax errors | Pre-validation catches parse errors before execution |
 
 ## How It Works
 
@@ -133,6 +136,7 @@ synchronous: the child blocks while the parent fulfills the request.
 Reuse a session across multiple executions to avoid startup overhead:
 
 ``` r
+
 session <- SecureSession$new(tools = tools, sandbox = TRUE)
 
 session$execute('query_db("iris", 3)')
@@ -146,6 +150,7 @@ session$close()
 Pre-warm multiple sessions for low-latency concurrent execution:
 
 ``` r
+
 pool <- SecureSessionPool$new(size = 4, tools = tools, sandbox = TRUE)
 
 result <- pool$execute('query_db("iris", 3)')
@@ -159,6 +164,7 @@ Constrain CPU, memory, file size, and more. Works with or without
 sandbox mode on all platforms:
 
 ``` r
+
 result <- execute_r("1 + 1",
   limits = list(cpu = 10, memory = 256 * 1024 * 1024)
 )
@@ -170,6 +176,7 @@ Kill long-running code automatically. The session recovers and is
 reusable:
 
 ``` r
+
 session <- SecureSession$new()
 session$execute("Sys.sleep(100)", timeout = 5)
 # Error: Execution timed out after 5 seconds
@@ -181,6 +188,7 @@ session$execute("1 + 1")  # still works
 Catch syntax errors before sending code to the child process:
 
 ``` r
+
 session$execute("if (TRUE {")  # immediate error, no child round-trip
 ```
 
@@ -190,6 +198,7 @@ Use securer as a code execution tool in
 [ellmer](https://ellmer.tidyverse.org/) LLM chats:
 
 ``` r
+
 library(ellmer)
 chat <- chat_openai()
 chat$register_tool(securer_as_ellmer_tool())
@@ -202,6 +211,7 @@ Write structured JSONL logs of all session events for compliance and
 debugging:
 
 ``` r
+
 session <- SecureSession$new(audit_log = "session.jsonl")
 ```
 
@@ -211,6 +221,7 @@ Debug session behavior with human-readable
 [`message()`](https://rdrr.io/r/base/message.html) output:
 
 ``` r
+
 session <- SecureSession$new(verbose = TRUE)
 # [securer] Session started (sandbox=FALSE, pid=1234)
 # [securer] Tool call: query_db(table="iris", limit=3)
@@ -219,12 +230,12 @@ session <- SecureSession$new(verbose = TRUE)
 
 ## Platform Support
 
-| Platform                    | Sandbox                     | Network blocked        | Filesystem restricted | Resource limits                    |
-|-----------------------------|-----------------------------|------------------------|-----------------------|------------------------------------|
-| **Linux**                   | bubblewrap (`bwrap`)        | Yes                    | Yes                   | Yes (ulimit)                       |
-| **macOS**                   | Seatbelt (`sandbox-exec`)   | Yes                    | Yes                   | Yes (ulimit)                       |
-| **Windows**                 | Job Objects + env isolation | No                     | No                    | Yes (memory, CPU, process count)   |
-| **docker-spawn** (any host) | Fresh container per session | Yes (`--network=none`) | Yes (container FS)    | Yes (`--memory`, `--cpus`, ulimit) |
+| Platform | Sandbox | Network blocked | Filesystem restricted | Resource limits |
+|----|----|----|----|----|
+| **Linux** | bubblewrap (`bwrap`) | Yes | Yes | Yes (ulimit) |
+| **macOS** | Seatbelt (`sandbox-exec`) | Yes | Yes | Yes (ulimit) |
+| **Windows** | Job Objects + env isolation | No | No | Yes (memory, CPU, process count) |
+| **docker-spawn** (any host) | Fresh container per session | Yes (`--network=none`) | Yes (container FS) | Yes (`--memory`, `--cpus`, ulimit) |
 
 All platforms support tool call IPC, execution timeouts, and code
 pre-validation. The `docker-spawn` backend is opt-in
@@ -241,6 +252,12 @@ security architecture, see
 
 To report security vulnerabilities, please email the maintainer directly
 rather than filing a public issue.
+
+## Contributing
+
+Contributions are welcome! Please [file an
+issue](https://github.com/ian-flores/securer/issues) or submit a pull
+request on GitHub.
 
 ## Documentation
 

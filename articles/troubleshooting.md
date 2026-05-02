@@ -9,6 +9,7 @@ bubblewrap (`bwrap`) for namespace isolation. On macOS, `sandbox-exec`
 ships with the OS and should already be available.
 
 ``` r
+
 # Linux -- install bubblewrap
 # Debian/Ubuntu: sudo apt install bubblewrap
 # Fedora:        sudo dnf install bubblewrap
@@ -30,6 +31,7 @@ If you have overridden `TMPDIR` or
 directory, the resulting socket path may exceed this limit.
 
 ``` r
+
 # Check your current tempdir length
 nchar(tempdir())
 # If this exceeds ~80 characters, reset TMPDIR before creating a session
@@ -44,6 +46,7 @@ child is killed by the OS (out-of-memory), hits a resource limit, or
 receives an external signal.
 
 ``` r
+
 session <- SecureSession$new(sandbox = TRUE)
 
 # Check whether the child process is still alive
@@ -66,6 +69,7 @@ For full isolation on Windows, run your R process inside Docker or WSL2
 with bubblewrap:
 
 ``` r
+
 # Inside WSL2 with bwrap installed, securer uses the Linux sandbox backend
 session <- SecureSession$new(sandbox = TRUE, sandbox_strict = TRUE)
 ```
@@ -77,6 +81,7 @@ for disposable agent sessions where you want to cap how many times code
 can run.
 
 ``` r
+
 # This session allows only 5 executions
 session <- SecureSession$new(max_executions = 5)
 
@@ -96,6 +101,7 @@ execution. Debug by testing the hook directly with the code string that
 was rejected.
 
 ``` r
+
 # Example hook that blocks system() calls
 my_hook <- function(code) {
   if (grepl("system\\(", code)) return(FALSE)
@@ -119,6 +125,7 @@ security. Only system-level packages (from `R_LIBS_SITE` and
 `R.home("library")`) are available inside the sandbox.
 
 ``` r
+
 # Option 1: Install the package system-wide
 # install.packages("foo", lib = .Library)
 
@@ -143,6 +150,7 @@ convenience function creates and tears down a session for every call.
 For repeated executions, reuse a persistent session or use a pool.
 
 ``` r
+
 # Slow -- new session per call
 for (i in 1:100) {
   execute_r(paste("sqrt(", i, ")"))
@@ -175,6 +183,7 @@ this. If you are on a shared system, ensure `/tmp` subdirectories are
 not world-accessible.
 
 ``` r
+
 # Verify socket directory permissions
 session <- SecureSession$new(verbose = TRUE)
 # Verbose mode logs the socket path -- check its permissions with:
@@ -188,6 +197,7 @@ parent directory exists and is writable. The log file is created with
 `0600` permissions, and symlinks are rejected for security.
 
 ``` r
+
 # Ensure the directory exists
 dir.create("logs", showWarnings = FALSE)
 

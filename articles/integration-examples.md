@@ -35,6 +35,7 @@ sandboxed session. The `SecureSession` is created once when the Shiny
 session starts and closed when the user disconnects.
 
 ``` r
+
 library(shiny)
 library(securer)
 
@@ -98,6 +99,7 @@ pool. The pool is created once at startup and shared across all
 requests.
 
 ``` r
+
 # plumber.R
 library(plumber)
 library(securer)
@@ -113,6 +115,7 @@ pool <- SecureSessionPool$new(
 ```
 
 ``` r
+
 #* Execute R code in a sandboxed session
 #* @param code Character string of R code
 #* @post /execute
@@ -136,6 +139,7 @@ function(req, res, code = "") {
 ```
 
 ``` r
+
 # Start the API
 pr <- plumb("plumber.R")
 pr$run(host = "0.0.0.0", port = 8080)
@@ -163,6 +167,7 @@ sequentially but each execution reuses a pre-warmed process, avoiding
 repeated startup costs.
 
 ``` r
+
 library(securer)
 
 # Code snippets to evaluate
@@ -176,6 +181,7 @@ snippets <- c(
 ```
 
 ``` r
+
 pool <- SecureSessionPool$new(size = 2, sandbox = TRUE)
 
 results <- lapply(snippets, function(code) {
@@ -194,6 +200,7 @@ pool$close()
 ```
 
 ``` r
+
 # Collect into a data frame for inspection
 outcome <- data.frame(
   code  = vapply(results, `[[`, character(1), "code"),

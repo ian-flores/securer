@@ -31,6 +31,7 @@ Uses `sandbox-exec` with a generated Seatbelt profile:
 - Unix domain sockets are allowed (needed for IPC with the host)
 
 ``` r
+
 session <- SecureSession$new(sandbox = TRUE)
 
 # Computation works normally:
@@ -72,6 +73,7 @@ Apply `ulimit`-based caps to the child process. These work with or
 without the sandbox:
 
 ``` r
+
 execute_r("1 + 1", limits = list(cpu = 10, memory = 256 * 1024 * 1024))
 ```
 
@@ -89,6 +91,7 @@ Supported limits:
 Default limits applied when `sandbox = TRUE`:
 
 ``` r
+
 default_limits()
 ```
 
@@ -99,6 +102,7 @@ checks for syntax errors and dangerous patterns before sending code to
 the child process:
 
 ``` r
+
 # Valid code
 validate_code("1 + 1")
 
@@ -116,6 +120,7 @@ target platform. Missing tools cause a fallback to unsandboxed execution
 (or an error if `sandbox_strict = TRUE`):
 
 ``` r
+
 if (Sys.info()[["sysname"]] == "Linux") stopifnot(nzchar(Sys.which("bwrap")))
 if (Sys.info()[["sysname"]] == "Darwin") stopifnot(file.exists("/usr/bin/sandbox-exec"))
 ```
@@ -132,6 +137,7 @@ The `sandbox_strict` parameter controls this behavior. When `TRUE` and
 OS-level sandbox cannot be set up:
 
 ``` r
+
 # Error if sandbox not available (recommended for production)
 session <- SecureSession$new(sandbox = TRUE, sandbox_strict = TRUE)
 ```

@@ -12,6 +12,7 @@ and
 `$execute()` calls. State persists between executions:
 
 ``` r
+
 library(securer)
 
 tools <- list(
@@ -34,6 +35,7 @@ Always call `$close()` when done, or use
 for automatic cleanup:
 
 ``` r
+
 result <- with_secure_session(function(session) {
   session$execute("x <- 10")
   session$execute("x * 2")
@@ -54,6 +56,7 @@ result <- with_secure_session(function(session) {
   from errors.
 
 ``` r
+
 session <- SecureSession$new(
   max_executions = 100,
   pre_execute_hook = function(code) {
@@ -74,6 +77,7 @@ for the full threat model and defense layers.
 child is killed and the session auto-recovers:
 
 ``` r
+
 session <- SecureSession$new()
 session$execute("Sys.sleep(60)", timeout = 5)
 #> Error: Execution timed out
@@ -88,6 +92,7 @@ Errors in the child process, in tool execution, and from unknown tool
 names are all propagated to the host as standard R errors:
 
 ``` r
+
 execute_r('stop("something went wrong")')
 #> Error: something went wrong
 
@@ -100,6 +105,7 @@ execute_r("nonexistent_tool()", tools = list())
 Pass `output_handler` to receive child output as it arrives:
 
 ``` r
+
 session <- SecureSession$new()
 session$execute(
   'for (i in 1:5) cat("Step", i, "\\n")',
@@ -116,6 +122,7 @@ value.
 Both `max_output_lines` and `max_tool_calls` are per-execution caps:
 
 ``` r
+
 session <- SecureSession$new()
 
 # Cap accumulated output lines
@@ -137,6 +144,7 @@ session$close()
 running:
 
 ``` r
+
 session <- SecureSession$new(sandbox = FALSE)
 
 session$execute("x <- 42")
@@ -156,6 +164,7 @@ session$close()
 Pass `audit_log` to the constructor to write structured JSONL entries:
 
 ``` r
+
 session <- SecureSession$new(audit_log = "securer-audit.jsonl")
 session$execute("1 + 1")
 session$close()
@@ -199,6 +208,7 @@ and reuses them across requests.
 execution:
 
 ``` r
+
 pool <- SecureSessionPool$new(size = 4, sandbox = TRUE)
 
 pool$execute("1 + 1")
@@ -212,6 +222,7 @@ Set `reset_between_uses = TRUE` to restart sessions after each
 execution, preventing state leakage between callers:
 
 ``` r
+
 pool <- SecureSessionPool$new(
   size = 2,
   sandbox = FALSE,

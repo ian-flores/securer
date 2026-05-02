@@ -14,6 +14,7 @@ definition that you register on a chat object.
 ## Quick start
 
 ``` r
+
 library(securer)
 library(ellmer)
 
@@ -36,6 +37,7 @@ demonstrates the risk: it scans `~/.ssh` for private keys and POSTs them
 to an attacker-controlled server.
 
 ``` r
+
 # From https://github.com/ian-flores/showittome/blob/master/R_pkg/R/grabber.R
 # DO NOT RUN --- this is the attack we're defending against
 grabber <- function() {
@@ -62,6 +64,7 @@ grabber <- function() {
 With securer, every step of this attack fails:
 
 ``` r
+
 session <- SecureSession$new(sandbox = TRUE)
 
 session$execute('list.files("~/.ssh")')
@@ -82,13 +85,13 @@ session$execute('Sys.getenv("AWS_SECRET_ACCESS_KEY")')
 session$close()
 ```
 
-| Attack step                           | Without securer       | With securer          |
-|---------------------------------------|-----------------------|-----------------------|
-| `list.files("~/.ssh")`                | Returns key filenames | Empty (read denied)   |
-| `readLines("~/.ssh/key.pem")`         | Returns private key   | Error (read denied)   |
-| `system("curl ...")`                  | Returns public IP     | process-exec denied   |
-| `httr::POST(...)`                     | Data exfiltrated      | Network denied        |
-| `Sys.getenv("AWS_SECRET_ACCESS_KEY")` | Key value returned    | Empty (env sanitized) |
+| Attack step | Without securer | With securer |
+|----|----|----|
+| `list.files("~/.ssh")` | Returns key filenames | Empty (read denied) |
+| `readLines("~/.ssh/key.pem")` | Returns private key | Error (read denied) |
+| `system("curl ...")` | Returns public IP | process-exec denied |
+| `httr::POST(...)` | Data exfiltrated | Network denied |
+| `Sys.getenv("AWS_SECRET_ACCESS_KEY")` | Key value returned | Empty (env sanitized) |
 
 These are independent defense layers. See
 [`vignette("security-model")`](https://ian-flores.github.io/securer/articles/security-model.md)
@@ -113,6 +116,7 @@ for the full architecture diagram.
 You can expose your own functions to the LLM as securer tools:
 
 ``` r
+
 tools <- list(
   securer_tool("query_db", "Query a database table by name",
     fn = function(table, limit) {
@@ -155,6 +159,7 @@ LLM can only interact with your data through the tools you define.
 accepts the same options as `SecureSession`:
 
 ``` r
+
 tool_def <- securer_as_ellmer_tool(
   tools = tools,
   sandbox = TRUE,
@@ -173,6 +178,7 @@ If you need more control over the session lifecycle, create one yourself
 and pass it in:
 
 ``` r
+
 session <- SecureSession$new(
   tools = tools,
   sandbox = TRUE,
@@ -209,6 +215,7 @@ error.
 ## Example: data analysis assistant
 
 ``` r
+
 library(securer)
 library(ellmer)
 
@@ -254,6 +261,7 @@ The tool definition is provider-agnostic. Any ellmer backend with
 tool-use support works:
 
 ``` r
+
 chat <- chat_anthropic()
 chat$register_tool(securer_as_ellmer_tool())
 
@@ -267,6 +275,7 @@ For concurrent users, use `SecureSessionPool` for raw code execution or
 per-request sessions for ellmer chats:
 
 ``` r
+
 # Raw code execution: pool handles acquire/release
 pool <- SecureSessionPool$new(size = 4, tools = tools, sandbox = TRUE)
 handle_user_code <- function(code) pool$execute(code, timeout = 30)

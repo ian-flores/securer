@@ -52,7 +52,7 @@
 <!-- badges: start -->
 
 <blockquote>
-<p>[!NOTE] Experimental release. APIs may change before the 1.0 stabilization; track the lifecycle badge above for the current tier.</p>
+<p><strong>Note:</strong> Experimental release. APIs may change before the 1.0 stabilization — track the lifecycle badge above for the current tier.</p>
 </blockquote>
 <p><strong>Let LLMs write R code that calls your functions — safely.</strong></p>
 <p>When an LLM generates R code, you need two things: a way for that code to call back into your application (tool calls), and confidence that the code can’t do anything dangerous (sandboxing). securer provides both.</p>
@@ -107,36 +107,36 @@
 <col width="60%">
 <col width="40%">
 </colgroup>
-<thead><tr class="header">
+<thead><tr>
 <th>Package</th>
 <th>Role</th>
 </tr></thead>
 <tbody>
-<tr class="odd">
+<tr>
 <td><a href="https://github.com/ian-flores/securer" class="external-link">securer</a></td>
 <td>Sandboxed R execution with tool-call IPC</td>
 </tr>
-<tr class="even">
+<tr>
 <td><a href="https://github.com/ian-flores/securetools" class="external-link">securetools</a></td>
 <td>Pre-built security-hardened tool definitions</td>
 </tr>
-<tr class="odd">
+<tr>
 <td><a href="https://github.com/ian-flores/secureguard" class="external-link">secureguard</a></td>
 <td>Input/code/output guardrails (injection, PII, secrets)</td>
 </tr>
-<tr class="even">
+<tr>
 <td><a href="https://github.com/ian-flores/orchestr" class="external-link">orchestr</a></td>
 <td>Graph-based agent orchestration</td>
 </tr>
-<tr class="odd">
+<tr>
 <td><a href="https://github.com/ian-flores/securecontext" class="external-link">securecontext</a></td>
 <td>Document chunking, embeddings, RAG retrieval</td>
 </tr>
-<tr class="even">
+<tr>
 <td><a href="https://github.com/ian-flores/securetrace" class="external-link">securetrace</a></td>
 <td>Structured tracing, token/cost accounting, JSONL export</td>
 </tr>
-<tr class="odd">
+<tr>
 <td><a href="https://github.com/ian-flores/securebench" class="external-link">securebench</a></td>
 <td>Guardrail benchmarking with precision/recall/F1 metrics</td>
 </tr>
@@ -163,32 +163,32 @@
 <col width="29%">
 <col width="70%">
 </colgroup>
-<thead><tr class="header">
+<thead><tr>
 <th>Problem</th>
 <th>How securer solves it</th>
 </tr></thead>
 <tbody>
-<tr class="odd">
+<tr>
 <td>LLM code could access the filesystem</td>
 <td>OS sandbox blocks writes; reads restricted to R libraries</td>
 </tr>
-<tr class="even">
+<tr>
 <td>LLM code could make network requests</td>
 <td>Network access blocked via namespace isolation (Linux) or Seatbelt (macOS)</td>
 </tr>
-<tr class="odd">
+<tr>
 <td>LLM code needs to call your APIs/databases</td>
 <td>Register tool functions that execute on the host side, outside the sandbox</td>
 </tr>
-<tr class="even">
+<tr>
 <td>LLM code could run forever</td>
 <td>Execution timeouts with automatic session recovery</td>
 </tr>
-<tr class="odd">
+<tr>
 <td>LLM code could consume all memory</td>
 <td>Resource limits via ulimit (Linux/macOS) and Job Objects (Windows)</td>
 </tr>
-<tr class="even">
+<tr>
 <td>LLM code has syntax errors</td>
 <td>Pre-validation catches parse errors before execution</td>
 </tr>
@@ -305,7 +305,7 @@
 <col width="29%">
 <col width="22%">
 </colgroup>
-<thead><tr class="header">
+<thead><tr>
 <th>Platform</th>
 <th>Sandbox</th>
 <th>Network blocked</th>
@@ -313,28 +313,28 @@
 <th>Resource limits</th>
 </tr></thead>
 <tbody>
-<tr class="odd">
+<tr>
 <td><strong>Linux</strong></td>
 <td>bubblewrap (<code>bwrap</code>)</td>
 <td>Yes</td>
 <td>Yes</td>
 <td>Yes (ulimit)</td>
 </tr>
-<tr class="even">
+<tr>
 <td><strong>macOS</strong></td>
 <td>Seatbelt (<code>sandbox-exec</code>)</td>
 <td>Yes</td>
 <td>Yes</td>
 <td>Yes (ulimit)</td>
 </tr>
-<tr class="odd">
+<tr>
 <td><strong>Windows</strong></td>
 <td>Job Objects + env isolation</td>
 <td>No</td>
 <td>No</td>
 <td>Yes (memory, CPU, process count)</td>
 </tr>
-<tr class="even">
+<tr>
 <td>
 <strong>docker-spawn</strong> (any host)</td>
 <td>Fresh container per session</td>
@@ -351,6 +351,11 @@
 </h2>
 <p>securer implements defense-in-depth with multiple layers: OS-level sandboxing, authenticated IPC, resource limits, environment sanitization, and input validation. For a detailed threat model and security architecture, see <code><a href="articles/security-model.html">vignette("security-model", package = "securer")</a></code>.</p>
 <p>To report security vulnerabilities, please email the maintainer directly rather than filing a public issue.</p>
+</div>
+<div class="section level2">
+<h2 id="contributing">Contributing<a class="anchor" aria-label="anchor" href="#contributing"></a>
+</h2>
+<p>Contributions are welcome! Please <a href="https://github.com/ian-flores/securer/issues" class="external-link">file an issue</a> or submit a pull request on GitHub.</p>
 </div>
 <div class="section level2">
 <h2 id="documentation">Documentation<a class="anchor" aria-label="anchor" href="#documentation"></a>
@@ -415,9 +420,9 @@
 <h2 data-toc-skip>Dev status</h2>
 <ul class="list-unstyled">
 <li><a href="https://github.com/ian-flores/securer/actions/workflows/R-CMD-check.yaml" class="external-link"><img src="https://github.com/ian-flores/securer/actions/workflows/R-CMD-check.yaml/badge.svg" alt="R-CMD-check"></a></li>
-<li><a href="https://codecov.io/gh/ian-flores/securer" class="external-link"><img src="https://codecov.io/gh/ian-flores/securer/graph/badge.svg" alt="Codecov test coverage"></a></li>
+<li><a href="https://app.codecov.io/gh/ian-flores/securer" class="external-link"><img src="https://codecov.io/gh/ian-flores/securer/graph/badge.svg" alt="Codecov test coverage"></a></li>
 <li><a href="https://lifecycle.r-lib.org/articles/stages.html#experimental" class="external-link"><img src="https://img.shields.io/badge/lifecycle-experimental-orange.svg" alt="Lifecycle: experimental"></a></li>
-<li><a href="https://ian-flores.github.io/securer/"><img src="https://github.com/ian-flores/securer/actions/workflows/pkgdown.yml/badge.svg" alt="pkgdown"></a></li>
+<li><a href="https://ian-flores.github.io/securer/"><img src="https://github.com/ian-flores/securer/actions/workflows/pkgdown.yaml/badge.svg" alt="pkgdown"></a></li>
 </ul>
 </div>
 
