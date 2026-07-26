@@ -41,33 +41,27 @@ on the host side, outside the sandbox, with full access to your
 resources. The LLM’s code never touches your filesystem, network, or
 data directly.
 
-## Part of the secure-r-dev Ecosystem
+## Companion Packages
 
-securer is part of a 7-package ecosystem for building governed AI agents
-in R:
+securer is one of four packages for building governed AI agents in R:
 
                         ┌────────────────┐
                         │ >>> securer <<< │
                         └───────┬────────┘
-              ┌─────────────────┼─────────────────┐
-              │                 │                  │
-       ┌──────▼──────┐  ┌──────▼──────┐  ┌───────▼────────┐
-       │ securetools  │  │ secureguard │  │ securecontext   │
-       └──────┬───────┘  └──────┬──────┘  └───────┬────────┘
-              └─────────────────┼─────────────────┘
-                        ┌───────▼──────┐
-                        │   orchestr   │
-                        └───────┬──────┘
-              ┌─────────────────┼─────────────────┐
-              │                                   │
-       ┌──────▼──────┐                     ┌──────▼──────┐
-       │ securetrace  │                    │ securebench  │
-       └─────────────┘                     └─────────────┘
+                  ┌─────────────┴─────────────┐
+                  │                           │
+           ┌──────▼──────┐             ┌──────▼──────┐
+           │ securetools  │             │ secureguard │
+           └─────────────┘             └──────┬──────┘
+                                       ┌──────▼──────┐
+                                       │ securebench  │
+                                       └─────────────┘
 
 securer sits at the top of the stack, providing the sandboxed R
-execution engine that other packages build on. securetools adds
-pre-built tool definitions, secureguard adds guardrails, and orchestr
-wires agents into workflows.
+execution engine that the other packages build on. securetools adds
+pre-built tool definitions, secureguard adds guardrails, and securebench
+benchmarks guardrail accuracy. Each package is installed individually
+(see Installation below).
 
 > **OS caveat:** the sandbox diagram above assumes macOS or Linux. On
 > Windows, securer provides environment isolation and Job Object
@@ -80,10 +74,17 @@ wires agents into workflows.
 | [securer](https://github.com/ian-flores/securer) | Sandboxed R execution with tool-call IPC |
 | [securetools](https://github.com/ian-flores/securetools) | Pre-built security-hardened tool definitions |
 | [secureguard](https://github.com/ian-flores/secureguard) | Input/code/output guardrails (injection, PII, secrets) |
-| [orchestr](https://github.com/ian-flores/orchestr) | Graph-based agent orchestration |
-| [securecontext](https://github.com/ian-flores/securecontext) | Document chunking, embeddings, RAG retrieval |
-| [securetrace](https://github.com/ian-flores/securetrace) | Structured tracing, token/cost accounting, JSONL export |
-| [securebench](https://github.com/ian-flores/securebench) | Guardrail benchmarking with precision/recall/F1 metrics |
+| [securebench](https://github.com/ian-flores/securebench) | Security-focused guardrail benchmarks, complementary to [vitals](https://vitals.tidyverse.org/) |
+
+For adjacent capabilities, use the broader R LLM ecosystem:
+
+- **Tracing and observability**:
+  [ellmer](https://ellmer.tidyverse.org/)’s native OpenTelemetry
+  instrumentation via the [otel](https://otel.r-lib.org/) package
+  (supersedes the archived securetrace).
+- **Document chunking, embeddings, and RAG retrieval**:
+  [ragnar](https://github.com/tidyverse/ragnar) (supersedes the archived
+  securecontext).
 
 ## Installation
 
