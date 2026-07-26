@@ -253,7 +253,7 @@ SecureSession <- R6::R6Class("SecureSession",
       }
 
       if (.trace_active()) {
-        securetrace::with_span("securer.execute", type = "custom", {
+        .with_span("securer::SecureSession$execute", {
           result <- .do_execute()
           .span_event("execute.complete", list(
             code_length = nchar(code),
@@ -864,9 +864,8 @@ SecureSession <- R6::R6Class("SecureSession",
               }
 
               if (.trace_active()) {
-                response <- securetrace::with_span(
-                  paste0("securer.tool.", tool_name),
-                  type = "tool",
+                response <- .with_span(
+                  paste0("securer::tool/", tool_name),
                   {
                     resp <- .do_tool_call()
                     .span_event("tool.complete", list(
@@ -874,7 +873,8 @@ SecureSession <- R6::R6Class("SecureSession",
                       error = !is.null(resp$error)
                     ))
                     resp
-                  }
+                  },
+                  attributes = list(tool.name = tool_name)
                 )
               } else {
                 response <- .do_tool_call()

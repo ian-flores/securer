@@ -36,17 +36,16 @@ Suggests:
     ellmer (>= 0.3.0),
     httr,
     knitr,
+    otel,
+    otelsdk,
     pak,
     plumber,
     rmarkdown,
     RSQLite,
-    securetrace (>= 0.1.0),
     shiny,
     spelling,
     testthat (>= 3.0.0),
     withr
-Remotes:
-    ian-flores/securetrace
 VignetteBuilder: knitr
 Config/testthat/edition: 3
 Config/Needs/website: pkgdown

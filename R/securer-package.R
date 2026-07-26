@@ -24,3 +24,7 @@
 #'   conn_connect_unix_socket conn_write conn_read_lines poll
 ## usethis namespace: end
 NULL
+
+# OpenTelemetry tracer name for this package, discovered/used by the otel
+# soft dependency (see R/utils-trace.R).  Deliberately not exported.
+otel_tracer_name <- "com.github.ian-flores.securer"

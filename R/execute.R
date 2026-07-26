@@ -55,7 +55,7 @@ execute_r <- function(code, tools = list(), timeout = 30, sandbox = TRUE,
   on.exit(session$close())
 
   if (.trace_active()) {
-    securetrace::with_span("securer.execute_r", type = "custom", {
+    .with_span("securer::execute_r", {
       result <- session$execute(code, timeout = timeout, validate = validate)
       .span_event("execute.complete", list(
         code_length = nchar(code),
@@ -111,7 +111,7 @@ with_secure_session <- function(fn, tools = list(), sandbox = TRUE, ...) {
   on.exit(session$close(), add = TRUE)
 
   if (.trace_active()) {
-    securetrace::with_span("securer.with_secure_session", type = "custom", {
+    .with_span("securer::with_secure_session", {
       result <- fn(session)
       .span_event("session.complete", list(
         sandbox = sandbox
