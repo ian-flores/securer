@@ -15,46 +15,48 @@ knitr::opts_chunk$set(
 )
 ```
 
-## Common issues and solutions
+## Common problems
 
-### "bwrap: No such file or directory" / "sandbox-exec not found"
+### "bwrap: No such file or directory" or "sandbox-exec not found"
 
-The sandbox backend is missing for your platform. On Linux, securer uses
-bubblewrap (`bwrap`) for namespace isolation. On macOS, `sandbox-exec` ships
-with the OS and should already be available.
+The sandbox tool for your platform is missing. On Linux, securer needs
+bubblewrap (`bwrap`). On macOS it uses `sandbox-exec`, which comes with the
+OS, so you shouldn't see this there.
 
 ```{r}
-# Linux -- install bubblewrap
+# Linux: install bubblewrap
 # Debian/Ubuntu: sudo apt install bubblewrap
 # Fedora:        sudo dnf install bubblewrap
 
-# Use sandbox_strict = TRUE to get a hard error instead of a silent fallback
+# With sandbox_strict = TRUE, a missing sandbox is an error, not a warning
 session <- SecureSession$new(sandbox = TRUE, sandbox_strict = TRUE)
 ```
 
-If you want the session to proceed without sandboxing when tools are missing,
-leave `sandbox_strict = FALSE` (the default); securer will emit a warning
-and continue unsandboxed.
+If you'd rather run without the sandbox when the tool is missing, leave
+`sandbox_strict = FALSE`, the default. securer warns you and carries on.
 
-### "Socket connection timed out"
+### "Timeout waiting for client connection"
 
-Unix domain socket paths are limited to approximately 104 characters on macOS.
-securer creates sockets in `/tmp` directly to keep paths short. If you have
-overridden `TMPDIR` or `tempdir()` to a deeply nested directory, the resulting
-socket path may exceed this limit.
+The child R process didn't connect to the socket within a few seconds.
+Usually that means the child failed to start, often because the sandbox
+wrapper couldn't run.
+
+The socket path isn't the problem. On macOS and Linux, securer always puts
+the socket in a new directory under `/tmp`, whatever `TMPDIR` is set to,
+because macOS limits socket paths to about 104 characters.
 
 ```{r}
-# Check your current tempdir length
-nchar(tempdir())
-# If this exceeds ~80 characters, reset TMPDIR before creating a session
-Sys.setenv(TMPDIR = "/tmp")
-session <- SecureSession$new()
+# /tmp has to be writable
+file.access("/tmp", 2) == 0
+
+# If this works, the sandbox is what's failing
+session <- SecureSession$new(sandbox = FALSE)
 ```
 
 ### "Session is not running"
 
-The child R process has exited unexpectedly. This can happen when the child is
-killed by the OS (out-of-memory), hits a resource limit, or receives an external
+The child R process has stopped. The OS may have killed it for using too
+much memory, it may have hit a resource limit, or something else sent it a
 signal.
 
 ```{r}
@@ -63,20 +65,21 @@ session <- SecureSession$new(sandbox = TRUE)
 # Check whether the child process is still alive
 session$is_alive()
 
-# After a timeout, securer auto-restarts the session automatically.
-# For other crashes, create a fresh session:
+# After a timeout, securer restarts the session by itself.
+# After any other crash, start a new one:
 session$close()
 session <- SecureSession$new(sandbox = TRUE)
 ```
 
 ### Windows sandbox limitations
 
-On Windows, securer provides environment isolation only: environment
-variables are sanitized (`HOME`, `TMPDIR`, `R_LIBS_USER`) and resource limits
-are applied via Job Objects. There are **no** filesystem or network restrictions.
+On Windows, securer only cleans the child's environment (`HOME`, `TMPDIR`,
+and `R_LIBS_USER`, among others) and sets resource limits with Job Objects.
+It doesn't restrict files or the network.
 
-For full isolation on Windows, run your R process inside Docker or WSL2 with
-bubblewrap:
+To get those restrictions, set `SECURER_SANDBOX_MODE=docker-spawn` so each
+session runs in its own Docker container. Or run R inside WSL2 with
+bubblewrap installed:
 ```{r}
 # Inside WSL2 with bwrap installed, securer uses the Linux sandbox backend
 session <- SecureSession$new(sandbox = TRUE, sandbox_strict = TRUE)
@@ -84,26 +87,27 @@ session <- SecureSession$new(sandbox = TRUE, sandbox_strict = TRUE)
 
 ### "Maximum executions (N) reached for this session"
 
-The `max_executions` safety limit has been reached. This feature exists for
-disposable agent sessions where you want to cap how many times code can run.
+The session has run code as many times as `max_executions` allows. The
+limit is for throwaway agent sessions, where you want a hard cap on how
+often code can run.
 
 ```{r}
 # This session allows only 5 executions
 session <- SecureSession$new(max_executions = 5)
 
-# After 5 calls to $execute(), further calls will error.
-# Either create a new session:
+# After 5 calls to $execute(), the next one is an error.
+# Start a new session:
 session$close()
 session <- SecureSession$new(max_executions = 10)
 
-# Or omit the limit entirely for unlimited executions:
+# Or leave out the limit:
 session <- SecureSession$new()
 ```
 
 ### "Execution blocked by pre_execute_hook"
 
-Your `pre_execute_hook` function returned `FALSE`, which blocks execution. Debug
-by testing the hook directly with the code string that was rejected.
+Your `pre_execute_hook` returned `FALSE` for this code. To see why, call the
+hook yourself on the code that was rejected.
 
 ```{r}
 # Example hook that blocks system() calls
@@ -112,27 +116,27 @@ my_hook <- function(code) {
   TRUE
 }
 
-# Test it directly to understand what triggers rejection
-my_hook("x <- 1 + 1")          # TRUE -- allowed
-my_hook("system('whoami')")     # FALSE -- blocked
+# Call it directly to see what it rejects
+my_hook("x <- 1 + 1")          # TRUE: allowed
+my_hook("system('whoami')")     # FALSE: blocked
 
 session <- SecureSession$new(pre_execute_hook = my_hook)
 ```
 
-Any return value other than `FALSE` (including `NULL` or `TRUE`) allows
-execution to proceed.
+Only `FALSE` blocks the code. Anything else the hook returns, `NULL`
+included, lets it run.
 
 ### "Package 'foo' not found" in child process
 
-The child process runs with `R_LIBS_USER` deliberately emptied for security.
-Only system-level packages (from `R_LIBS_SITE` and `R.home("library")`) are
-available inside the sandbox.
+securer empties `R_LIBS_USER` in the child on purpose, so a package in a
+user library can't run code when it loads. Inside the sandbox you only get
+packages from `R_LIBS_SITE` and `R.home("library")`.
 
 ```{r}
 # Option 1: Install the package system-wide
 # install.packages("foo", lib = .Library)
 
-# Option 2: Register a tool that calls the package on the host side
+# Option 2: Register a tool that uses the package in your session
 tools <- list(
   securer_tool(
     name = "run_foo",
@@ -147,23 +151,23 @@ session$execute('run_foo("input")')
 
 ### Slow session startup
 
-The `execute_r()` convenience function creates and tears down a session for
-every call. For repeated executions, reuse a persistent session or use a pool.
+`execute_r()` starts and stops a session every time you call it. If you run
+code many times, keep one session open or use a pool.
 
 ```{r}
-# Slow -- new session per call
+# Slow: a new session for every call
 for (i in 1:100) {
   execute_r(paste("sqrt(", i, ")"))
 }
 
-# Fast -- reuse a single session
+# Fast: one session, reused
 session <- SecureSession$new()
 for (i in 1:100) {
   session$execute(paste("sqrt(", i, ")"))
 }
 session$close()
 
-# Fast with concurrency management -- use a pool
+# Fast, and handles several callers at once: a pool
 pool <- SecureSessionPool$new(size = 4)
 for (i in 1:100) {
   pool$execute(paste("sqrt(", i, ")"))
@@ -173,29 +177,27 @@ pool$close()
 
 ### "IPC authentication failed"
 
-The child process failed to present the correct authentication token when
-connecting to the Unix domain socket. This typically means another process on
-the system connected to the socket before the legitimate child did.
+Whatever connected to the socket first didn't send the random token securer
+gave the child. Either the child failed before it could send it, or another
+process on the machine connected first.
 
-securer creates socket directories with `0700` permissions to prevent this. If
-you are on a shared system, ensure `/tmp` subdirectories are not
-world-accessible.
+securer creates each socket directory with `0700` permissions, so only your
+user can get in. On a shared machine, check that those directories really
+are private.
 
 ```{r}
-# Verify socket directory permissions
-session <- SecureSession$new(verbose = TRUE)
-# Verbose mode logs the socket path -- check its permissions with:
-# ls -la /tmp/securer_sock_*
+# Socket directories are /tmp/securer_*. Check their permissions with:
+# ls -ld /tmp/securer_*
 ```
 
 ### "Audit log not written"
 
-The `audit_log` path must be passed at session creation time. Ensure the parent
-directory exists and is writable. The log file is created with `0600`
-permissions, and symlinks are rejected for security.
+Pass `audit_log` when you create the session. The directory it goes in has
+to exist and be writable. securer creates the file with `0600` permissions
+and refuses a path that's a symlink.
 
 ```{r}
-# Ensure the directory exists
+# Make sure the directory exists
 dir.create("logs", showWarnings = FALSE)
 
 session <- SecureSession$new(
@@ -205,6 +207,6 @@ session <- SecureSession$new(
 session$execute("1 + 1")
 session$close()
 
-# Verify the log was written
+# Check the log was written
 readLines("logs/securer-audit.jsonl")
 ```

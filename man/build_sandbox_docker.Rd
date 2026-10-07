@@ -2,7 +2,7 @@
 % Please edit documentation in R/sandbox-docker.R
 \name{build_sandbox_docker}
 \alias{build_sandbox_docker}
-\title{Build Docker sandbox configuration}
+\title{Build in-container Docker sandbox configuration}
 \usage{
 build_sandbox_docker(socket_path, r_home, limits = NULL)
 }
@@ -18,13 +18,17 @@ build_sandbox_docker(socket_path, r_home, limits = NULL)
 A sandbox config list (see \code{\link[=build_sandbox_config]{build_sandbox_config()}})
 }
 \description{
-When running inside a Docker container, the container itself provides
-filesystem and network isolation.  This builder skips bubblewrap (which
-requires namespace support that Docker typically doesn't expose) and
-applies only resource limits (\code{ulimit}) via a wrapper script.
+Used when the securer session is \emph{already running inside} a Docker
+container.  The container itself provides filesystem and network
+isolation, so this builder skips bubblewrap (which requires namespace
+support Docker typically doesn't expose) and applies only resource
+limits (\code{ulimit}) via a wrapper script.
 }
 \details{
-Docker mode is activated automatically when \verb{/.dockerenv} exists, or
-manually by setting \code{SECURER_SANDBOX_MODE=docker}.
+This is different from \code{\link[=build_sandbox_docker_spawn]{build_sandbox_docker_spawn()}}, which starts a
+new container for each child session.  This backend is
+activated automatically when \verb{/.dockerenv} exists, or manually by
+setting \code{SECURER_SANDBOX_MODE=docker}.  The container-spawning backend
+is activated by \code{SECURER_SANDBOX_MODE=docker-spawn}.
 }
 \keyword{internal}

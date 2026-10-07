@@ -1,17 +1,18 @@
 #' @title SecureSessionPool
-#' @description R6 class for a pool of pre-warmed [SecureSession] instances.
+#' @description An R6 class for a pool of [SecureSession] objects that are
+#' started ahead of time.
 #'
-#' Creates multiple sessions at initialization time so that `$execute()` calls
-#' can run immediately on an idle session without waiting for process startup.
-#' Sessions are returned to the pool after each execution completes (or errors).
+#' The pool starts all its sessions when you create it, so `$execute()` can
+#' use an idle one straight away instead of waiting for R to start. Each
+#' session goes back to the pool when its run finishes, whether it succeeded
+#' or failed.
 #'
-#' @section Thread Safety:
-#' \code{SecureSessionPool} is \strong{NOT} thread-safe. The acquire/release
-#' mechanism uses no locking and assumes single-threaded access. If you need
-#' to use pools from multiple processes (e.g., via \code{parallel::mclapply}
-#' or \code{future}), each process should create its own pool instance.
-#' Sharing a single pool across threads or forked processes will lead to
-#' race conditions in session acquisition.
+#' @section Threads and forks:
+#' \code{SecureSessionPool} isn't thread-safe. Handing out and taking back
+#' sessions uses no locks. If you use pools from several processes (for
+#' example with \code{parallel::mclapply} or \code{future}), create a pool
+#' in each process. Two processes sharing one pool can end up grabbing the
+#' same session.
 #'
 #' @examples
 #' \donttest{
@@ -27,17 +28,17 @@
 SecureSessionPool <- R6::R6Class("SecureSessionPool",
   cloneable = FALSE,
   public = list(
-    #' @description Create a new SecureSessionPool
-    #' @param size Integer, number of sessions to pre-warm (default 4, minimum 1).
+    #' @description Start a new SecureSessionPool
+    #' @param size Integer, number of sessions to start (default 4, minimum 1).
     #' @param tools A list of [securer_tool()] objects passed to each session.
-    #' @param sandbox Logical, whether to enable OS-level sandboxing.
+    #' @param sandbox Logical, whether to use the OS sandbox.
     #' @param limits Optional named list of resource limits.
-    #' @param verbose Logical, whether to emit diagnostic messages.
+    #' @param verbose Logical, whether to print what each session is doing.
     #' @param reset_between_uses Logical, whether to restart each session
-    #'   after an execution before returning it to the pool (default `FALSE`).
-    #'   When `TRUE`, calls `session$restart()` after every `$execute()` to
-    #'   prevent state leaking between executions (e.g., variables, loaded
-    #'   packages, options set by prior code).
+    #'   before it goes back to the pool (default `FALSE`). With `TRUE`, the
+    #'   pool calls `session$restart()` after every `$execute()`, so
+    #'   variables, loaded packages, and options from one run don't carry
+    #'   over to the next.
     initialize = function(size = 4L, tools = list(), sandbox = TRUE,
                           limits = NULL, verbose = FALSE,
                           reset_between_uses = FALSE) {
@@ -74,14 +75,14 @@ SecureSessionPool <- R6::R6Class("SecureSessionPool",
       }
     },
 
-    #' @description Execute R code on an available pooled session
+    #' @description Run R code on an idle session from the pool
     #' @param code Character string of R code to execute.
     #' @param timeout Timeout in seconds, or `NULL` for no timeout.
-    #' @param acquire_timeout Optional timeout in seconds to wait for a
-    #'   session to become available. If `NULL` (default), fails immediately
-    #'   when all sessions are busy. If provided, retries acquisition with
-    #'   a short sleep (0.1s) between retries until the timeout expires.
-    #' @return The result of evaluating the code.
+    #' @param acquire_timeout Optional number of seconds to wait for a free
+    #'   session. If `NULL` (the default), the call fails straight away when
+    #'   every session is busy. Otherwise the pool keeps trying, every 0.1
+    #'   seconds, until the time is up.
+    #' @return The value of the last expression in `code`.
     execute = function(code, timeout = NULL, acquire_timeout = NULL) {
       if (private$closed) {
         cli::cli_abort("Pool is closed.", call = NULL)
@@ -114,16 +115,17 @@ SecureSessionPool <- R6::R6Class("SecureSessionPool",
       length(private$sessions)
     },
 
-    #' @description Number of idle (non-busy) sessions
+    #' @description Number of idle sessions
     #' @return Integer
     available = function() {
       if (private$closed) return(0L)
       sum(!private$busy)
     },
 
-    #' @description Summary of pool state
+    #' @description Count sessions by state
     #' @return A named list with `total`, `busy`, `idle`, and `dead` counts.
-    #'   `dead` indicates sessions that have crashed and need restart.
+    #'   `dead` counts sessions whose process has stopped and that need a
+    #'   restart.
     status = function() {
       if (private$closed) {
         return(list(total = 0L, busy = 0L, idle = 0L, dead = 0L))
@@ -138,7 +140,7 @@ SecureSessionPool <- R6::R6Class("SecureSessionPool",
       list(total = n_total, busy = n_busy, idle = n_idle, dead = n_dead)
     },
 
-    #' @description Format method for display
+    #' @description Format the pool for printing
     #' @param ... Ignored.
     #' @return A character string describing the pool.
     format = function(...) {
@@ -172,7 +174,7 @@ SecureSessionPool <- R6::R6Class("SecureSessionPool",
       invisible(self)
     },
 
-    #' @description Close all sessions and shut down the pool
+    #' @description Close every session in the pool
     #' @return Invisible self
     close = function() {
       for (i in seq_along(private$sessions)) {

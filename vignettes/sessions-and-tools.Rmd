@@ -1,8 +1,8 @@
 ---
-title: "Sessions and Tools"
+title: "Sessions and tools"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Sessions and Tools}
+  %\VignetteIndexEntry{Sessions and tools}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -16,14 +16,14 @@ knitr::opts_chunk$set(
 can_eval <- requireNamespace("securer", quietly = TRUE)
 ```
 
-This vignette covers session lifecycle, output handling, audit logging, and
-session pooling. See also `vignette("quickstart")` and
-`vignette("security-model")`.
+This vignette covers sessions you keep open, what happens to output and
+errors, the audit log, and session pools. If you're new to securer, start
+with `vignette("quickstart")`.
 
 ## Persistent sessions
 
-`SecureSession` keeps a child R process alive across multiple `$execute()` calls.
-State persists between executions:
+`SecureSession` keeps one child R process running across many `$execute()`
+calls. Variables you create in one call are still there in the next:
 
 ```{r}
 library(securer)
@@ -43,8 +43,8 @@ session$execute("x * 2")
 session$close()
 ```
 
-Always call `$close()` when done, or use `with_secure_session()` for automatic
-cleanup:
+Call `$close()` when you're done. Or use `with_secure_session()`, which
+closes the session for you, even if the code fails:
 
 ```{r}
 result <- with_secure_session(function(session) {
@@ -53,15 +53,15 @@ result <- with_secure_session(function(session) {
 }, sandbox = FALSE)
 ```
 
-## Agent safety options
+## Limits for agents
 
-`SecureSession` has several options for hardening LLM agent deployments:
-
-- **`max_code_length`** (`$execute()`): Reject code exceeding a character limit
-  (default 100,000).
-- **`max_executions`** (`$new()`): Cap total `$execute()` calls per session.
-- **`pre_execute_hook`** (`$new()`): Callback returning `FALSE` to block execution.
-- **`sanitize_errors`** (`$new()`): Strip paths, PIDs, and hostnames from errors.
+A few options are there mainly for code written by an LLM. `$execute()`
+refuses code longer than `max_code_length` characters (100,000 by default).
+In `$new()`, `max_executions` caps how many times a session can run code,
+and `pre_execute_hook` is a function that sees the code first and can block
+it by returning `FALSE`. `sanitize_errors = TRUE` removes file paths, process
+IDs, and host names from error messages before you see them, so they don't
+end up back in the model's context.
 
 ```{r}
 session <- SecureSession$new(
@@ -74,17 +74,18 @@ session <- SecureSession$new(
 )
 ```
 
-See `vignette("security-model")` for the full threat model and defense layers.
+`vignette("security-model")` explains how these fit with the sandbox.
 
 ## Execution timeouts
 
-`$execute()` accepts a `timeout` in seconds (default 30). On timeout the child
-is killed and the session auto-recovers:
+`$execute()` takes a `timeout` in seconds (30 by default). When time runs
+out, securer kills the child process and starts a new one, so the session
+still works:
 
 ```{r}
 session <- SecureSession$new()
 session$execute("Sys.sleep(60)", timeout = 5)
-#> Error: Execution timed out
+#> Error: Execution timed out after 5 seconds
 session$is_alive()
 #> [1] TRUE
 session$close()
@@ -92,20 +93,21 @@ session$close()
 
 ## Error handling
 
-Errors in the child process, in tool execution, and from unknown tool names are
-all propagated to the host as standard R errors:
+An error in the sandboxed code or in a tool comes back to you as an ordinary
+R error:
 
 ```{r}
 execute_r('stop("something went wrong")')
 #> Error: something went wrong
 
 execute_r("nonexistent_tool()", tools = list())
-#> Error: Unknown tool: nonexistent_tool
+#> Error: could not find function "nonexistent_tool"
 ```
 
 ## Streaming output
 
-Pass `output_handler` to receive child output as it arrives:
+To see output while the code is still running, pass an `output_handler`. It
+gets each line as it's printed:
 
 ```{r}
 session <- SecureSession$new()
@@ -116,11 +118,12 @@ session$execute(
 session$close()
 ```
 
-Output is always available as `attr(result, "output")` on the return value.
+Whether or not you pass a handler, the printed output is also attached to the
+result as `attr(result, "output")`.
 
 ## Output and tool call limits
 
-Both `max_output_lines` and `max_tool_calls` are per-execution caps:
+`max_output_lines` and `max_tool_calls` limit a single `$execute()` call:
 
 ```{r}
 session <- SecureSession$new()
@@ -140,7 +143,8 @@ session$close()
 
 ## Session lifecycle
 
-`$restart()` resets the child process; `$is_alive()` checks if it is running:
+`$restart()` replaces the child process with a fresh one. `$is_alive()` tells
+you whether the child is running:
 
 ```{r}
 session <- SecureSession$new(sandbox = FALSE)
@@ -159,7 +163,8 @@ session$close()
 
 ## Audit logging
 
-Pass `audit_log` to the constructor to write structured JSONL entries:
+Pass a file path as `audit_log` and the session writes one JSON object per
+line for each thing that happens:
 
 ```{r}
 session <- SecureSession$new(audit_log = "securer-audit.jsonl")
@@ -167,29 +172,39 @@ session$execute("1 + 1")
 session$close()
 ```
 
-Each line is a JSON object with `timestamp`, `event`, and `session_id` fields
-plus event-specific data. Events: `session_start` (pid), `session_close`,
-`session_restart`, `execute_start` (code), `execute_complete` (elapsed),
-`execute_error` (error), `execute_timeout` (timeout_secs), `tool_call`
-(tool, args), `tool_result` (tool, elapsed). Example:
+Every line has `timestamp`, `event`, and `session_id`, plus fields that
+depend on the event:
+
+| Event | Extra fields |
+|---|---|
+| `session_start` | `sandbox`, `pid` |
+| `session_close`, `session_restart` | none |
+| `execute_start` | `code` |
+| `execute_complete` | `elapsed` |
+| `execute_error` | `error`, `elapsed` |
+| `execute_timeout` | `timeout_secs` |
+| `tool_call` | `tool`, `args` |
+| `tool_result` | `tool`, `error`, `result_summary`, `elapsed_secs` |
+
+A `tool_call` line looks like this:
 
 ```json
 {"timestamp":"2024-01-15T10:30:00.000Z","event":"tool_call","session_id":"sess_abc123","tool":"add","args":{"a":1,"b":2}}
 ```
 
-The log file is created with `0600` permissions. Code fields longer than 10,000
-characters are truncated.
+Only you can read or write the log file (permissions `0600`). Code longer
+than 10,000 characters is cut short in the log.
 
 ## Session pooling
 
-### Why session pooling?
+### Why use a pool
 
-Creating a `SecureSession` starts a child R process, sets up the sandbox, and
-establishes the IPC socket. This takes 0.5--1 second. For Plumber APIs or
-multi-user Shiny apps, that per-request overhead adds up fast. Session pooling
-pre-warms a fixed number of sessions at startup and reuses them across requests.
+A new `SecureSession` has to start R, set up the sandbox, and open the
+socket. That takes half a second to a second. In a Plumber API or a Shiny
+app with many users, paying that on every request adds up. A pool starts a
+fixed number of sessions once and hands them out as requests come in.
 
-### Session pool lifecycle
+### How a pool works
 
 ```
  Initialize          Acquire            Execute           Release
@@ -201,7 +216,7 @@ pre-warms a fixed number of sessions at startup and reuses them across requests.
 +-------------+   +-------------+   +-------------+   +-------------+
 ```
 
-`SecureSessionPool` pre-warms multiple sessions for low-latency execution:
+`SecureSessionPool` starts its sessions when you create it:
 
 ```{r}
 pool <- SecureSessionPool$new(size = 4, sandbox = TRUE)
@@ -213,8 +228,9 @@ pool$status()  # returns list(total, busy, idle, dead)
 pool$close()
 ```
 
-Set `reset_between_uses = TRUE` to restart sessions after each execution,
-preventing state leakage between callers:
+Sessions in a pool keep their variables between uses. If different users
+share the pool, set `reset_between_uses = TRUE` so each session restarts
+after every call and one caller can't see another's data:
 
 ```{r}
 pool <- SecureSessionPool$new(
@@ -230,5 +246,6 @@ pool$execute("exists('x')")
 pool$close()
 ```
 
-Dead sessions are automatically restarted on acquire. The pool is **not**
-thread-safe; create separate instances when using `parallel` or `future`.
+If a session has died, the pool restarts it before handing it out. The pool
+isn't thread-safe. With `parallel` or `future`, give each worker its own
+pool.

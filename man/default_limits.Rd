@@ -10,10 +10,9 @@ default_limits()
 A named list of resource limits.
 }
 \description{
-Returns the default resource limits that are applied automatically when
-\code{sandbox = TRUE} and no explicit \code{limits} are provided to
-\link{SecureSession} or \code{\link[=execute_r]{execute_r()}}.  Useful for inspecting the defaults
-and creating custom limits based on them.
+Returns the resource limits that \link{SecureSession} and \code{\link[=execute_r]{execute_r()}} use
+when \code{sandbox = TRUE} and you don't pass \code{limits}. Use it to see the
+defaults, or as a starting point for your own.
 }
 \details{
 The returned list contains:
@@ -21,13 +20,12 @@ The returned list contains:
 \item{cpu}{CPU time limit in seconds (default: 60).}
 \item{memory}{Virtual memory limit in bytes (default: 512 MB).}
 \item{fsize}{Maximum file size in bytes (default: 50 MB).}
-\item{nproc}{Maximum number of child processes (default: 50).}
+\item{nproc}{Maximum number of processes (default: 50).}
 \item{nofile}{Maximum number of open file descriptors (default: 256).}
 }
 
-You can pass a modified copy to \code{SecureSession$new(limits = ...)} or
-\code{execute_r(limits = ...)}.  Pass \code{limits = list()} to explicitly
-disable all resource limits.
+Pass a changed copy to \code{SecureSession$new(limits = ...)} or
+\code{execute_r(limits = ...)}. Pass \code{limits = list()} to turn all limits off.
 }
 \examples{
 # Inspect defaults

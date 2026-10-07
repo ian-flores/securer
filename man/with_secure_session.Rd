@@ -2,7 +2,7 @@
 % Please edit documentation in R/execute.R
 \name{with_secure_session}
 \alias{with_secure_session}
-\title{Execute code with an auto-managed SecureSession}
+\title{Run a function with a SecureSession that closes itself}
 \usage{
 with_secure_session(fn, tools = list(), sandbox = TRUE, ...)
 }
@@ -19,11 +19,10 @@ with_secure_session(fn, tools = list(), sandbox = TRUE, ...)
 The return value of \code{fn(session)}.
 }
 \description{
-Creates a \link{SecureSession}, passes it to a user function, and guarantees
-cleanup via \code{\link[=on.exit]{on.exit()}}.
-This is useful when you need to run multiple executions on the same session
-(e.g., building up state across calls) without worrying about leaked
-processes.
+Starts a \link{SecureSession}, passes it to \code{fn}, and closes it when \code{fn}
+returns or fails. Use it when you want several calls to share one session,
+for example to build up variables across calls, without having to
+remember to close it.
 }
 \examples{
 \donttest{

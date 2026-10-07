@@ -7,11 +7,12 @@
 An R6 object of class \code{SecureSession}.
 }
 \description{
-R6 class for secure code execution with tool-call IPC.
+An R6 class for a child R process that runs code, usually in
+a sandbox, and can call tools in your session.
 
-Wraps a \code{callr::r_session} with a bidirectional Unix domain socket protocol
-that allows code running in the child process to pause, call tools on the
-parent side, and resume with the result.
+It wraps a \code{callr::r_session} and connects to it over a Unix domain
+socket. When code in the child calls a tool, the child pauses, your
+session runs the tool, and the child carries on with the result.
 }
 \examples{
 \donttest{
@@ -55,7 +56,7 @@ session$close()
 \if{html}{\out{<a id="method-SecureSession-new"></a>}}
 \if{latex}{\out{\hypertarget{method-SecureSession-new}{}}}
 \subsection{Method \code{new()}}{
-Create a new SecureSession
+Start a new SecureSession
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{SecureSession$new(
   tools = list(),
@@ -74,58 +75,54 @@ Create a new SecureSession
 \if{html}{\out{<div class="arguments">}}
 \describe{
 \item{\code{tools}}{A list of \code{\link[=securer_tool]{securer_tool()}} objects, or a named list of
-functions (legacy format for backward compatibility)}
+functions (the older format, still accepted)}
 
-\item{\code{sandbox}}{Logical, whether to enable the OS-level sandbox.
-On macOS this uses \code{sandbox-exec} with a Seatbelt profile that
-denies network access and restricts file writes to temp
-directories.  On Linux this uses bubblewrap (\code{bwrap}) with full
-namespace isolation.  On Windows this provides environment
-isolation (clean HOME/TMPDIR, empty R_LIBS_USER) and resource
-limits (memory, CPU time, process count) via Job Objects.
-On other platforms the session runs without sandboxing.}
+\item{\code{sandbox}}{Logical, whether to use the OS sandbox. On macOS this
+is \code{sandbox-exec} with a Seatbelt profile that blocks the network
+and only allows writes to temp directories. On Linux it's
+bubblewrap (\code{bwrap}), with the child in its own namespaces. On
+Windows there's no real sandbox: securer cleans the environment
+(private \code{HOME} and \code{TMPDIR}, empty \code{R_LIBS_USER}) and can limit
+memory, CPU time, and process count with a Job Object. On other
+platforms the session runs without a sandbox.}
 
 \item{\code{limits}}{An optional named list of resource limits to apply to the
 child process via \code{ulimit}.  Supported names: \code{cpu} (seconds),
 \code{memory} (bytes, virtual address space), \code{fsize} (bytes, max file
 size), \code{nproc} (max processes), \code{nofile} (max open files),
-\code{stack} (bytes, stack size).  When \code{sandbox = TRUE} and \code{limits}
-is \code{NULL} (the default), sensible defaults are applied automatically
-(see \code{\link[=default_limits]{default_limits()}}).  Pass \code{limits = list()} to explicitly
-disable resource limits.  When \code{sandbox = FALSE}, \code{NULL} means
-no limits.}
+\code{stack} (bytes, stack size). With \code{sandbox = TRUE}, \code{NULL} (the
+default) means \code{\link[=default_limits]{default_limits()}}, and \code{limits = list()} means no
+limits. With \code{sandbox = FALSE}, \code{NULL} means no limits.}
 
-\item{\code{verbose}}{Logical, whether to emit diagnostic messages via
-\code{message()}.  Useful for debugging.  Users can suppress with
-\code{suppressMessages()}.}
+\item{\code{verbose}}{Logical, whether to print what the session is doing
+with \code{message()}. Handy for debugging. Use \code{suppressMessages()} to
+hide them.}
 
-\item{\code{sandbox_strict}}{Logical, whether to error if sandbox tools are
-not available on the current platform (default \code{FALSE}).  When
-\code{TRUE} and \code{sandbox = TRUE}, the session will stop with an
-informative error if the OS-level sandbox cannot be set up.
-When \code{FALSE} (default), the existing behavior is preserved:
-a warning is emitted and the session continues without sandboxing.}
+\item{\code{sandbox_strict}}{Logical, whether to stop if the sandbox tools
+aren't available on this platform (default \code{FALSE}). With \code{TRUE}
+and \code{sandbox = TRUE}, the session fails to start if it can't set up
+the sandbox. With \code{FALSE}, you get a warning and the session runs
+without one.}
 
-\item{\code{audit_log}}{Optional path to a JSONL file for persistent audit
-logging.  If \code{NULL} (the default), no file logging is performed.
-When a path is provided, structured JSON entries are appended for
-session lifecycle events, executions, and tool calls.}
+\item{\code{audit_log}}{Optional path to a JSONL file. If you give one, the
+session appends a JSON line for each start, close, restart, run, and
+tool call. If \code{NULL} (the default), nothing is written.}
 
 \item{\code{max_executions}}{Optional integer, the maximum number of
-\verb{$execute()} calls allowed on this session (default \code{NULL} = unlimited).
-Once the limit is reached, subsequent \verb{$execute()} calls stop with
-an error.  Useful for disposable sessions in agent workflows.}
+\verb{$execute()} calls this session allows. The default, \code{NULL}, means
+no limit. After that, \verb{$execute()} stops with an error. Useful for
+throwaway sessions in agent code.}
 
 \item{\code{pre_execute_hook}}{Optional function taking a single \code{code}
-argument.  Called at the start of every \verb{$execute()} invocation.
-If it returns \code{FALSE}, execution is blocked with an error.  Any
-other return value (including \code{NULL} or \code{TRUE}) allows execution
-to proceed.  Default \code{NULL} (no hook).}
+argument, called at the start of every \verb{$execute()}. If it returns
+\code{FALSE}, the code doesn't run and \verb{$execute()} stops with an error.
+Anything else, \code{NULL} included, lets the code run. The default,
+\code{NULL}, means no hook.}
 
-\item{\code{sanitize_errors}}{Logical, whether to strip sensitive details
-(file paths, PIDs, hostnames) from error messages returned by
-\verb{$execute()} (default \code{FALSE}).  When \code{TRUE},
-\code{\link[=sanitize_error_message]{sanitize_error_message()}} is applied before the error is raised.}
+\item{\code{sanitize_errors}}{Logical, whether to remove file paths, process
+IDs, and host names from the errors \verb{$execute()} raises (default
+\code{FALSE}). With \code{TRUE}, each message goes through
+\code{\link[=sanitize_error_message]{sanitize_error_message()}} first.}
 }
 \if{html}{\out{</div>}}
 }
@@ -134,7 +131,7 @@ to proceed.  Default \code{NULL} (no hook).}
 \if{html}{\out{<a id="method-SecureSession-execute"></a>}}
 \if{latex}{\out{\hypertarget{method-SecureSession-execute}{}}}
 \subsection{Method \code{execute()}}{
-Execute R code in the secure session
+Run R code in the session
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{SecureSession$execute(
   code,
@@ -152,42 +149,41 @@ Execute R code in the secure session
 \describe{
 \item{\code{code}}{Character string of R code to execute}
 
-\item{\code{timeout}}{Timeout in seconds (default 30).  Pass \code{NULL} to
-disable the timeout entirely.  Both this method and the
-\code{\link[=execute_r]{execute_r()}} convenience wrapper default to 30 seconds.  For
-long-running workloads, pass an explicit higher value or \code{NULL}.}
+\item{\code{timeout}}{Timeout in seconds (default 30, the same as
+\code{\link[=execute_r]{execute_r()}}). Pass \code{NULL} for no timeout. For long jobs, pass a
+bigger number or \code{NULL}.}
 
-\item{\code{validate}}{Logical, whether to pre-validate the code for syntax
-errors before sending it to the child process (default \code{TRUE}).}
+\item{\code{validate}}{Logical, whether to check the code for syntax errors
+before sending it to the child process (default \code{TRUE}).}
 
-\item{\code{output_handler}}{An optional callback function that receives output
-lines (character) as they arrive from the child process. If \code{NULL}
-(default), output is only collected and returned as the \code{"output"}
-attribute on the result.}
+\item{\code{output_handler}}{Optional function that gets each line of output
+from the child as it's printed. Either way, the output is also
+attached to the result as its \code{"output"} attribute.}
 
 \item{\code{max_tool_calls}}{Maximum number of tool calls allowed in this
 execution, or \code{NULL} for unlimited (default \code{NULL}).}
 
-\item{\code{max_code_length}}{Maximum allowed \code{nchar(code)} (default 100000).
-Code exceeding this limit is rejected before parsing.  Prevents
-resource exhaustion from extremely large code strings.}
+\item{\code{max_code_length}}{Largest \code{nchar(code)} allowed (default 100000).
+Longer code is rejected before it's parsed, so a huge string can't
+tie up the session.}
 
-\item{\code{max_output_lines}}{Maximum number of output lines to accumulate
-(default \code{NULL} = unlimited).  Once the limit is reached, further
-output from the child is still drained but not stored.}
+\item{\code{max_output_lines}}{Most lines of output to keep. The default,
+\code{NULL}, means no limit. Past the limit, securer still reads the
+child's output but throws it away.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-The result of evaluating the code, with an \code{"output"} attribute
-containing all captured stdout/stderr as a character vector.
+The value of the last expression, with an \code{"output"}
+attribute holding the printed stdout and stderr as a character
+vector.
 }
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-SecureSession-close"></a>}}
 \if{latex}{\out{\hypertarget{method-SecureSession-close}{}}}
 \subsection{Method \code{close()}}{
-Close the session and clean up resources
+Close the session and remove its temp files
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{SecureSession$close()}\if{html}{\out{</div>}}
 }
@@ -200,7 +196,7 @@ Invisible self
 \if{html}{\out{<a id="method-SecureSession-is_alive"></a>}}
 \if{latex}{\out{\hypertarget{method-SecureSession-is_alive}{}}}
 \subsection{Method \code{is_alive()}}{
-Check if session is alive
+Check whether the child process is running
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{SecureSession$is_alive()}\if{html}{\out{</div>}}
 }
@@ -213,7 +209,7 @@ Logical
 \if{html}{\out{<a id="method-SecureSession-format"></a>}}
 \if{latex}{\out{\hypertarget{method-SecureSession-format}{}}}
 \subsection{Method \code{format()}}{
-Format method for display
+Format the session for printing
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{SecureSession$format(...)}\if{html}{\out{</div>}}
 }
@@ -253,7 +249,7 @@ Invisible self.
 \if{html}{\out{<a id="method-SecureSession-tools"></a>}}
 \if{latex}{\out{\hypertarget{method-SecureSession-tools}{}}}
 \subsection{Method \code{tools()}}{
-List registered tools and their argument specs
+List the registered tools and their arguments
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{SecureSession$tools()}\if{html}{\out{</div>}}
 }
@@ -270,9 +266,9 @@ registered.
 \subsection{Method \code{restart()}}{
 Restart the child R process
 
-Kills the current child process, cleans up the socket, and starts
-a fresh child with the runtime and tool wrappers re-injected.
-The session remains usable for subsequent \verb{$execute()} calls.
+Kills the child process, removes the socket, and starts a new child
+with the tools set up again. Variables from before are gone, but you
+can keep calling \verb{$execute()}.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{SecureSession$restart()}\if{html}{\out{</div>}}
 }

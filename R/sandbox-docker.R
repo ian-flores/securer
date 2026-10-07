@@ -6,8 +6,8 @@
 #' support Docker typically doesn't expose) and applies only resource
 #' limits (`ulimit`) via a wrapper script.
 #'
-#' This is **not** the same as [build_sandbox_docker_spawn()], which
-#' *spawns* a fresh container for each child session.  This backend is
+#' This is different from [build_sandbox_docker_spawn()], which starts a
+#' new container for each child session.  This backend is
 #' activated automatically when `/.dockerenv` exists, or manually by
 #' setting `SECURER_SANDBOX_MODE=docker`.  The container-spawning backend
 #' is activated by `SECURER_SANDBOX_MODE=docker-spawn`.

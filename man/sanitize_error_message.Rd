@@ -2,7 +2,7 @@
 % Please edit documentation in R/sanitize.R
 \name{sanitize_error_message}
 \alias{sanitize_error_message}
-\title{Sanitize error messages before returning to LLM}
+\title{Clean error messages before they go back to an LLM}
 \usage{
 sanitize_error_message(msg, max_length = 500L)
 }
@@ -15,8 +15,8 @@ sanitize_error_message(msg, max_length = 500L)
 A sanitized character string.
 }
 \description{
-Removes sensitive information from R error messages that could leak
-host details to an adversarial LLM. Replaces file paths, hostnames/IPs,
+Removes details from R error messages that would tell a hostile LLM
+about the host. Replaces file paths, hostnames/IPs,
 process IDs, and stack traces while preserving the core error type.
 }
 \keyword{internal}

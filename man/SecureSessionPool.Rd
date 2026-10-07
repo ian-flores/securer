@@ -7,20 +7,21 @@
 An R6 object of class \code{SecureSessionPool}.
 }
 \description{
-R6 class for a pool of pre-warmed \link{SecureSession} instances.
+An R6 class for a pool of \link{SecureSession} objects that are
+started ahead of time.
 
-Creates multiple sessions at initialization time so that \verb{$execute()} calls
-can run immediately on an idle session without waiting for process startup.
-Sessions are returned to the pool after each execution completes (or errors).
+The pool starts all its sessions when you create it, so \verb{$execute()} can
+use an idle one straight away instead of waiting for R to start. Each
+session goes back to the pool when its run finishes, whether it succeeded
+or failed.
 }
-\section{Thread Safety}{
+\section{Threads and forks}{
 
-\code{SecureSessionPool} is \strong{NOT} thread-safe. The acquire/release
-mechanism uses no locking and assumes single-threaded access. If you need
-to use pools from multiple processes (e.g., via \code{parallel::mclapply}
-or \code{future}), each process should create its own pool instance.
-Sharing a single pool across threads or forked processes will lead to
-race conditions in session acquisition.
+\code{SecureSessionPool} isn't thread-safe. Handing out and taking back
+sessions uses no locks. If you use pools from several processes (for
+example with \code{parallel::mclapply} or \code{future}), create a pool
+in each process. Two processes sharing one pool can end up grabbing the
+same session.
 }
 
 \examples{
@@ -49,7 +50,7 @@ pool$close()
 \if{html}{\out{<a id="method-SecureSessionPool-new"></a>}}
 \if{latex}{\out{\hypertarget{method-SecureSessionPool-new}{}}}
 \subsection{Method \code{new()}}{
-Create a new SecureSessionPool
+Start a new SecureSessionPool
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{SecureSessionPool$new(
   size = 4L,
@@ -64,21 +65,21 @@ Create a new SecureSessionPool
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{size}}{Integer, number of sessions to pre-warm (default 4, minimum 1).}
+\item{\code{size}}{Integer, number of sessions to start (default 4, minimum 1).}
 
 \item{\code{tools}}{A list of \code{\link[=securer_tool]{securer_tool()}} objects passed to each session.}
 
-\item{\code{sandbox}}{Logical, whether to enable OS-level sandboxing.}
+\item{\code{sandbox}}{Logical, whether to use the OS sandbox.}
 
 \item{\code{limits}}{Optional named list of resource limits.}
 
-\item{\code{verbose}}{Logical, whether to emit diagnostic messages.}
+\item{\code{verbose}}{Logical, whether to print what each session is doing.}
 
 \item{\code{reset_between_uses}}{Logical, whether to restart each session
-after an execution before returning it to the pool (default \code{FALSE}).
-When \code{TRUE}, calls \code{session$restart()} after every \verb{$execute()} to
-prevent state leaking between executions (e.g., variables, loaded
-packages, options set by prior code).}
+before it goes back to the pool (default \code{FALSE}). With \code{TRUE}, the
+pool calls \code{session$restart()} after every \verb{$execute()}, so
+variables, loaded packages, and options from one run don't carry
+over to the next.}
 }
 \if{html}{\out{</div>}}
 }
@@ -87,7 +88,7 @@ packages, options set by prior code).}
 \if{html}{\out{<a id="method-SecureSessionPool-execute"></a>}}
 \if{latex}{\out{\hypertarget{method-SecureSessionPool-execute}{}}}
 \subsection{Method \code{execute()}}{
-Execute R code on an available pooled session
+Run R code on an idle session from the pool
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{SecureSessionPool$execute(code, timeout = NULL, acquire_timeout = NULL)}\if{html}{\out{</div>}}
 }
@@ -99,15 +100,15 @@ Execute R code on an available pooled session
 
 \item{\code{timeout}}{Timeout in seconds, or \code{NULL} for no timeout.}
 
-\item{\code{acquire_timeout}}{Optional timeout in seconds to wait for a
-session to become available. If \code{NULL} (default), fails immediately
-when all sessions are busy. If provided, retries acquisition with
-a short sleep (0.1s) between retries until the timeout expires.}
+\item{\code{acquire_timeout}}{Optional number of seconds to wait for a free
+session. If \code{NULL} (the default), the call fails straight away when
+every session is busy. Otherwise the pool keeps trying, every 0.1
+seconds, until the time is up.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-The result of evaluating the code.
+The value of the last expression in \code{code}.
 }
 }
 \if{html}{\out{<hr>}}
@@ -127,7 +128,7 @@ Integer
 \if{html}{\out{<a id="method-SecureSessionPool-available"></a>}}
 \if{latex}{\out{\hypertarget{method-SecureSessionPool-available}{}}}
 \subsection{Method \code{available()}}{
-Number of idle (non-busy) sessions
+Number of idle sessions
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{SecureSessionPool$available()}\if{html}{\out{</div>}}
 }
@@ -140,21 +141,22 @@ Integer
 \if{html}{\out{<a id="method-SecureSessionPool-status"></a>}}
 \if{latex}{\out{\hypertarget{method-SecureSessionPool-status}{}}}
 \subsection{Method \code{status()}}{
-Summary of pool state
+Count sessions by state
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{SecureSessionPool$status()}\if{html}{\out{</div>}}
 }
 
 \subsection{Returns}{
 A named list with \code{total}, \code{busy}, \code{idle}, and \code{dead} counts.
-\code{dead} indicates sessions that have crashed and need restart.
+\code{dead} counts sessions whose process has stopped and that need a
+restart.
 }
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-SecureSessionPool-format"></a>}}
 \if{latex}{\out{\hypertarget{method-SecureSessionPool-format}{}}}
 \subsection{Method \code{format()}}{
-Format method for display
+Format the pool for printing
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{SecureSessionPool$format(...)}\if{html}{\out{</div>}}
 }
@@ -194,7 +196,7 @@ Invisible self.
 \if{html}{\out{<a id="method-SecureSessionPool-close"></a>}}
 \if{latex}{\out{\hypertarget{method-SecureSessionPool-close}{}}}
 \subsection{Method \code{close()}}{
-Close all sessions and shut down the pool
+Close every session in the pool
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{SecureSessionPool$close()}\if{html}{\out{</div>}}
 }

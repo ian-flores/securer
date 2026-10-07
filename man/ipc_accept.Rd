@@ -16,8 +16,8 @@ Invisible NULL; the server_conn is modified in place
 }
 \description{
 Polls the server connection and accepts the incoming client.
-Note: \code{processx::conn_accept_unix_socket()} transitions the server
-connection itself to "connected_server" state. After calling this,
-the same \code{server_conn} object is used for bidirectional data transfer.
+\code{processx::conn_accept_unix_socket()} doesn't return a new connection. It
+switches the server connection itself to the "connected_server" state,
+and from then on the same \code{server_conn} object carries data both ways.
 }
 \keyword{internal}

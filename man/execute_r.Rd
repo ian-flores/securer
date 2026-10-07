@@ -30,25 +30,25 @@ timeout (default 30).}
 \item{limits}{Optional named list of resource limits (see
 \link{SecureSession} for details).}
 
-\item{verbose}{Logical, whether to emit diagnostic messages via
-\code{message()}.  Useful for debugging.  Users can suppress with
-\code{suppressMessages()}.}
+\item{verbose}{Logical, whether to print what the session is doing with
+\code{message()}. Handy for debugging. Wrap the call in \code{suppressMessages()}
+to hide them.}
 
-\item{validate}{Logical, whether to pre-validate the code for syntax
-errors before sending it to the child process (default \code{TRUE}).}
+\item{validate}{Logical, whether to check the code for syntax errors
+before sending it to the child process (default \code{TRUE}).}
 
-\item{sandbox_strict}{Logical, whether to error if sandbox tools are
-not available (default \code{FALSE}).  See \link{SecureSession} for details.}
+\item{sandbox_strict}{Logical, whether to stop with an error if the
+sandbox tools aren't available (default \code{FALSE}). See \link{SecureSession}.}
 
-\item{audit_log}{Optional path to a JSONL file for persistent audit
-logging (default \code{NULL}, no file logging).}
+\item{audit_log}{Optional path to a JSONL file to log session events to.
+The default, \code{NULL}, writes no log.}
 }
 \value{
-The result of evaluating \code{code} in the secure session.
+The value of the last expression in \code{code}.
 }
 \description{
-A convenience wrapper that creates a \link{SecureSession}, executes code, and
-returns the result. The session is automatically closed when done.
+Starts a \link{SecureSession}, runs \code{code} in it, and returns the result. The
+session is closed afterwards, even if the code fails.
 }
 \examples{
 \donttest{

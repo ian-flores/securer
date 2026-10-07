@@ -8,7 +8,8 @@
 #'   \item Allows file writes only to the temp directory (for UDS + R temp files)
 #'   \item Allows Unix domain socket operations (IPC with the parent)
 #'   \item Denies remote network access (TCP/UDP)
-#'   \item Allows only process-fork and process-exec for the R binary
+#'   \item Allows process-exec only for the R binaries, `/bin/sh`, and a few
+#'     utilities R's startup script needs
 #'   \item Allows only specific system operations R needs
 #' }
 #'

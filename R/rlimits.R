@@ -1,22 +1,20 @@
 #' Default resource limits for sandboxed sessions
 #'
-#' Returns the default resource limits that are applied automatically when
-#' `sandbox = TRUE` and no explicit `limits` are provided to
-#' [SecureSession] or [execute_r()].  Useful for inspecting the defaults
-#' and creating custom limits based on them.
+#' Returns the resource limits that [SecureSession] and [execute_r()] use
+#' when `sandbox = TRUE` and you don't pass `limits`. Use it to see the
+#' defaults, or as a starting point for your own.
 #'
 #' The returned list contains:
 #' \describe{
 #'   \item{cpu}{CPU time limit in seconds (default: 60).}
 #'   \item{memory}{Virtual memory limit in bytes (default: 512 MB).}
 #'   \item{fsize}{Maximum file size in bytes (default: 50 MB).}
-#'   \item{nproc}{Maximum number of child processes (default: 50).}
+#'   \item{nproc}{Maximum number of processes (default: 50).}
 #'   \item{nofile}{Maximum number of open file descriptors (default: 256).}
 #' }
 #'
-#' You can pass a modified copy to `SecureSession$new(limits = ...)` or
-#' `execute_r(limits = ...)`.  Pass `limits = list()` to explicitly
-#' disable all resource limits.
+#' Pass a changed copy to `SecureSession$new(limits = ...)` or
+#' `execute_r(limits = ...)`. Pass `limits = list()` to turn all limits off.
 #'
 #' @return A named list of resource limits.
 #'

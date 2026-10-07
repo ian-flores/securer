@@ -17,24 +17,27 @@ securer_tool(name, description, fn, args = list())
 \arguments{
 \item{name}{Character, the tool name (must be non-empty).}
 
-\item{description}{Character, description of what the tool does.}
+\item{description}{Character, what the tool does. You can show this to
+an LLM so it knows when to use the tool.}
 
-\item{fn}{Function that implements the tool.}
+\item{fn}{The function that runs when the tool is called.}
 
-\item{args}{Named list mapping argument names to type strings
-(e.g. \code{list(city = "character")}). Used to generate wrapper functions
-in the child process with the correct formal arguments.}
+\item{args}{Named list of argument names and their types, such as
+\code{list(city = "character")}. securer uses it to build a function with
+the same arguments in the child, and to check argument types. Allowed
+types are \code{"numeric"}, \code{"character"}, \code{"logical"}, \code{"integer"},
+\code{"list"}, and \code{"data.frame"}.}
 }
 \value{
 A \code{securer_tool} object.
 }
 \description{
-S7 class for tool definitions.
+The S7 class behind \code{\link[=securer_tool]{securer_tool()}}. You normally create
+tools with \code{\link[=securer_tool]{securer_tool()}} rather than with this class directly.
 
-Defines a named tool with a function implementation and typed argument
-metadata. Tool objects are passed to \link{SecureSession} or \code{\link[=execute_r]{execute_r()}} so
-that code running in the sandboxed child process can call the tool by name
-and the parent process executes the actual function.
+A tool is a function that code in the sandbox can call by name, but that
+runs in your session. Pass a list of tools to \link{SecureSession} or
+\code{\link[=execute_r]{execute_r()}}.
 }
 \examples{
 tool <- securer_tool(

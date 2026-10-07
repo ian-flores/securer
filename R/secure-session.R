@@ -16,11 +16,12 @@
 }
 
 #' @title SecureSession
-#' @description R6 class for secure code execution with tool-call IPC.
+#' @description An R6 class for a child R process that runs code, usually in
+#' a sandbox, and can call tools in your session.
 #'
-#' Wraps a `callr::r_session` with a bidirectional Unix domain socket protocol
-#' that allows code running in the child process to pause, call tools on the
-#' parent side, and resume with the result.
+#' It wraps a `callr::r_session` and connects to it over a Unix domain
+#' socket. When code in the child calls a tool, the child pauses, your
+#' session runs the tool, and the child carries on with the result.
 #'
 #' @examples
 #' \donttest{
@@ -52,52 +53,48 @@
 SecureSession <- R6::R6Class("SecureSession",
   cloneable = FALSE,
   public = list(
-    #' @description Create a new SecureSession
+    #' @description Start a new SecureSession
     #' @param tools A list of [securer_tool()] objects, or a named list of
-    #'   functions (legacy format for backward compatibility)
-    #' @param sandbox Logical, whether to enable the OS-level sandbox.
-    #'   On macOS this uses `sandbox-exec` with a Seatbelt profile that
-    #'   denies network access and restricts file writes to temp
-    #'   directories.  On Linux this uses bubblewrap (`bwrap`) with full
-    #'   namespace isolation.  On Windows this provides environment
-    #'   isolation (clean HOME/TMPDIR, empty R_LIBS_USER) and resource
-    #'   limits (memory, CPU time, process count) via Job Objects.
-    #'   On other platforms the session runs without sandboxing.
+    #'   functions (the older format, still accepted)
+    #' @param sandbox Logical, whether to use the OS sandbox. On macOS this
+    #'   is `sandbox-exec` with a Seatbelt profile that blocks the network
+    #'   and only allows writes to temp directories. On Linux it's
+    #'   bubblewrap (`bwrap`), with the child in its own namespaces. On
+    #'   Windows there's no real sandbox: securer cleans the environment
+    #'   (private `HOME` and `TMPDIR`, empty `R_LIBS_USER`) and can limit
+    #'   memory, CPU time, and process count with a Job Object. On other
+    #'   platforms the session runs without a sandbox.
     #' @param limits An optional named list of resource limits to apply to the
     #'   child process via `ulimit`.  Supported names: `cpu` (seconds),
     #'   `memory` (bytes, virtual address space), `fsize` (bytes, max file
     #'   size), `nproc` (max processes), `nofile` (max open files),
-    #'   `stack` (bytes, stack size).  When `sandbox = TRUE` and `limits`
-    #'   is `NULL` (the default), sensible defaults are applied automatically
-    #'   (see [default_limits()]).  Pass `limits = list()` to explicitly
-    #'   disable resource limits.  When `sandbox = FALSE`, `NULL` means
-    #'   no limits.
-    #' @param verbose Logical, whether to emit diagnostic messages via
-    #'   `message()`.  Useful for debugging.  Users can suppress with
-    #'   `suppressMessages()`.
-    #' @param sandbox_strict Logical, whether to error if sandbox tools are
-    #'   not available on the current platform (default `FALSE`).  When
-    #'   `TRUE` and `sandbox = TRUE`, the session will stop with an
-    #'   informative error if the OS-level sandbox cannot be set up.
-    #'   When `FALSE` (default), the existing behavior is preserved:
-    #'   a warning is emitted and the session continues without sandboxing.
-    #' @param audit_log Optional path to a JSONL file for persistent audit
-    #'   logging.  If `NULL` (the default), no file logging is performed.
-    #'   When a path is provided, structured JSON entries are appended for
-    #'   session lifecycle events, executions, and tool calls.
+    #'   `stack` (bytes, stack size). With `sandbox = TRUE`, `NULL` (the
+    #'   default) means [default_limits()], and `limits = list()` means no
+    #'   limits. With `sandbox = FALSE`, `NULL` means no limits.
+    #' @param verbose Logical, whether to print what the session is doing
+    #'   with `message()`. Handy for debugging. Use `suppressMessages()` to
+    #'   hide them.
+    #' @param sandbox_strict Logical, whether to stop if the sandbox tools
+    #'   aren't available on this platform (default `FALSE`). With `TRUE`
+    #'   and `sandbox = TRUE`, the session fails to start if it can't set up
+    #'   the sandbox. With `FALSE`, you get a warning and the session runs
+    #'   without one.
+    #' @param audit_log Optional path to a JSONL file. If you give one, the
+    #'   session appends a JSON line for each start, close, restart, run, and
+    #'   tool call. If `NULL` (the default), nothing is written.
     #' @param max_executions Optional integer, the maximum number of
-    #'   `$execute()` calls allowed on this session (default `NULL` = unlimited).
-    #'   Once the limit is reached, subsequent `$execute()` calls stop with
-    #'   an error.  Useful for disposable sessions in agent workflows.
+    #'   `$execute()` calls this session allows. The default, `NULL`, means
+    #'   no limit. After that, `$execute()` stops with an error. Useful for
+    #'   throwaway sessions in agent code.
     #' @param pre_execute_hook Optional function taking a single `code`
-    #'   argument.  Called at the start of every `$execute()` invocation.
-    #'   If it returns `FALSE`, execution is blocked with an error.  Any
-    #'   other return value (including `NULL` or `TRUE`) allows execution
-    #'   to proceed.  Default `NULL` (no hook).
-    #' @param sanitize_errors Logical, whether to strip sensitive details
-    #'   (file paths, PIDs, hostnames) from error messages returned by
-    #'   `$execute()` (default `FALSE`).  When `TRUE`,
-    #'   [sanitize_error_message()] is applied before the error is raised.
+    #'   argument, called at the start of every `$execute()`. If it returns
+    #'   `FALSE`, the code doesn't run and `$execute()` stops with an error.
+    #'   Anything else, `NULL` included, lets the code run. The default,
+    #'   `NULL`, means no hook.
+    #' @param sanitize_errors Logical, whether to remove file paths, process
+    #'   IDs, and host names from the errors `$execute()` raises (default
+    #'   `FALSE`). With `TRUE`, each message goes through
+    #'   [sanitize_error_message()] first.
     initialize = function(tools = list(), sandbox = FALSE, limits = NULL,
                           verbose = FALSE, sandbox_strict = FALSE,
                           audit_log = NULL, max_executions = NULL,
@@ -144,28 +141,27 @@ SecureSession <- R6::R6Class("SecureSession",
       private$start_session()
     },
 
-    #' @description Execute R code in the secure session
+    #' @description Run R code in the session
     #' @param code Character string of R code to execute
-    #' @param timeout Timeout in seconds (default 30).  Pass `NULL` to
-    #'   disable the timeout entirely.  Both this method and the
-    #'   [execute_r()] convenience wrapper default to 30 seconds.  For
-    #'   long-running workloads, pass an explicit higher value or `NULL`.
-    #' @param validate Logical, whether to pre-validate the code for syntax
-    #'   errors before sending it to the child process (default `TRUE`).
-    #' @param output_handler An optional callback function that receives output
-    #'   lines (character) as they arrive from the child process. If `NULL`
-    #'   (default), output is only collected and returned as the `"output"`
-    #'   attribute on the result.
+    #' @param timeout Timeout in seconds (default 30, the same as
+    #'   [execute_r()]). Pass `NULL` for no timeout. For long jobs, pass a
+    #'   bigger number or `NULL`.
+    #' @param validate Logical, whether to check the code for syntax errors
+    #'   before sending it to the child process (default `TRUE`).
+    #' @param output_handler Optional function that gets each line of output
+    #'   from the child as it's printed. Either way, the output is also
+    #'   attached to the result as its `"output"` attribute.
     #' @param max_tool_calls Maximum number of tool calls allowed in this
     #'   execution, or `NULL` for unlimited (default `NULL`).
-    #' @param max_code_length Maximum allowed `nchar(code)` (default 100000).
-    #'   Code exceeding this limit is rejected before parsing.  Prevents
-    #'   resource exhaustion from extremely large code strings.
-    #' @param max_output_lines Maximum number of output lines to accumulate
-    #'   (default `NULL` = unlimited).  Once the limit is reached, further
-    #'   output from the child is still drained but not stored.
-    #' @return The result of evaluating the code, with an `"output"` attribute
-    #'   containing all captured stdout/stderr as a character vector.
+    #' @param max_code_length Largest `nchar(code)` allowed (default 100000).
+    #'   Longer code is rejected before it's parsed, so a huge string can't
+    #'   tie up the session.
+    #' @param max_output_lines Most lines of output to keep. The default,
+    #'   `NULL`, means no limit. Past the limit, securer still reads the
+    #'   child's output but throws it away.
+    #' @return The value of the last expression, with an `"output"`
+    #'   attribute holding the printed stdout and stderr as a character
+    #'   vector.
     execute = function(code, timeout = 30, validate = TRUE,
                        output_handler = NULL, max_tool_calls = NULL,
                        max_code_length = 100000L,
@@ -267,7 +263,7 @@ SecureSession <- R6::R6Class("SecureSession",
       }
     },
 
-    #' @description Close the session and clean up resources
+    #' @description Close the session and remove its temp files
     #' @return Invisible self
     close = function() {
       private$audit_log("session_close")
@@ -282,13 +278,13 @@ SecureSession <- R6::R6Class("SecureSession",
       invisible(self)
     },
 
-    #' @description Check if session is alive
+    #' @description Check whether the child process is running
     #' @return Logical
     is_alive = function() {
       !is.null(private$session) && private$session$is_alive()
     },
 
-    #' @description Format method for display
+    #' @description Format the session for printing
     #' @param ... Ignored.
     #' @return A character string describing the session.
     format = function(...) {
@@ -320,7 +316,7 @@ SecureSession <- R6::R6Class("SecureSession",
       invisible(self)
     },
 
-    #' @description List registered tools and their argument specs
+    #' @description List the registered tools and their arguments
     #' @return A named list of tool information. Each element contains
     #'   `name` and `args` fields. Returns an empty list if no tools are
     #'   registered.
@@ -343,9 +339,9 @@ SecureSession <- R6::R6Class("SecureSession",
 
     #' @description Restart the child R process
     #'
-    #' Kills the current child process, cleans up the socket, and starts
-    #' a fresh child with the runtime and tool wrappers re-injected.
-    #' The session remains usable for subsequent `$execute()` calls.
+    #' Kills the child process, removes the socket, and starts a new child
+    #' with the tools set up again. Variables from before are gone, but you
+    #' can keep calling `$execute()`.
     #' @return Invisible self.
     restart = function() {
       if (private$executing) {

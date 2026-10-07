@@ -3,10 +3,10 @@
 #' Spawns the child R process inside a fresh Docker container instead of
 #' running it natively.  The wrapper script invokes `docker run` with
 #' `--network=none`, memory/CPU caps, and a bind mount of the UDS socket
-#' directory so the child can connect back to the parent.  This provides
-#' stronger isolation than the in-Docker backend (which assumes the session
-#' itself is already inside a container) at the cost of docker startup
-#' latency.
+#' directory so the child can connect back to the parent. It isolates the
+#' child more than the in-Docker backend (which assumes the session itself
+#' is already inside a container), but each session waits for a container
+#' to start.
 #'
 #' Activated by setting `SECURER_SANDBOX_MODE=docker-spawn`.  The image
 #' defaults to `rocker/r-base:latest` but can be overridden via

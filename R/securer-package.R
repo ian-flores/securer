@@ -1,14 +1,15 @@
-#' @title securer: Secure R Code Execution with Tool-Call IPC
+#' @title securer: run LLM-written R code in a sandbox
 #'
 #' @description
-#' Wraps `callr::r_session` with a bidirectional IPC protocol for
-#' pause/resume tool calls, enabling safe execution of LLM-generated R code
-#' inside an OS-level sandbox.
+#' securer runs R code in a child R process inside an OS sandbox. The code
+#' can call tools, which are functions that run in your own session: the
+#' child pauses, your session runs the tool, and the child carries on with
+#' the result.
 #'
-#' The main entry points are:
-#' * [execute_r()] -- convenience function for one-shot execution
-#' * [SecureSession] -- R6 class for persistent sessions with tool support
-#' * [securer_tool()] -- define tools that child code can call
+#' Start with:
+#' * [execute_r()] to run one piece of code and shut the session down.
+#' * [SecureSession] to keep a session open across many calls.
+#' * [securer_tool()] to define the tools the code can call.
 #'
 #' @keywords internal
 "_PACKAGE"

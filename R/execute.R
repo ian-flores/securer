@@ -1,7 +1,7 @@
 #' Execute R code securely with tool support
 #'
-#' A convenience wrapper that creates a [SecureSession], executes code, and
-#' returns the result. The session is automatically closed when done.
+#' Starts a [SecureSession], runs `code` in it, and returns the result. The
+#' session is closed afterwards, even if the code fails.
 #'
 #' @param code Character string of R code to execute.
 #' @param tools List of tools created with [securer_tool()], or a named list
@@ -11,17 +11,17 @@
 #' @param sandbox Logical, whether to enable OS-level sandboxing (default TRUE).
 #' @param limits Optional named list of resource limits (see
 #'   [SecureSession] for details).
-#' @param verbose Logical, whether to emit diagnostic messages via
-#'   `message()`.  Useful for debugging.  Users can suppress with
-#'   `suppressMessages()`.
-#' @param validate Logical, whether to pre-validate the code for syntax
-#'   errors before sending it to the child process (default `TRUE`).
-#' @param sandbox_strict Logical, whether to error if sandbox tools are
-#'   not available (default `FALSE`).  See [SecureSession] for details.
-#' @param audit_log Optional path to a JSONL file for persistent audit
-#'   logging (default `NULL`, no file logging).
+#' @param verbose Logical, whether to print what the session is doing with
+#'   `message()`. Handy for debugging. Wrap the call in `suppressMessages()`
+#'   to hide them.
+#' @param validate Logical, whether to check the code for syntax errors
+#'   before sending it to the child process (default `TRUE`).
+#' @param sandbox_strict Logical, whether to stop with an error if the
+#'   sandbox tools aren't available (default `FALSE`). See [SecureSession].
+#' @param audit_log Optional path to a JSONL file to log session events to.
+#'   The default, `NULL`, writes no log.
 #'
-#' @return The result of evaluating `code` in the secure session.
+#' @return The value of the last expression in `code`.
 #'
 #' @examples
 #' \donttest{
@@ -69,13 +69,12 @@ execute_r <- function(code, tools = list(), timeout = 30, sandbox = TRUE,
 }
 
 
-#' Execute code with an auto-managed SecureSession
+#' Run a function with a SecureSession that closes itself
 #'
-#' Creates a [SecureSession], passes it to a user function, and guarantees
-#' cleanup via [on.exit()].
-#' This is useful when you need to run multiple executions on the same session
-#' (e.g., building up state across calls) without worrying about leaked
-#' processes.
+#' Starts a [SecureSession], passes it to `fn`, and closes it when `fn`
+#' returns or fails. Use it when you want several calls to share one session,
+#' for example to build up variables across calls, without having to
+#' remember to close it.
 #'
 #' @param fn A function that receives a [SecureSession] as its first argument.
 #' @param tools List of [securer_tool()] objects to register in the session.

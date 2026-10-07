@@ -15,8 +15,8 @@ A list with \code{fns} (named list of functions) and \code{arg_meta}
 legacy tools without metadata)
 }
 \description{
-Accepts either a named list of bare functions (legacy format from
-increment 1) or a list of \code{\link[=securer_tool]{securer_tool()}} objects. Returns a named
+Accepts either a named list of plain functions (the older format) or a
+list of \code{\link[=securer_tool]{securer_tool()}} objects. Returns a named
 list with two components: \code{fns} (tool functions keyed by name) and
 \code{arg_meta} (expected argument names keyed by tool name).
 }

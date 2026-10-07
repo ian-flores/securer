@@ -1,6 +1,7 @@
 #' @name securer_tool
 #' @title securer_tool S7 class
-#' @description S7 class for tool definitions.
+#' @description The S7 class behind [securer_tool()]. You normally create
+#'   tools with [securer_tool()] rather than with this class directly.
 #' @export
 securer_tool_class <- new_class("securer_tool", properties = list(
   name = class_character,
@@ -29,17 +30,19 @@ method(print, securer_tool_class) <- function(x, ...) {
 
 #' Create a tool definition
 #'
-#' Defines a named tool with a function implementation and typed argument
-#' metadata. Tool objects are passed to [SecureSession] or [execute_r()] so
-#' that code running in the sandboxed child process can call the tool by name
-#' and the parent process executes the actual function.
+#' A tool is a function that code in the sandbox can call by name, but that
+#' runs in your session. Pass a list of tools to [SecureSession] or
+#' [execute_r()].
 #'
 #' @param name Character, the tool name (must be non-empty).
-#' @param description Character, description of what the tool does.
-#' @param fn Function that implements the tool.
-#' @param args Named list mapping argument names to type strings
-#'   (e.g. `list(city = "character")`). Used to generate wrapper functions
-#'   in the child process with the correct formal arguments.
+#' @param description Character, what the tool does. You can show this to
+#'   an LLM so it knows when to use the tool.
+#' @param fn The function that runs when the tool is called.
+#' @param args Named list of argument names and their types, such as
+#'   `list(city = "character")`. securer uses it to build a function with
+#'   the same arguments in the child, and to check argument types. Allowed
+#'   types are `"numeric"`, `"character"`, `"logical"`, `"integer"`,
+#'   `"list"`, and `"data.frame"`.
 #' @return A `securer_tool` object.
 #'
 #' @examples
@@ -104,8 +107,8 @@ securer_tool <- function(name, description, fn, args = list()) {
 
 #' Validate a list of tools
 #'
-#' Accepts either a named list of bare functions (legacy format from
-#' increment 1) or a list of [securer_tool()] objects. Returns a named
+#' Accepts either a named list of plain functions (the older format) or a
+#' list of [securer_tool()] objects. Returns a named
 #' list with two components: `fns` (tool functions keyed by name) and
 #' `arg_meta` (expected argument names keyed by tool name).
 #'
