@@ -8,9 +8,13 @@
 <title>Secure R Code Execution with Tool-Call IPC • securer</title>
 <script src="deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
-<script src="deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<script src="deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="deps/Hanken_Grotesk-0.4.10/font.css" rel="stylesheet">
+<link href="deps/Space_Mono-0.4.10/font.css" rel="stylesheet">
+<link href="deps/Fraunces-0.4.10/font.css" rel="stylesheet">
+<link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Secure R Code Execution with Tool-Call IPC">
+<script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><link href="extra.css" rel="stylesheet">
+<meta property="og:title" content="Secure R Code Execution with Tool-Call IPC">
 <meta name="description" content="Provides sandboxed execution of R code with a bidirectional tool-call protocol over Unix domain sockets. Wraps a callr session inside an OS-level sandbox (Seatbelt on macOS, bubblewrap on Linux, environment isolation on Windows, or a fresh Docker container via the opt-in docker-spawn backend) so that Large Language Model (LLM) generated code can compute results and call host-side tools without accessing the filesystem, network, or credentials.">
 <meta property="og:description" content="Provides sandboxed execution of R code with a bidirectional tool-call protocol over Unix domain sockets. Wraps a callr session inside an OS-level sandbox (Seatbelt on macOS, bubblewrap on Linux, environment isolation on Windows, or a fresh Docker container via the opt-in docker-spawn backend) so that Large Language Model (LLM) generated code can compute results and call host-side tools without accessing the filesystem, network, or credentials.">
 </head>
@@ -38,7 +42,7 @@
 <li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="search.json">
 </form></li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/ian-flores/securer"><span class="fa fa-github"></span></a></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/ian-flores/securer" aria-label="securer on GitHub"><span class="fa fa-github"></span></a></li>
       </ul>
 </div>
 
@@ -51,167 +55,94 @@
 </h1></div>
 <!-- badges: start -->
 
-<blockquote>
-<p><strong>Note:</strong> Experimental release. APIs may change before the 1.0 stabilization — track the lifecycle badge above for the current tier.</p>
-</blockquote>
-<p><strong>Let LLMs write R code that calls your functions — safely.</strong></p>
-<p>When an LLM generates R code, you need two things: a way for that code to call back into your application (tool calls), and confidence that the code can’t do anything dangerous (sandboxing). securer provides both.</p>
+<p>securer runs R code written by an LLM in a sandbox, and lets that code call functions you choose. The calls run in your own R session, so the code can reach your data through those functions and nothing else.</p>
+<p>The package is experimental, and function names may still change.</p>
+<div class="section level2">
+<h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
+</h2>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Simplest usage -- run R code in a sandbox</span></span>
-<span><span class="fu"><a href="reference/execute_r.html">execute_r</a></span><span class="op">(</span><span class="st">"1 + 1"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 2</span></span></code></pre></div>
-<p>For tool calls, define functions the sandboxed code can use:</p>
+<code class="sourceCode R"><span><span class="co"># install.packages("pak")</span></span>
+<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"ian-flores/securer"</span><span class="op">)</span></span></code></pre></div>
+<p>Check that it works:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ian-flores.github.io/securer/">securer</a></span><span class="op">)</span></span>
+<span><span class="fu"><a href="reference/execute_r.html">execute_r</a></span><span class="op">(</span><span class="st">"1 + 1"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] 2</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="a-quick-look">A quick look<a class="anchor" aria-label="anchor" href="#a-quick-look"></a>
+</h2>
+<p>Give the sandboxed code a function it can call. Here that function is a stand-in for a database query:</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ian-flores.github.io/securer/">securer</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Your functions become tools the LLM's code can call</span></span>
 <span><span class="va">tools</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="reference/securer_tool.html">securer_tool</a></span><span class="op">(</span><span class="st">"query_db"</span>, <span class="st">"Query a database table"</span>,</span>
 <span>    fn <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">table</span>, <span class="va">limit</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/get.html" class="external-link">get</a></span><span class="op">(</span><span class="va">table</span>, <span class="st">"package:datasets"</span><span class="op">)</span>, <span class="va">limit</span><span class="op">)</span>,</span>
 <span>    args <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>table <span class="op">=</span> <span class="st">"character"</span>, limit <span class="op">=</span> <span class="st">"numeric"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># LLM-generated code runs sandboxed — tool calls pause, execute on your side, resume</span></span>
 <span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/execute_r.html">execute_r</a></span><span class="op">(</span><span class="st">'</span></span>
 <span><span class="st">  data &lt;- query_db("mtcars", 5)</span></span>
 <span><span class="st">  mean(data$mpg)</span></span>
 <span><span class="st">'</span>, tools <span class="op">=</span> <span class="va">tools</span>, sandbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
-<p>The child R process is sandboxed at the OS level. Tool functions execute on the host side, outside the sandbox, with full access to your resources. The LLM’s code never touches your filesystem, network, or data directly.</p>
+<p>When the code reaches <code>query_db()</code>, it pauses. Your session runs the real function, outside the sandbox, and sends the result back. Then the code carries on. The LLM’s code never touches your files, network, or data directly.</p>
+</div>
 <div class="section level2">
-<h2 id="companion-packages">Companion Packages<a class="anchor" aria-label="anchor" href="#companion-packages"></a>
+<h2 id="why-use-it">Why use it<a class="anchor" aria-label="anchor" href="#why-use-it"></a>
 </h2>
-<p>securer is one of four packages for building governed AI agents in R:</p>
-<pre><code>                    ┌────────────────┐
-                    │ &gt;&gt;&gt; securer &lt;&lt;&lt; │
-                    └───────┬────────┘
-              ┌─────────────┴─────────────┐
-              │                           │
-       ┌──────▼──────┐             ┌──────▼──────┐
-       │ securetools  │             │ secureguard │
-       └─────────────┘             └──────┬──────┘
-                                   ┌──────▼──────┐
-                                   │ securebench  │
-                                   └─────────────┘</code></pre>
-<p>securer sits at the top of the stack, providing the sandboxed R execution engine that the other packages build on. securetools adds pre-built tool definitions, secureguard adds guardrails, and securebench benchmarks guardrail accuracy. Each package is installed individually (see Installation below).</p>
-<blockquote>
-<p><strong>OS caveat:</strong> the sandbox diagram above assumes macOS or Linux. On Windows, securer provides environment isolation and Job Object resource limits only — no filesystem or network restrictions. For parity with Unix, run securer inside a Linux container (see the <code>docker-spawn</code> backend below) or a Linux VM.</p>
-</blockquote>
+<p>LLM-written code can do things you didn’t ask for. securer limits what it can do:</p>
 <table class="table">
 <colgroup>
-<col width="60%">
-<col width="40%">
+<col width="50%">
+<col width="50%">
 </colgroup>
 <thead><tr>
-<th>Package</th>
-<th>Role</th>
+<th>Risk</th>
+<th>What securer does</th>
 </tr></thead>
 <tbody>
 <tr>
-<td><a href="https://github.com/ian-flores/securer" class="external-link">securer</a></td>
-<td>Sandboxed R execution with tool-call IPC</td>
+<td>The code reads or writes your files</td>
+<td>An OS sandbox lets it write only to a temp directory and read only R’s own files and libraries</td>
 </tr>
 <tr>
-<td><a href="https://github.com/ian-flores/securetools" class="external-link">securetools</a></td>
-<td>Pre-built security-hardened tool definitions</td>
+<td>The code makes network requests</td>
+<td>Network access is blocked, by namespaces on Linux and Seatbelt on macOS</td>
 </tr>
 <tr>
-<td><a href="https://github.com/ian-flores/secureguard" class="external-link">secureguard</a></td>
-<td>Input/code/output guardrails (injection, PII, secrets)</td>
+<td>The code needs your APIs or databases</td>
+<td>You register tool functions, which run in your session</td>
 </tr>
 <tr>
-<td><a href="https://github.com/ian-flores/securebench" class="external-link">securebench</a></td>
-<td>Security-focused guardrail benchmarks, complementary to <a href="https://vitals.tidyverse.org/" class="external-link">vitals</a>
-</td>
+<td>The code runs forever</td>
+<td>A timeout stops it, and the session restarts so you can keep using it</td>
+</tr>
+<tr>
+<td>The code uses all your memory</td>
+<td>Resource limits, with <code>ulimit</code> on Linux and macOS and Job Objects on Windows</td>
+</tr>
+<tr>
+<td>The code doesn’t parse</td>
+<td>It’s checked for syntax errors before it’s sent to the sandbox</td>
 </tr>
 </tbody>
 </table>
-<p>For adjacent capabilities, use the broader R LLM ecosystem:</p>
-<ul>
-<li>
-<strong>Tracing and observability</strong>: <a href="https://ellmer.tidyverse.org/" class="external-link">ellmer</a>’s native OpenTelemetry instrumentation via the <a href="https://otel.r-lib.org/" class="external-link">otel</a> package (supersedes the archived securetrace).</li>
-<li>
-<strong>Document chunking, embeddings, and RAG retrieval</strong>: <a href="https://github.com/tidyverse/ragnar" class="external-link">ragnar</a> (supersedes the archived securecontext).</li>
-</ul>
+<p>Posit’s commons package has its own sandbox for its built-in agents, but you can’t reuse it for an agent you write yourself. securer is meant for that case.</p>
 </div>
 <div class="section level2">
-<h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
+<h2 id="how-it-works">How it works<a class="anchor" aria-label="anchor" href="#how-it-works"></a>
 </h2>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># install.packages("pak")</span></span>
-<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"ian-flores/securer"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Verify it works</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ian-flores.github.io/securer/">securer</a></span><span class="op">)</span></span>
-<span><span class="fu"><a href="reference/execute_r.html">execute_r</a></span><span class="op">(</span><span class="st">"1 + 1"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 2</span></span></code></pre></div>
-</div>
-<div class="section level2">
-<h2 id="why-securer">Why securer?<a class="anchor" aria-label="anchor" href="#why-securer"></a>
-</h2>
-<table class="table">
-<colgroup>
-<col width="29%">
-<col width="70%">
-</colgroup>
-<thead><tr>
-<th>Problem</th>
-<th>How securer solves it</th>
-</tr></thead>
-<tbody>
-<tr>
-<td>LLM code could access the filesystem</td>
-<td>OS sandbox blocks writes; reads restricted to R libraries</td>
-</tr>
-<tr>
-<td>LLM code could make network requests</td>
-<td>Network access blocked via namespace isolation (Linux) or Seatbelt (macOS)</td>
-</tr>
-<tr>
-<td>LLM code needs to call your APIs/databases</td>
-<td>Register tool functions that execute on the host side, outside the sandbox</td>
-</tr>
-<tr>
-<td>LLM code could run forever</td>
-<td>Execution timeouts with automatic session recovery</td>
-</tr>
-<tr>
-<td>LLM code could consume all memory</td>
-<td>Resource limits via ulimit (Linux/macOS) and Job Objects (Windows)</td>
-</tr>
-<tr>
-<td>LLM code has syntax errors</td>
-<td>Pre-validation catches parse errors before execution</td>
-</tr>
-</tbody>
-</table>
-</div>
-<div class="section level2">
-<h2 id="how-it-works">How It Works<a class="anchor" aria-label="anchor" href="#how-it-works"></a>
-</h2>
-<pre><code>┌──────────────────────┐        ┌──────────────────────┐
-│    Parent (host)      │        │  Child (sandboxed R)  │
-│                       │        │                       │
-│  1. Send code ────────┼───────&gt;│  2. eval(code)        │
-│                       │  UDS   │                       │
-│  3. Execute tool  &lt;───┼────────│  Code calls tool()    │
-│     (your function)   │        │  → pauses on socket   │
-│                       │        │                       │
-│  4. Send result ──────┼───────&gt;│  5. Resumes with      │
-│                       │        │     tool result       │
-│                       │        │                       │
-│  6. Receive final &lt;───┼────────│  Returns final value  │
-│     result            │        │                       │
-└──────────────────────┘        └──────────────────────┘</code></pre>
-<p>Communication happens over a Unix domain socket. Tool calls are synchronous: the child blocks while the parent fulfills the request.</p>
+<figure class="hairline"><svg role="img" aria-label="Host sends code to the sandboxed child; the child pauses on a tool call, the host runs it, sends the result back, and the child returns the final value" viewbox="0 0 900 292" xmlns="http://www.w3.org/2000/svg"><defs><marker id="tc-arrow" viewbox="0 0 10 10" refx="9" refy="5" markerwidth="7" markerheight="7" orient="auto-start-reverse"><path d="M1 1L9 5L1 9" fill="none" stroke="#2b1f12" stroke-width="1"></path></marker><pattern id="tc-hatch" width="6" height="6" patternunits="userSpaceOnUse" patterntransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#bf5a36" stroke-width="0.6" opacity="0.55"></line></pattern></defs><rect x="440" y="20" width="440" height="258" fill="url(#tc-hatch)" opacity="0.35" stroke="none"></rect><rect x="440" y="20" width="440" height="258" fill="none" stroke="#bf5a36" stroke-width="0.75" stroke-dasharray="4 3"></rect><text x="872" y="36" font-family="Space Mono, ui-monospace, monospace" font-size="8.5" fill="#bf5a36" text-anchor="end" font-weight="400" letter-spacing="1.6">OS SANDBOX</text><rect x="140" y="40" width="180" height="36" fill="none" stroke="#2b1f12" stroke-width="0.75"></rect><text x="230.0" y="62.0" font-family="Space Mono, ui-monospace, monospace" font-size="10.5" fill="#2b1f12" text-anchor="middle" font-weight="700" letter-spacing="1.2">HOST R SESSION</text><rect x="500" y="40" width="180" height="36" fill="none" stroke="#2b1f12" stroke-width="0.75"></rect><text x="590.0" y="62.0" font-family="Space Mono, ui-monospace, monospace" font-size="10.5" fill="#2b1f12" text-anchor="middle" font-weight="700" letter-spacing="1.2">CHILD R PROCESS</text><path d="M230 76V274M590 76V274" stroke="#6b5638" stroke-width="0.6" stroke-dasharray="1 3"></path><path d="M230 132H588" fill="none" stroke="#2b1f12" stroke-width="0.75" marker-end="url(#tc-arrow)"></path><text x="410.0" y="125" font-family="Space Mono, ui-monospace, monospace" font-size="9.5" fill="#2b1f12" text-anchor="middle" font-weight="400" letter-spacing="0.8">SEND THE CODE</text><text x="604" y="136" font-family="Space Mono, ui-monospace, monospace" font-size="9" fill="#6b5638" text-anchor="start" font-weight="400" letter-spacing="0.3">runs it</text><path d="M590 172H232" fill="none" stroke="#2b1f12" stroke-width="0.75" marker-end="url(#tc-arrow)"></path><text x="410.0" y="165" font-family="Space Mono, ui-monospace, monospace" font-size="9.5" fill="#2b1f12" text-anchor="middle" font-weight="400" letter-spacing="0.8">TOOL CALL</text><text x="216" y="176" font-family="Space Mono, ui-monospace, monospace" font-size="9" fill="#6b5638" text-anchor="end" font-weight="400" letter-spacing="0.3">runs your tool function</text><text x="604" y="176" font-family="Space Mono, ui-monospace, monospace" font-size="9" fill="#6b5638" text-anchor="start" font-weight="400" letter-spacing="0.3">pauses on the socket</text><path d="M230 212H588" fill="none" stroke="#2b1f12" stroke-width="0.75" marker-end="url(#tc-arrow)"></path><text x="410.0" y="205" font-family="Space Mono, ui-monospace, monospace" font-size="9.5" fill="#2b1f12" text-anchor="middle" font-weight="400" letter-spacing="0.8">TOOL RESULT</text><text x="604" y="216" font-family="Space Mono, ui-monospace, monospace" font-size="9" fill="#6b5638" text-anchor="start" font-weight="400" letter-spacing="0.3">carries on</text><path d="M590 252H232" fill="none" stroke="#2b1f12" stroke-width="0.75" marker-end="url(#tc-arrow)"></path><text x="410.0" y="245" font-family="Space Mono, ui-monospace, monospace" font-size="9.5" fill="#2b1f12" text-anchor="middle" font-weight="400" letter-spacing="0.8">FINAL VALUE</text><text x="216" y="256" font-family="Space Mono, ui-monospace, monospace" font-size="9" fill="#6b5638" text-anchor="end" font-weight="400" letter-spacing="0.3">hands it back to you</text></svg><figcaption>Fig. 1 · A tool call: the code runs in the child, your function runs in the host</figcaption></figure><p>The two processes talk over a Unix domain socket. A tool call blocks the child until the parent sends back the result.</p>
 </div>
 <div class="section level2">
 <h2 id="features">Features<a class="anchor" aria-label="anchor" href="#features"></a>
 </h2>
 <div class="section level3">
-<h3 id="persistent-sessions">Persistent Sessions<a class="anchor" aria-label="anchor" href="#persistent-sessions"></a>
+<h3 id="sessions">Sessions<a class="anchor" aria-label="anchor" href="#sessions"></a>
 </h3>
-<p>Reuse a session across multiple executions to avoid startup overhead:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<p>Starting a sandboxed R process takes a moment. Keep one open to run several pieces of code:</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>tools <span class="op">=</span> <span class="va">tools</span>, sandbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">'query_db("iris", 3)'</span><span class="op">)</span></span>
@@ -220,10 +151,10 @@
 <span><span class="va">session</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
-<h3 id="session-pooling">Session Pooling<a class="anchor" aria-label="anchor" href="#session-pooling"></a>
+<h3 id="session-pools">Session pools<a class="anchor" aria-label="anchor" href="#session-pools"></a>
 </h3>
-<p>Pre-warm multiple sessions for low-latency concurrent execution:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<p>If you run many requests at once, start a few sessions ahead of time:</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pool</span> <span class="op">&lt;-</span> <span class="va"><a href="reference/SecureSessionPool.html">SecureSessionPool</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>size <span class="op">=</span> <span class="fl">4</span>, tools <span class="op">=</span> <span class="va">tools</span>, sandbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">result</span> <span class="op">&lt;-</span> <span class="va">pool</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">'query_db("iris", 3)'</span><span class="op">)</span></span>
@@ -231,69 +162,71 @@
 <span><span class="va">pool</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
-<h3 id="resource-limits">Resource Limits<a class="anchor" aria-label="anchor" href="#resource-limits"></a>
+<h3 id="resource-limits">Resource limits<a class="anchor" aria-label="anchor" href="#resource-limits"></a>
 </h3>
-<p>Constrain CPU, memory, file size, and more. Works with or without sandbox mode on all platforms:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<p>Cap CPU time, memory, file size, and more. Limits work on every platform, with or without the sandbox:</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/execute_r.html">execute_r</a></span><span class="op">(</span><span class="st">"1 + 1"</span>,</span>
 <span>  limits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>cpu <span class="op">=</span> <span class="fl">10</span>, memory <span class="op">=</span> <span class="fl">256</span> <span class="op">*</span> <span class="fl">1024</span> <span class="op">*</span> <span class="fl">1024</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
-<h3 id="execution-timeouts">Execution Timeouts<a class="anchor" aria-label="anchor" href="#execution-timeouts"></a>
+<h3 id="timeouts">Timeouts<a class="anchor" aria-label="anchor" href="#timeouts"></a>
 </h3>
-<p>Kill long-running code automatically. The session recovers and is reusable:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<p>Code that runs too long is stopped. The session restarts itself, so you can use it again straight away:</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">"Sys.sleep(100)"</span>, timeout <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span>
 <span><span class="co"># Error: Execution timed out after 5 seconds</span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">"1 + 1"</span><span class="op">)</span>  <span class="co"># still works</span></span></code></pre></div>
 </div>
 <div class="section level3">
-<h3 id="code-pre-validation">Code Pre-Validation<a class="anchor" aria-label="anchor" href="#code-pre-validation"></a>
+<h3 id="syntax-checks">Syntax checks<a class="anchor" aria-label="anchor" href="#syntax-checks"></a>
 </h3>
-<p>Catch syntax errors before sending code to the child process:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">"if (TRUE {"</span><span class="op">)</span>  <span class="co"># immediate error, no child round-trip</span></span></code></pre></div>
+<p>Code that doesn’t parse fails right away, without a trip to the child process:</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">"if (TRUE {"</span><span class="op">)</span>  <span class="co"># immediate error</span></span></code></pre></div>
 </div>
 <div class="section level3">
-<h3 id="ellmer-integration">ellmer Integration<a class="anchor" aria-label="anchor" href="#ellmer-integration"></a>
+<h3 id="ellmer">ellmer<a class="anchor" aria-label="anchor" href="#ellmer"></a>
 </h3>
-<p>Use securer as a code execution tool in <a href="https://ellmer.tidyverse.org/" class="external-link">ellmer</a> LLM chats:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<p>Give an <a href="https://ellmer.tidyverse.org/" class="external-link">ellmer</a> chat a tool that runs R code in the sandbox:</p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ellmer.tidyverse.org" class="external-link">ellmer</a></span><span class="op">)</span></span>
 <span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="fu"><a href="reference/as_ellmer_tool.html">securer_as_ellmer_tool</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="fu"><a href="reference/as_ellmer_tool.html">as_ellmer_tool</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">chat</span><span class="op">$</span><span class="fu">chat</span><span class="op">(</span><span class="st">"Calculate the mean of 1 through 100 using R"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
-<h3 id="audit-logging">Audit Logging<a class="anchor" aria-label="anchor" href="#audit-logging"></a>
+<h3 id="audit-log">Audit log<a class="anchor" aria-label="anchor" href="#audit-log"></a>
 </h3>
-<p>Write structured JSONL logs of all session events for compliance and debugging:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<p>Write every session event to a JSONL file, one JSON object per line:</p>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>audit_log <span class="op">=</span> <span class="st">"session.jsonl"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
-<h3 id="verbose-logging">Verbose Logging<a class="anchor" aria-label="anchor" href="#verbose-logging"></a>
+<h3 id="verbose-mode">Verbose mode<a class="anchor" aria-label="anchor" href="#verbose-mode"></a>
 </h3>
-<p>Debug session behavior with human-readable <code><a href="https://rdrr.io/r/base/message.html" class="external-link">message()</a></code> output:</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="co"># [securer] Session started (sandbox=FALSE, pid=1234)</span></span>
-<span><span class="co"># [securer] Tool call: query_db(table="iris", limit=3)</span></span>
-<span><span class="co"># [securer] Execution complete (0.5s)</span></span></code></pre></div>
+<p>Print what the session is doing as it happens:</p>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>tools <span class="op">=</span> <span class="va">tools</span>, verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">'query_db("iris", 3)'</span><span class="op">)</span></span>
+<span><span class="co"># [securer] Session started (sandbox=false, pid=1234)</span></span>
+<span><span class="co"># [securer] Tool call: query_db(table=iris, limit=3)</span></span>
+<span><span class="co"># [securer] Tool result: query_db -&gt; ... (0.00s)</span></span>
+<span><span class="co"># [securer] Execution complete (0.27s)</span></span></code></pre></div>
 </div>
 </div>
 <div class="section level2">
-<h2 id="platform-support">Platform Support<a class="anchor" aria-label="anchor" href="#platform-support"></a>
+<h2 id="platform-support">Platform support<a class="anchor" aria-label="anchor" href="#platform-support"></a>
 </h2>
 <table class="table">
 <colgroup>
-<col width="13%">
-<col width="12%">
-<col width="22%">
-<col width="29%">
-<col width="22%">
+<col width="20%">
+<col width="20%">
+<col width="20%">
+<col width="20%">
+<col width="20%">
 </colgroup>
 <thead><tr>
 <th>Platform</th>
@@ -304,70 +237,80 @@
 </tr></thead>
 <tbody>
 <tr>
-<td><strong>Linux</strong></td>
+<td>Linux</td>
 <td>bubblewrap (<code>bwrap</code>)</td>
 <td>Yes</td>
 <td>Yes</td>
-<td>Yes (ulimit)</td>
+<td>Yes (<code>ulimit</code>)</td>
 </tr>
 <tr>
-<td><strong>macOS</strong></td>
+<td>macOS</td>
 <td>Seatbelt (<code>sandbox-exec</code>)</td>
 <td>Yes</td>
 <td>Yes</td>
-<td>Yes (ulimit)</td>
+<td>Yes (<code>ulimit</code>)</td>
 </tr>
 <tr>
-<td><strong>Windows</strong></td>
-<td>Job Objects + env isolation</td>
+<td>Windows</td>
+<td>Job Objects and a clean environment</td>
 <td>No</td>
 <td>No</td>
 <td>Yes (memory, CPU, process count)</td>
 </tr>
 <tr>
-<td>
-<strong>docker-spawn</strong> (any host)</td>
-<td>Fresh container per session</td>
+<td>docker-spawn (any host)</td>
+<td>A new container per session</td>
 <td>Yes (<code>--network=none</code>)</td>
-<td>Yes (container FS)</td>
-<td>Yes (<code>--memory</code>, <code>--cpus</code>, ulimit)</td>
+<td>Yes (container filesystem)</td>
+<td>Yes (<code>--memory</code>, <code>--cpus</code>, <code>ulimit</code>)</td>
 </tr>
 </tbody>
 </table>
-<p>All platforms support tool call IPC, execution timeouts, and code pre-validation. The <code>docker-spawn</code> backend is opt-in (<code>SECURER_SANDBOX_MODE=docker-spawn</code>) and requires the <code>docker</code> CLI plus a reachable daemon. See <code>inst/docker/Dockerfile</code> for a reference image.</p>
+<p>Tool calls, timeouts, and syntax checks work everywhere.</p>
+<p>On Windows, securer can only clean the environment and set resource limits. It can’t stop the code from reading files or using the network. If you need that on Windows, use the docker-spawn backend or a Linux VM.</p>
+<p>The docker-spawn backend is off by default. Turn it on with <code>SECURER_SANDBOX_MODE=docker-spawn</code>. It needs the <code>docker</code> command and a running Docker daemon. <code>inst/docker/Dockerfile</code> has a reference image.</p>
 </div>
 <div class="section level2">
 <h2 id="security">Security<a class="anchor" aria-label="anchor" href="#security"></a>
 </h2>
-<p>securer implements defense-in-depth with multiple layers: OS-level sandboxing, authenticated IPC, resource limits, environment sanitization, and input validation. For a detailed threat model and security architecture, see <code><a href="articles/security-model.html">vignette("security-model", package = "securer")</a></code>.</p>
-<p>To report security vulnerabilities, please email the maintainer directly rather than filing a public issue.</p>
+<p>The sandbox is one of several protections. securer also checks that only the child it started can connect to the socket, limits resources, strips secrets from the child’s environment, and checks tool arguments. The security model vignette (<code><a href="articles/security-model.html">vignette("security-model", package = "securer")</a></code>) covers what securer protects against and what it doesn’t.</p>
+<p>To report a security problem, email the maintainer instead of opening a public issue.</p>
 </div>
 <div class="section level2">
-<h2 id="contributing">Contributing<a class="anchor" aria-label="anchor" href="#contributing"></a>
+<h2 id="related-packages">Related packages<a class="anchor" aria-label="anchor" href="#related-packages"></a>
 </h2>
-<p>Contributions are welcome! Please <a href="https://github.com/ian-flores/securer/issues" class="external-link">file an issue</a> or submit a pull request on GitHub.</p>
+<p>securer is part of a small set of packages for running LLM agents in R more safely:</p>
+<ul>
+<li>
+<a href="https://github.com/ian-flores/secureguard" class="external-link">secureguard</a> checks prompts, generated code, and outputs for things like prompt injection and leaked secrets.</li>
+<li>
+<a href="https://github.com/ian-flores/securetools" class="external-link">securetools</a> has ready-made tools (file access, SQL, web requests) with limits built in.</li>
+<li>
+<a href="https://github.com/ian-flores/securebench" class="external-link">securebench</a> measures how well your guardrails work. It complements <a href="https://vitals.tidyverse.org/" class="external-link">vitals</a>.</li>
+</ul>
+<p>They build on Posit’s tools rather than replacing them. For tracing, use <a href="https://ellmer.tidyverse.org/" class="external-link">ellmer</a>’s OpenTelemetry support through the <a href="https://otel.r-lib.org/" class="external-link">otel</a> package. For retrieval (RAG), use <a href="https://github.com/tidyverse/ragnar" class="external-link">ragnar</a>.</p>
 </div>
 <div class="section level2">
-<h2 id="documentation">Documentation<a class="anchor" aria-label="anchor" href="#documentation"></a>
+<h2 id="learn-more">Learn more<a class="anchor" aria-label="anchor" href="#learn-more"></a>
 </h2>
 <ul>
 <li>
-<code><a href="articles/quickstart.html">vignette("quickstart", package = "securer")</a></code> – installation and first examples</li>
+<code><a href="articles/quickstart.html">vignette("quickstart", package = "securer")</a></code>: installing and first examples</li>
 <li>
-<code><a href="articles/sessions-and-tools.html">vignette("sessions-and-tools", package = "securer")</a></code> – persistent sessions, streaming, pooling</li>
+<code><a href="articles/sessions-and-tools.html">vignette("sessions-and-tools", package = "securer")</a></code>: sessions, streaming output, and pools</li>
 <li>
-<code><a href="articles/deployment.html">vignette("deployment", package = "securer")</a></code> – sandboxing, resource limits, architecture</li>
+<code><a href="articles/deployment.html">vignette("deployment", package = "securer")</a></code>: sandboxes, resource limits, and how the pieces fit</li>
 <li>
-<code><a href="articles/security-model.html">vignette("security-model", package = "securer")</a></code> – threat model and defense layers</li>
+<code><a href="articles/security-model.html">vignette("security-model", package = "securer")</a></code>: what securer protects against</li>
 <li>
-<code><a href="articles/ellmer-integration.html">vignette("ellmer-integration", package = "securer")</a></code> – using securer with ellmer LLM chats</li>
+<code><a href="articles/ellmer-integration.html">vignette("ellmer-integration", package = "securer")</a></code>: using securer with ellmer chats</li>
 <li>
-<code><a href="articles/integration-examples.html">vignette("integration-examples", package = "securer")</a></code> – Shiny, Plumber, and batch examples</li>
+<code><a href="articles/integration-examples.html">vignette("integration-examples", package = "securer")</a></code>: Shiny, Plumber, and batch jobs</li>
 <li>
-<code><a href="articles/troubleshooting.html">vignette("troubleshooting", package = "securer")</a></code> – common issues and solutions</li>
-<li>
-<a href="https://ian-flores.github.io/securer/">pkgdown site</a> – API reference</li>
+<code><a href="articles/troubleshooting.html">vignette("troubleshooting", package = "securer")</a></code>: common problems</li>
+<li><a href="https://ian-flores.github.io/securer/reference/">Function reference</a></li>
 </ul>
+<p>Found a bug or have an idea? <a href="https://github.com/ian-flores/securer/issues" class="external-link">Open an issue</a>.</p>
 </div>
 <div class="section level2">
 <h2 id="license">License<a class="anchor" aria-label="anchor" href="#license"></a>
@@ -421,7 +364,20 @@
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Ian Flores Siaca.</p>
+  <div class="title-block">
+<div>
+<b>Sheet</b>1 of 4
+</div>
+<div>
+<b>Quadrangle</b>securer
+</div>
+<div>
+<b>Survey</b>Sandbox
+</div>
+<div>
+<b>Series</b>secure-r-dev
+</div>
+</div>
 </div>
 
 <div class="pkgdown-footer-right">

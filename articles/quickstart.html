@@ -5,12 +5,16 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Quick Start • securer</title>
+<title>Quick start • securer</title>
 <script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
-<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/Hanken_Grotesk-0.4.10/font.css" rel="stylesheet">
+<link href="../deps/Space_Mono-0.4.10/font.css" rel="stylesheet">
+<link href="../deps/Fraunces-0.4.10/font.css" rel="stylesheet">
+<link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Quick Start">
+<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><link href="../extra.css" rel="stylesheet">
+<meta property="og:title" content="Quick start">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -36,7 +40,7 @@
 <li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json">
 </form></li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/ian-flores/securer"><span class="fa fa-github"></span></a></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/ian-flores/securer" aria-label="securer on GitHub"><span class="fa fa-github"></span></a></li>
       </ul>
 </div>
 
@@ -50,7 +54,7 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
 
-      <h1>Quick Start</h1>
+      <h1>Quick start</h1>
             
       
       <small class="dont-index">Source: <a href="https://github.com/ian-flores/securer/blob/main/vignettes/quickstart.Rmd" class="external-link"><code>vignettes/quickstart.Rmd</code></a></small>
@@ -60,15 +64,15 @@
     
     
 <div class="section level2">
-<h2 id="overview">Overview<a class="anchor" aria-label="anchor" href="#overview"></a>
+<h2 id="what-securer-does">What securer does<a class="anchor" aria-label="anchor" href="#what-securer-does"></a>
 </h2>
-<p>securer runs R code in a sandboxed child process with OS-level
-isolation. Code in the child can call named “tools” — host-side
-functions that execute outside the sandbox. Communication happens over a
-Unix domain socket using JSON messages. The package is designed for LLM
-agent systems where generated code needs access to host-provided
-capabilities while being prevented from reaching the network or
-filesystem.</p>
+<p>securer runs R code in a separate R process that the operating system
+keeps in a sandbox. That code can call “tools”, which are functions you
+define. The tools run in your own R session, outside the sandbox, and
+the two processes pass messages over a Unix domain socket.</p>
+<p>It’s built for LLM agents. The model writes R code, and the code can
+use the tools you give it, but it can’t reach the network or your files
+on its own.</p>
 </div>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
@@ -84,9 +88,8 @@ filesystem.</p>
 <div class="section level2">
 <h2 id="hello-world">Hello world<a class="anchor" aria-label="anchor" href="#hello-world"></a>
 </h2>
-<p>The simplest way to run code is with <code><a href="../reference/execute_r.html">execute_r()</a></code>. It
-creates a session, runs the code, and tears everything down
-automatically:</p>
+<p>The simplest way to run code is <code><a href="../reference/execute_r.html">execute_r()</a></code>. It starts a
+session, runs the code, and shuts the session down again:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ian-flores.github.io/securer/">securer</a></span><span class="op">)</span></span>
 <span></span>
@@ -95,15 +98,15 @@ automatically:</p>
 <span></span>
 <span><span class="fu"><a href="../reference/execute_r.html">execute_r</a></span><span class="op">(</span><span class="st">"paste('Hello from', R.version.string)"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] "Hello from R version 4.4.2 (2024-10-31)"</span></span></code></pre></div>
-<p>By default <code><a href="../reference/execute_r.html">execute_r()</a></code> enables the OS sandbox
-(<code>sandbox = TRUE</code>). Pass <code>sandbox = FALSE</code> to
-disable it.</p>
+<p><code><a href="../reference/execute_r.html">execute_r()</a></code> uses the sandbox by default
+(<code>sandbox = TRUE</code>). Pass <code>sandbox = FALSE</code> to turn
+it off.</p>
 </div>
 <div class="section level2">
 <h2 id="defining-tools">Defining tools<a class="anchor" aria-label="anchor" href="#defining-tools"></a>
 </h2>
-<p>Tools let sandboxed code call functions on the host. Define them with
-<code><a href="../reference/securer_tool.html">securer_tool()</a></code>:</p>
+<p>A tool is a function that sandboxed code can call but that runs in
+your session. Make one with <code><a href="../reference/securer_tool.html">securer_tool()</a></code>:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">add_tool</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/securer_tool.html">securer_tool</a></span><span class="op">(</span></span>
 <span>  name <span class="op">=</span> <span class="st">"add"</span>,</span>
@@ -112,23 +115,13 @@ disable it.</p>
 <span>  args <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>a <span class="op">=</span> <span class="st">"numeric"</span>, b <span class="op">=</span> <span class="st">"numeric"</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="va">add_tool</span></span></code></pre></div>
-<p>Each tool has four components:</p>
-<ul>
-<li>
-<strong>name</strong> – the function name available in the child
-process</li>
-<li>
-<strong>description</strong> – metadata (useful for LLM tool-use
-prompts)</li>
-<li>
-<strong>fn</strong> – the implementation, which runs on the host
-side</li>
-<li>
-<strong>args</strong> – argument names mapped to type strings for
-validation</li>
-</ul>
+<p>A tool has a <code>name</code>, which is what the sandboxed code
+calls it, and a <code>description</code>, which you can show to an LLM
+so it knows what the tool is for. <code>fn</code> is the function that
+actually runs, in your session. <code>args</code> lists the argument
+names and, optionally, the type each one must have.</p>
 <div class="section level3">
-<h3 id="supported-type-annotations">Supported type annotations<a class="anchor" aria-label="anchor" href="#supported-type-annotations"></a>
+<h3 id="argument-types">Argument types<a class="anchor" aria-label="anchor" href="#argument-types"></a>
 </h3>
 <table class="table">
 <thead><tr class="header">
@@ -162,14 +155,13 @@ validation</li>
 </tr>
 </tbody>
 </table>
-<p>Type annotations are optional. Arguments without type annotations
-skip validation.</p>
+<p>If you leave out an argument’s type, securer doesn’t check it.</p>
 </div>
 </div>
 <div class="section level2">
 <h2 id="using-tools">Using tools<a class="anchor" aria-label="anchor" href="#using-tools"></a>
 </h2>
-<p>Pass tools as a list to <code><a href="../reference/execute_r.html">execute_r()</a></code>:</p>
+<p>Pass a list of tools to <code><a href="../reference/execute_r.html">execute_r()</a></code>:</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">tools</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="../reference/securer_tool.html">securer_tool</a></span><span class="op">(</span><span class="st">"add"</span>, <span class="st">"Add two numbers"</span>,</span>
@@ -193,16 +185,16 @@ skip validation.</p>
 <div class="section level2">
 <h2 id="next-steps">Next steps<a class="anchor" aria-label="anchor" href="#next-steps"></a>
 </h2>
-<p>Now that you’ve seen the basics:</p>
 <ul>
 <li>
-<code><a href="../articles/sessions-and-tools.html">vignette("sessions-and-tools")</a></code> — persistent sessions
-and advanced features</li>
+<code><a href="../articles/sessions-and-tools.html">vignette("sessions-and-tools")</a></code> covers sessions you keep
+open, streaming output, and pools.</li>
 <li>
-<code><a href="../articles/deployment.html">vignette("deployment")</a></code> — sandboxing and resource
-limits</li>
+<code><a href="../articles/deployment.html">vignette("deployment")</a></code> covers the sandboxes and
+resource limits.</li>
 <li>
-<code><a href="../articles/security-model.html">vignette("security-model")</a></code> — the full threat model</li>
+<code><a href="../articles/security-model.html">vignette("security-model")</a></code> covers what securer protects
+against, and what it doesn’t.</li>
 </ul>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
@@ -212,7 +204,20 @@ limits</li>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Ian Flores Siaca.</p>
+  <div class="title-block">
+<div>
+<b>Sheet</b>1 of 4
+</div>
+<div>
+<b>Quadrangle</b>securer
+</div>
+<div>
+<b>Survey</b>Sandbox
+</div>
+<div>
+<b>Series</b>secure-r-dev
+</div>
+</div>
 </div>
 
 <div class="pkgdown-footer-right">

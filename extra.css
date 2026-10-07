@@ -1,0 +1,298 @@
+/* secure-r-dev pkgdown theme: "desert survey sheet".
+   Modeled on a printed topographic quadrangle: warm paper, hairline rules,
+   a framed sheet with corner ticks, contour lines in the margins, and a
+   title block in the footer. Shared by securer, secureguard, securetools,
+   and securebench; edit theme/extra.css and copy to each pkgdown/. */
+
+:root {
+  --paper: #f4ecdc;
+  --paper-hi: #fbf6ec;
+  --ink: #2b1f12;
+  --ink-soft: #6b5638;
+  --rule: #cdb48a;
+  --rule-soft: #e2d2b2;
+  --clay: #bf5a36;
+  --sage: #7c8a4e;
+  --ochre: #d4a03c;
+  --dusk: #3f5d72;
+  --hair: 0.5px;
+  --mono: "Space Mono", ui-monospace, monospace;
+}
+
+/* Paper, with contour lines in the margins only. */
+body {
+  background-color: var(--paper);
+  background-image: url("contours.svg");
+  background-size: 1200px auto;
+  background-attachment: fixed;
+  color: var(--ink);
+  font-feature-settings: "kern", "liga";
+}
+
+/* The sheet: an opaque panel over the contours, framed by a double hairline. */
+main#main,
+.template-home main,
+.row > main {
+  background: var(--paper);
+  position: relative;
+}
+
+body > .container,
+body > .container-fluid,
+.container.template-home,
+.container.template-reference-index,
+.container.template-article,
+.container.template-reference-topic,
+.container.template-news,
+.container.template-title-body,
+.container.template-citation-authors {
+  background: var(--paper);
+  border: var(--hair) solid var(--ink-soft);
+  outline: var(--hair) solid var(--rule);
+  outline-offset: 5px;
+  margin-top: 2.5rem;
+  margin-bottom: 2.5rem;
+  padding-top: 1.5rem;
+  position: relative;
+}
+
+/* Corner registration ticks. */
+body > .container::before,
+body > .container::after {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+}
+body > .container::before {
+  top: -14px;
+  left: -14px;
+  border-top: var(--hair) solid var(--ink);
+  border-left: var(--hair) solid var(--ink);
+}
+body > .container::after {
+  bottom: -14px;
+  right: -14px;
+  border-bottom: var(--hair) solid var(--ink);
+  border-right: var(--hair) solid var(--ink);
+}
+
+/* Navbar: a plain strip of survey labels on paper. */
+.navbar {
+  background: var(--paper-hi) !important;
+  border-bottom: var(--hair) solid var(--ink-soft);
+  box-shadow: none;
+}
+.navbar .navbar-brand {
+  font-family: "Fraunces", serif;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink) !important;
+}
+.navbar .nav-link,
+.navbar .navbar-text,
+.navbar .version {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-soft) !important;
+}
+.navbar .nav-link:hover,
+.navbar .nav-item.active .nav-link {
+  color: var(--clay) !important;
+}
+.navbar .version {
+  border: var(--hair) solid var(--rule);
+  padding: 0.1rem 0.4rem;
+  background: transparent !important;
+}
+.dropdown-menu {
+  background: var(--paper-hi);
+  border: var(--hair) solid var(--ink-soft);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Headings: editorial serif over a hairline, numbered like map grid labels. */
+h1, h2, h3, h4 {
+  font-family: "Fraunces", serif;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+h1 { font-weight: 600; font-variation-settings: "opsz" 96; }
+.contents h2 {
+  border-bottom: var(--hair) solid var(--rule);
+  padding-bottom: 0.35rem;
+  margin-top: 2.6rem;
+}
+main { counter-reset: sheet-section; }
+main h2:not(.page-header h2) { counter-increment: sheet-section; }
+main h2:not(.page-header h2)::before {
+  content: counter(sheet-section, decimal-leading-zero);
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  color: var(--clay);
+  margin-right: 0.8rem;
+  vertical-align: 0.35em;
+}
+.page-header {
+  border-bottom: var(--hair) solid var(--ink-soft);
+}
+
+/* Links: clay, with a hairline underline. */
+a {
+  color: var(--clay);
+  text-decoration-thickness: var(--hair);
+  text-underline-offset: 0.18em;
+}
+a:hover { color: var(--ink); }
+
+/* Code: lighter paper, one hairline frame, square corners. */
+div.sourceCode {
+  background: var(--paper-hi) !important;
+  border: var(--hair) solid var(--rule) !important;
+  border-radius: 0 !important;
+  margin: 1rem 0 1.4rem;
+}
+div.sourceCode pre,
+pre {
+  background: var(--paper-hi) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  margin: 0;
+}
+div.sourceCode pre *,
+pre code span {
+  border: 0 !important;
+  background: transparent !important;
+}
+pre a, pre a:hover { text-decoration: none; }
+pre a:hover { color: var(--clay) !important; }
+:not(pre) > code {
+  color: var(--dusk);
+  background: var(--paper-hi);
+  border: var(--hair) solid var(--rule-soft);
+  padding: 0.05em 0.3em;
+}
+:not(pre) > code a, a > code { text-decoration: none; }
+pre code { color: var(--ink); }
+.btn-copy-ex {
+  border-radius: 0;
+  font-family: var(--mono);
+  font-size: 0.65rem;
+}
+
+/* Tables: hairline rules only, mono headers like a map legend. */
+.table, table {
+  --bs-table-bg: transparent;
+  border-color: var(--rule);
+}
+table th {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-soft);
+  border-bottom: var(--hair) solid var(--ink-soft) !important;
+}
+table td { border-color: var(--rule-soft) !important; }
+
+/* Sidebar ("On this page", links, badges) as a map legend. */
+#toc h2, aside h2, aside h3, .sidebar h2 {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-soft);
+}
+aside .nav-link { color: var(--ink-soft); }
+aside .nav-link.active, aside .nav-link:hover { color: var(--clay); }
+aside .nav-link.active { border-left: var(--hair) solid var(--clay) !important; }
+
+blockquote {
+  border-left: 2px solid var(--ochre);
+  padding-left: 1rem;
+  color: var(--ink-soft);
+}
+hr { border-top: var(--hair) solid var(--rule); opacity: 1; }
+
+/* Footer: the sheet's title block. */
+footer {
+  border-top: var(--hair) solid var(--ink-soft);
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+}
+.title-block {
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  border: var(--hair) solid var(--ink-soft);
+  text-transform: uppercase;
+}
+.title-block > div {
+  padding: 0.35rem 0.7rem;
+  border-right: var(--hair) solid var(--rule);
+}
+.title-block > div:last-child { border-right: 0; }
+.title-block b {
+  display: block;
+  font-weight: 400;
+  font-size: 0.58rem;
+  color: var(--clay);
+  letter-spacing: 0.14em;
+}
+
+/* Hairline diagrams (inline SVG in articles). */
+figure.hairline {
+  margin: 2rem 0;
+  border: var(--hair) solid var(--rule);
+  background: var(--paper-hi);
+  padding: 1rem;
+}
+figure.hairline svg { width: 100%; height: auto; display: block; }
+figure.hairline figcaption {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-top: 0.6rem;
+}
+
+@media (max-width: 767px) {
+  /* On phones the sheet runs edge to edge: no side frame, no offset outline. */
+  body > .container {
+    margin: 0;
+    max-width: 100%;
+    border-left: 0;
+    border-right: 0;
+    outline: 0;
+  }
+  body > .container::before,
+  body > .container::after { display: none; }
+  .title-block { grid-template-columns: repeat(2, auto); }
+}
+.navbar .nav-item.active .nav-link,
+.navbar .nav-link.active { background: transparent !important; }
+
+/* Syntax colors from the palette (pandoc token classes). */
+pre code span.fu, pre code span.fu a { color: var(--dusk) !important; }
+pre code span.st, pre code span.ch, pre code span.ss { color: var(--sage) !important; }
+pre code span.dv, pre code span.fl, pre code span.cn { color: var(--clay) !important; }
+pre code span.va { color: var(--ink) !important; }
+pre code span.co, pre code span.do { color: #9a845f !important; font-style: italic; }
+pre code span.kw, pre code span.cf, pre code span.ot { color: var(--ink) !important; font-weight: 700; }
+pre code span.op, pre code span.sc { color: var(--ink-soft) !important; }
+
+/* Less dead air above the page title. */
+.template-home .page-header, .page-header { margin-top: 0.5rem; padding-top: 0; }
+
+/* Never hyphenate code. */
+code, pre { hyphens: none; -webkit-hyphens: none; }

@@ -5,12 +5,16 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Integration Examples • securer</title>
+<title>Integration examples • securer</title>
 <script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
-<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/Hanken_Grotesk-0.4.10/font.css" rel="stylesheet">
+<link href="../deps/Space_Mono-0.4.10/font.css" rel="stylesheet">
+<link href="../deps/Fraunces-0.4.10/font.css" rel="stylesheet">
+<link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Integration Examples">
+<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><link href="../extra.css" rel="stylesheet">
+<meta property="og:title" content="Integration examples">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -36,7 +40,7 @@
 <li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json">
 </form></li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/ian-flores/securer"><span class="fa fa-github"></span></a></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/ian-flores/securer" aria-label="securer on GitHub"><span class="fa fa-github"></span></a></li>
       </ul>
 </div>
 
@@ -50,7 +54,7 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
 
-      <h1>Integration Examples</h1>
+      <h1>Integration examples</h1>
             
       
       <small class="dont-index">Source: <a href="https://github.com/ian-flores/securer/blob/main/vignettes/integration-examples.Rmd" class="external-link"><code>vignettes/integration-examples.Rmd</code></a></small>
@@ -59,10 +63,10 @@
 
     
     
-<p>These examples show how to embed securer in common R application
-frameworks. Each example is self-contained and can be adapted to your
-own project. All code chunks use <code>eval = FALSE</code> — copy them
-into your application and adjust as needed.</p>
+<p>These examples put securer inside a Shiny app, a Plumber API, and a
+batch script. Each one stands alone. None of the code runs when this
+page is built, so copy what you need into your project and adjust
+it.</p>
 <div class="section level3">
 <h3 id="where-securer-fits">Where securer fits<a class="anchor" aria-label="anchor" href="#where-securer-fits"></a>
 </h3>
@@ -90,9 +94,9 @@ into your application and adjust as needed.</p>
 <div class="section level2">
 <h2 id="shiny">Shiny<a class="anchor" aria-label="anchor" href="#shiny"></a>
 </h2>
-<p>A minimal Shiny app that lets users type R code and execute it inside
-a sandboxed session. The <code>SecureSession</code> is created once when
-the Shiny session starts and closed when the user disconnects.</p>
+<p>This small app lets a user type R code and run it in a sandbox. Each
+visitor gets their own <code>SecureSession</code>, started when they
+connect and closed when they leave.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://shiny.posit.co/" class="external-link">shiny</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ian-flores.github.io/securer/">securer</a></span><span class="op">)</span></span>
@@ -142,26 +146,25 @@ the Shiny session starts and closed when the user disconnects.</p>
 <span><span class="op">}</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/pkg/shiny/man/shinyApp.html" class="external-link">shinyApp</a></span><span class="op">(</span><span class="va">ui</span>, <span class="va">server</span><span class="op">)</span></span></code></pre></div>
-<p>For multi-user apps that handle many concurrent visitors, consider
-using <code>SecureSessionPool</code> instead of creating one
-<code>SecureSession</code> per Shiny session. A single pool can be
-shared across all Shiny sessions — each request acquires an idle
-session, executes, and returns it to the pool automatically.</p>
+<p>With many visitors at once, one session each gets expensive. Share a
+single <code>SecureSessionPool</code> across all of them instead. Each
+run takes an idle session from the pool and gives it back when it’s
+done.</p>
 </div>
 <div class="section level2">
 <h2 id="plumber-api">Plumber API<a class="anchor" aria-label="anchor" href="#plumber-api"></a>
 </h2>
-<p>A REST API that accepts R code via POST and executes it in a
-sandboxed pool. The pool is created once at startup and shared across
-all requests.</p>
+<p>This API takes R code in a POST request and runs it in a pool of
+sandboxed sessions. The pool starts with the API and every request
+shares it.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># plumber.R</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://www.rplumber.io" class="external-link">plumber</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ian-flores.github.io/securer/">securer</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Create the pool at startup -- sessions are pre-warmed and reused.</span></span>
-<span><span class="co"># reset_between_uses = TRUE restarts each session after use so that</span></span>
-<span><span class="co"># variables and packages from one request do not leak into the next.</span></span>
+<span><span class="co"># Start the pool once, when the API starts.</span></span>
+<span><span class="co"># reset_between_uses = TRUE restarts each session after use, so one</span></span>
+<span><span class="co"># request can't see variables or packages left by another.</span></span>
 <span><span class="va">pool</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSessionPool.html">SecureSessionPool</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  size <span class="op">=</span> <span class="fl">4</span>,</span>
 <span>  sandbox <span class="op">=</span> <span class="cn">TRUE</span>,</span>
@@ -192,30 +195,33 @@ all requests.</p>
 <code class="sourceCode R"><span><span class="co"># Start the API</span></span>
 <span><span class="va">pr</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://www.rplumber.io/reference/plumb.html" class="external-link">plumb</a></span><span class="op">(</span><span class="st">"plumber.R"</span><span class="op">)</span></span>
 <span><span class="va">pr</span><span class="op">$</span><span class="fu">run</span><span class="op">(</span>host <span class="op">=</span> <span class="st">"0.0.0.0"</span>, port <span class="op">=</span> <span class="fl">8080</span><span class="op">)</span></span></code></pre></div>
-<p><strong>API hardening tips:</strong></p>
+<p>Some things to tighten before you expose an API like this:</p>
 <ul>
-<li>Validate <code>nchar(code)</code> before execution to reject
-oversized payloads — <code>SecureSession$execute()</code> enforces
-<code>max_code_length</code> (default 100 000 characters) but an early
-check avoids unnecessary work.</li>
-<li>Set <code>timeout</code> to a value appropriate for your workload.
-The sandbox enforces CPU-time limits via <code>ulimit</code>, but
-<code>timeout</code> catches wall-clock delays from I/O waits.</li>
-<li>Use <code>max_tool_calls</code> on individual
-<code>session$execute()</code> calls if tools are registered, to cap
-iterations.</li>
-<li>Enable <code>sanitize_errors = TRUE</code> on the underlying
-sessions if error messages are returned to untrusted clients — this
-strips file paths and PIDs.</li>
+<li>Check <code>nchar(code)</code> yourself and reject huge requests
+early. <code>$execute()</code> already refuses code over
+<code>max_code_length</code> (100,000 characters by default), but
+there’s no point getting that far.</li>
+<li>Pick a <code>timeout</code> that suits your workload. The CPU limit
+from <code>ulimit</code> doesn’t count time spent waiting, and
+<code>timeout</code> does.</li>
+<li>If you register tools, cap how often one request can call them with
+<code>max_tool_calls</code>.</li>
+<li>If error messages go back to people you don’t trust, use
+<code>sanitize_errors = TRUE</code>. It removes file paths and process
+IDs.</li>
 </ul>
+<p><code>SecureSessionPool</code> doesn’t take
+<code>max_tool_calls</code> or <code>sanitize_errors</code>. For those
+two, manage your own <code>SecureSession</code> objects and pass them to
+<code>$new()</code> and <code>$execute()</code>.</p>
 </div>
 <div class="section level2">
-<h2 id="batch-processing">Batch Processing<a class="anchor" aria-label="anchor" href="#batch-processing"></a>
+<h2 id="batch-jobs">Batch jobs<a class="anchor" aria-label="anchor" href="#batch-jobs"></a>
 </h2>
-<p>Processing a vector of code snippets in parallel using a session
-pool. The pool manages a fixed number of sessions — <code>lapply</code>
-iterates sequentially but each execution reuses a pre-warmed process,
-avoiding repeated startup costs.</p>
+<p>Here a pool runs a vector of code snippets. <code><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply()</a></code>
+goes through them one at a time, but each snippet runs in a session
+that’s already started, so you don’t pay the startup cost again and
+again.</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ian-flores.github.io/securer/">securer</a></span><span class="op">)</span></span>
 <span></span>
@@ -259,12 +265,11 @@ avoiding repeated startup costs.</p>
 <span><span class="co">#&gt; 3     UNDEFINED_VAR + 1    object 'UNDEFINED_VAR' not found</span></span>
 <span><span class="co">#&gt; 4  paste('hello', 'world')                              &lt;NA&gt;</span></span>
 <span><span class="co">#&gt; 5       sum(rnorm(1000))                               &lt;NA&gt;</span></span></code></pre></div>
-<p>Successful results are stored in the <code>result</code> column as a
-list. Errors are captured per-snippet so that one failure does not abort
-the entire batch. For larger workloads, increase the <code>size</code>
-argument to <code>SecureSessionPool$new()</code> to allow more sessions
-to run concurrently — keeping in mind that each session is a separate R
-process.</p>
+<p>The <code>result</code> column is a list holding each value. Each
+snippet’s error is caught on its own, so one failure doesn’t stop the
+batch. If you run snippets in parallel, raise <code>size</code> in
+<code>SecureSessionPool$new()</code>. Each session is a separate R
+process, so more sessions means more memory.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>
@@ -273,7 +278,20 @@ process.</p>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Ian Flores Siaca.</p>
+  <div class="title-block">
+<div>
+<b>Sheet</b>1 of 4
+</div>
+<div>
+<b>Quadrangle</b>securer
+</div>
+<div>
+<b>Survey</b>Sandbox
+</div>
+<div>
+<b>Series</b>secure-r-dev
+</div>
+</div>
 </div>
 
 <div class="pkgdown-footer-right">

@@ -1,8 +1,8 @@
-# Sanitize error messages before returning to LLM
+# Clean error messages before they go back to an LLM
 
-Removes sensitive information from R error messages that could leak host
-details to an adversarial LLM. Replaces file paths, hostnames/IPs,
-process IDs, and stack traces while preserving the core error type.
+Removes details from R error messages that would tell a hostile LLM
+about the host. Replaces file paths, hostnames/IPs, process IDs, and
+stack traces while preserving the core error type.
 
 ## Usage
 

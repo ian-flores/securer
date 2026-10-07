@@ -1,9 +1,8 @@
-# Integration Examples
+# Integration examples
 
-These examples show how to embed securer in common R application
-frameworks. Each example is self-contained and can be adapted to your
-own project. All code chunks use `eval = FALSE` — copy them into your
-application and adjust as needed.
+These examples put securer inside a Shiny app, a Plumber API, and a
+batch script. Each one stands alone. None of the code runs when this
+page is built, so copy what you need into your project and adjust it.
 
 ### Where securer fits
 
@@ -30,9 +29,9 @@ application and adjust as needed.
 
 ## Shiny
 
-A minimal Shiny app that lets users type R code and execute it inside a
-sandboxed session. The `SecureSession` is created once when the Shiny
-session starts and closed when the user disconnects.
+This small app lets a user type R code and run it in a sandbox. Each
+visitor gets their own `SecureSession`, started when they connect and
+closed when they leave.
 
 ``` r
 
@@ -86,17 +85,15 @@ server <- function(input, output, session) {
 shinyApp(ui, server)
 ```
 
-For multi-user apps that handle many concurrent visitors, consider using
-`SecureSessionPool` instead of creating one `SecureSession` per Shiny
-session. A single pool can be shared across all Shiny sessions — each
-request acquires an idle session, executes, and returns it to the pool
-automatically.
+With many visitors at once, one session each gets expensive. Share a
+single `SecureSessionPool` across all of them instead. Each run takes an
+idle session from the pool and gives it back when it’s done.
 
 ## Plumber API
 
-A REST API that accepts R code via POST and executes it in a sandboxed
-pool. The pool is created once at startup and shared across all
-requests.
+This API takes R code in a POST request and runs it in a pool of
+sandboxed sessions. The pool starts with the API and every request
+shares it.
 
 ``` r
 
@@ -104,9 +101,9 @@ requests.
 library(plumber)
 library(securer)
 
-# Create the pool at startup -- sessions are pre-warmed and reused.
-# reset_between_uses = TRUE restarts each session after use so that
-# variables and packages from one request do not leak into the next.
+# Start the pool once, when the API starts.
+# reset_between_uses = TRUE restarts each session after use, so one
+# request can't see variables or packages left by another.
 pool <- SecureSessionPool$new(
   size = 4,
   sandbox = TRUE,
@@ -145,26 +142,28 @@ pr <- plumb("plumber.R")
 pr$run(host = "0.0.0.0", port = 8080)
 ```
 
-**API hardening tips:**
+Some things to tighten before you expose an API like this:
 
-- Validate `nchar(code)` before execution to reject oversized payloads —
-  `SecureSession$execute()` enforces `max_code_length` (default 100 000
-  characters) but an early check avoids unnecessary work.
-- Set `timeout` to a value appropriate for your workload. The sandbox
-  enforces CPU-time limits via `ulimit`, but `timeout` catches
-  wall-clock delays from I/O waits.
-- Use `max_tool_calls` on individual `session$execute()` calls if tools
-  are registered, to cap iterations.
-- Enable `sanitize_errors = TRUE` on the underlying sessions if error
-  messages are returned to untrusted clients — this strips file paths
-  and PIDs.
+- Check `nchar(code)` yourself and reject huge requests early.
+  `$execute()` already refuses code over `max_code_length` (100,000
+  characters by default), but there’s no point getting that far.
+- Pick a `timeout` that suits your workload. The CPU limit from `ulimit`
+  doesn’t count time spent waiting, and `timeout` does.
+- If you register tools, cap how often one request can call them with
+  `max_tool_calls`.
+- If error messages go back to people you don’t trust, use
+  `sanitize_errors = TRUE`. It removes file paths and process IDs.
 
-## Batch Processing
+`SecureSessionPool` doesn’t take `max_tool_calls` or `sanitize_errors`.
+For those two, manage your own `SecureSession` objects and pass them to
+`$new()` and `$execute()`.
 
-Processing a vector of code snippets in parallel using a session pool.
-The pool manages a fixed number of sessions — `lapply` iterates
-sequentially but each execution reuses a pre-warmed process, avoiding
-repeated startup costs.
+## Batch jobs
+
+Here a pool runs a vector of code snippets.
+[`lapply()`](https://rdrr.io/r/base/lapply.html) goes through them one
+at a time, but each snippet runs in a session that’s already started, so
+you don’t pay the startup cost again and again.
 
 ``` r
 
@@ -218,8 +217,7 @@ outcome[, c("code", "error")]
 #> 5       sum(rnorm(1000))                               <NA>
 ```
 
-Successful results are stored in the `result` column as a list. Errors
-are captured per-snippet so that one failure does not abort the entire
-batch. For larger workloads, increase the `size` argument to
-`SecureSessionPool$new()` to allow more sessions to run concurrently —
-keeping in mind that each session is a separate R process.
+The `result` column is a list holding each value. Each snippet’s error
+is caught on its own, so one failure doesn’t stop the batch. If you run
+snippets in parallel, raise `size` in `SecureSessionPool$new()`. Each
+session is a separate R process, so more sessions means more memory.

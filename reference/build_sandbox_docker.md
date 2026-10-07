@@ -1,9 +1,10 @@
-# Build Docker sandbox configuration
+# Build in-container Docker sandbox configuration
 
-When running inside a Docker container, the container itself provides
-filesystem and network isolation. This builder skips bubblewrap (which
-requires namespace support that Docker typically doesn't expose) and
-applies only resource limits (`ulimit`) via a wrapper script.
+Used when the securer session is *already running inside* a Docker
+container. The container itself provides filesystem and network
+isolation, so this builder skips bubblewrap (which requires namespace
+support Docker typically doesn't expose) and applies only resource
+limits (`ulimit`) via a wrapper script.
 
 ## Usage
 
@@ -33,5 +34,9 @@ A sandbox config list (see
 
 ## Details
 
-Docker mode is activated automatically when `/.dockerenv` exists, or
-manually by setting `SECURER_SANDBOX_MODE=docker`.
+This is different from
+[`build_sandbox_docker_spawn()`](https://ian-flores.github.io/securer/reference/build_sandbox_docker_spawn.md),
+which starts a new container for each child session. This backend is
+activated automatically when `/.dockerenv` exists, or manually by
+setting `SECURER_SANDBOX_MODE=docker`. The container-spawning backend is
+activated by `SECURER_SANDBOX_MODE=docker-spawn`.

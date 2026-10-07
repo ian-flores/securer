@@ -5,12 +5,16 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Sessions and Tools • securer</title>
+<title>Sessions and tools • securer</title>
 <script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
-<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/Hanken_Grotesk-0.4.10/font.css" rel="stylesheet">
+<link href="../deps/Space_Mono-0.4.10/font.css" rel="stylesheet">
+<link href="../deps/Fraunces-0.4.10/font.css" rel="stylesheet">
+<link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Sessions and Tools">
+<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><link href="../extra.css" rel="stylesheet">
+<meta property="og:title" content="Sessions and tools">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -36,7 +40,7 @@
 <li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json">
 </form></li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/ian-flores/securer"><span class="fa fa-github"></span></a></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/ian-flores/securer" aria-label="securer on GitHub"><span class="fa fa-github"></span></a></li>
       </ul>
 </div>
 
@@ -50,7 +54,7 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
 
-      <h1>Sessions and Tools</h1>
+      <h1>Sessions and tools</h1>
             
       
       <small class="dont-index">Source: <a href="https://github.com/ian-flores/securer/blob/main/vignettes/sessions-and-tools.Rmd" class="external-link"><code>vignettes/sessions-and-tools.Rmd</code></a></small>
@@ -59,16 +63,15 @@
 
     
     
-<p>This vignette covers session lifecycle, output handling, audit
-logging, and session pooling. See also
-<code><a href="../articles/quickstart.html">vignette("quickstart")</a></code> and
-<code><a href="../articles/security-model.html">vignette("security-model")</a></code>.</p>
+<p>This vignette covers sessions you keep open, what happens to output
+and errors, the audit log, and session pools. If you’re new to securer,
+start with <code><a href="../articles/quickstart.html">vignette("quickstart")</a></code>.</p>
 <div class="section level2">
 <h2 id="persistent-sessions">Persistent sessions<a class="anchor" aria-label="anchor" href="#persistent-sessions"></a>
 </h2>
-<p><code>SecureSession</code> keeps a child R process alive across
-multiple <code>$execute()</code> calls. State persists between
-executions:</p>
+<p><code>SecureSession</code> keeps one child R process running across
+many <code>$execute()</code> calls. Variables you create in one call are
+still there in the next:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ian-flores.github.io/securer/">securer</a></span><span class="op">)</span></span>
 <span></span>
@@ -85,8 +88,9 @@ executions:</p>
 <span><span class="co">#&gt; [1] 60</span></span>
 <span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-<p>Always call <code>$close()</code> when done, or use
-<code><a href="../reference/with_secure_session.html">with_secure_session()</a></code> for automatic cleanup:</p>
+<p>Call <code>$close()</code> when you’re done. Or use
+<code><a href="../reference/with_secure_session.html">with_secure_session()</a></code>, which closes the session for you,
+even if the code fails:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/with_secure_session.html">with_secure_session</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">session</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">"x &lt;- 10"</span><span class="op">)</span></span>
@@ -94,26 +98,17 @@ executions:</p>
 <span><span class="op">}</span>, sandbox <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="agent-safety-options">Agent safety options<a class="anchor" aria-label="anchor" href="#agent-safety-options"></a>
+<h2 id="limits-for-agents">Limits for agents<a class="anchor" aria-label="anchor" href="#limits-for-agents"></a>
 </h2>
-<p><code>SecureSession</code> has several options for hardening LLM
-agent deployments:</p>
-<ul>
-<li>
-<strong><code>max_code_length</code></strong>
-(<code>$execute()</code>): Reject code exceeding a character limit
-(default 100,000).</li>
-<li>
-<strong><code>max_executions</code></strong> (<code>$new()</code>):
-Cap total <code>$execute()</code> calls per session.</li>
-<li>
-<strong><code>pre_execute_hook</code></strong>
-(<code>$new()</code>): Callback returning <code>FALSE</code> to block
-execution.</li>
-<li>
-<strong><code>sanitize_errors</code></strong> (<code>$new()</code>):
-Strip paths, PIDs, and hostnames from errors.</li>
-</ul>
+<p>A few options are there mainly for code written by an LLM.
+<code>$execute()</code> refuses code longer than
+<code>max_code_length</code> characters (100,000 by default). In
+<code>$new()</code>, <code>max_executions</code> caps how many times a
+session can run code, and <code>pre_execute_hook</code> is a function
+that sees the code first and can block it by returning
+<code>FALSE</code>. <code>sanitize_errors = TRUE</code> removes file
+paths, process IDs, and host names from error messages before you see
+them, so they don’t end up back in the model’s context.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  max_executions <span class="op">=</span> <span class="fl">100</span>,</span>
@@ -123,19 +118,19 @@ Strip paths, PIDs, and hostnames from errors.</li>
 <span>  <span class="op">}</span>,</span>
 <span>  sanitize_errors <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>See <code><a href="../articles/security-model.html">vignette("security-model")</a></code> for the full threat model
-and defense layers.</p>
+<p><code><a href="../articles/security-model.html">vignette("security-model")</a></code> explains how these fit with
+the sandbox.</p>
 </div>
 <div class="section level2">
 <h2 id="execution-timeouts">Execution timeouts<a class="anchor" aria-label="anchor" href="#execution-timeouts"></a>
 </h2>
-<p><code>$execute()</code> accepts a <code>timeout</code> in seconds
-(default 30). On timeout the child is killed and the session
-auto-recovers:</p>
+<p><code>$execute()</code> takes a <code>timeout</code> in seconds (30
+by default). When time runs out, securer kills the child process and
+starts a new one, so the session still works:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">"Sys.sleep(60)"</span>, timeout <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Error: Execution timed out</span></span>
+<span><span class="co">#&gt; Error: Execution timed out after 5 seconds</span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">is_alive</span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] TRUE</span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
@@ -143,20 +138,20 @@ auto-recovers:</p>
 <div class="section level2">
 <h2 id="error-handling">Error handling<a class="anchor" aria-label="anchor" href="#error-handling"></a>
 </h2>
-<p>Errors in the child process, in tool execution, and from unknown tool
-names are all propagated to the host as standard R errors:</p>
+<p>An error in the sandboxed code or in a tool comes back to you as an
+ordinary R error:</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/execute_r.html">execute_r</a></span><span class="op">(</span><span class="st">'stop("something went wrong")'</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Error: something went wrong</span></span>
 <span></span>
 <span><span class="fu"><a href="../reference/execute_r.html">execute_r</a></span><span class="op">(</span><span class="st">"nonexistent_tool()"</span>, tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Error: Unknown tool: nonexistent_tool</span></span></code></pre></div>
+<span><span class="co">#&gt; Error: could not find function "nonexistent_tool"</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="streaming-output">Streaming output<a class="anchor" aria-label="anchor" href="#streaming-output"></a>
 </h2>
-<p>Pass <code>output_handler</code> to receive child output as it
-arrives:</p>
+<p>To see output while the code is still running, pass an
+<code>output_handler</code>. It gets each line as it’s printed:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span></span>
@@ -164,14 +159,14 @@ arrives:</p>
 <span>  output_handler <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">line</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/message.html" class="external-link">message</a></span><span class="op">(</span><span class="st">"[child] "</span>, <span class="va">line</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-<p>Output is always available as <code>attr(result, "output")</code> on
-the return value.</p>
+<p>Whether or not you pass a handler, the printed output is also
+attached to the result as <code>attr(result, "output")</code>.</p>
 </div>
 <div class="section level2">
 <h2 id="output-and-tool-call-limits">Output and tool call limits<a class="anchor" aria-label="anchor" href="#output-and-tool-call-limits"></a>
 </h2>
-<p>Both <code>max_output_lines</code> and <code>max_tool_calls</code>
-are per-execution caps:</p>
+<p><code>max_output_lines</code> and <code>max_tool_calls</code> limit a
+single <code>$execute()</code> call:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span><span class="op">)</span></span>
 <span></span>
@@ -190,8 +185,8 @@ are per-execution caps:</p>
 <div class="section level2">
 <h2 id="session-lifecycle">Session lifecycle<a class="anchor" aria-label="anchor" href="#session-lifecycle"></a>
 </h2>
-<p><code>$restart()</code> resets the child process;
-<code>$is_alive()</code> checks if it is running:</p>
+<p><code>$restart()</code> replaces the child process with a fresh one.
+<code>$is_alive()</code> tells you whether the child is running:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>sandbox <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span></span>
@@ -209,38 +204,85 @@ are per-execution caps:</p>
 <div class="section level2">
 <h2 id="audit-logging">Audit logging<a class="anchor" aria-label="anchor" href="#audit-logging"></a>
 </h2>
-<p>Pass <code>audit_log</code> to the constructor to write structured
-JSONL entries:</p>
+<p>Pass a file path as <code>audit_log</code> and the session writes one
+JSON object per line for each thing that happens:</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>audit_log <span class="op">=</span> <span class="st">"securer-audit.jsonl"</span><span class="op">)</span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">"1 + 1"</span><span class="op">)</span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-<p>Each line is a JSON object with <code>timestamp</code>,
-<code>event</code>, and <code>session_id</code> fields plus
-event-specific data. Events: <code>session_start</code> (pid),
-<code>session_close</code>, <code>session_restart</code>,
-<code>execute_start</code> (code), <code>execute_complete</code>
-(elapsed), <code>execute_error</code> (error),
-<code>execute_timeout</code> (timeout_secs), <code>tool_call</code>
-(tool, args), <code>tool_result</code> (tool, elapsed). Example:</p>
+<p>Every line has <code>timestamp</code>, <code>event</code>, and
+<code>session_id</code>, plus fields that depend on the event:</p>
+<table class="table">
+<thead><tr class="header">
+<th>Event</th>
+<th>Extra fields</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td><code>session_start</code></td>
+<td>
+<code>sandbox</code>, <code>pid</code>
+</td>
+</tr>
+<tr class="even">
+<td>
+<code>session_close</code>, <code>session_restart</code>
+</td>
+<td>none</td>
+</tr>
+<tr class="odd">
+<td><code>execute_start</code></td>
+<td><code>code</code></td>
+</tr>
+<tr class="even">
+<td><code>execute_complete</code></td>
+<td><code>elapsed</code></td>
+</tr>
+<tr class="odd">
+<td><code>execute_error</code></td>
+<td>
+<code>error</code>, <code>elapsed</code>
+</td>
+</tr>
+<tr class="even">
+<td><code>execute_timeout</code></td>
+<td><code>timeout_secs</code></td>
+</tr>
+<tr class="odd">
+<td><code>tool_call</code></td>
+<td>
+<code>tool</code>, <code>args</code>
+</td>
+</tr>
+<tr class="even">
+<td><code>tool_result</code></td>
+<td>
+<code>tool</code>, <code>error</code>, <code>result_summary</code>,
+<code>elapsed_secs</code>
+</td>
+</tr>
+</tbody>
+</table>
+<p>A <code>tool_call</code> line looks like this:</p>
 <div class="sourceCode" id="cb10"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="fu">{</span><span class="dt">"timestamp"</span><span class="fu">:</span><span class="st">"2024-01-15T10:30:00.000Z"</span><span class="fu">,</span><span class="dt">"event"</span><span class="fu">:</span><span class="st">"tool_call"</span><span class="fu">,</span><span class="dt">"session_id"</span><span class="fu">:</span><span class="st">"sess_abc123"</span><span class="fu">,</span><span class="dt">"tool"</span><span class="fu">:</span><span class="st">"add"</span><span class="fu">,</span><span class="dt">"args"</span><span class="fu">:{</span><span class="dt">"a"</span><span class="fu">:</span><span class="dv">1</span><span class="fu">,</span><span class="dt">"b"</span><span class="fu">:</span><span class="dv">2</span><span class="fu">}}</span></span></code></pre></div>
-<p>The log file is created with <code>0600</code> permissions. Code
-fields longer than 10,000 characters are truncated.</p>
+<p>Only you can read or write the log file (permissions
+<code>0600</code>). Code longer than 10,000 characters is cut short in
+the log.</p>
 </div>
 <div class="section level2">
 <h2 id="session-pooling">Session pooling<a class="anchor" aria-label="anchor" href="#session-pooling"></a>
 </h2>
 <div class="section level3">
-<h3 id="why-session-pooling">Why session pooling?<a class="anchor" aria-label="anchor" href="#why-session-pooling"></a>
+<h3 id="why-use-a-pool">Why use a pool<a class="anchor" aria-label="anchor" href="#why-use-a-pool"></a>
 </h3>
-<p>Creating a <code>SecureSession</code> starts a child R process, sets
-up the sandbox, and establishes the IPC socket. This takes 0.5–1 second.
-For Plumber APIs or multi-user Shiny apps, that per-request overhead
-adds up fast. Session pooling pre-warms a fixed number of sessions at
-startup and reuses them across requests.</p>
+<p>A new <code>SecureSession</code> has to start R, set up the sandbox,
+and open the socket. That takes half a second to a second. In a Plumber
+API or a Shiny app with many users, paying that on every request adds
+up. A pool starts a fixed number of sessions once and hands them out as
+requests come in.</p>
 </div>
 <div class="section level3">
-<h3 id="session-pool-lifecycle">Session pool lifecycle<a class="anchor" aria-label="anchor" href="#session-pool-lifecycle"></a>
+<h3 id="how-a-pool-works">How a pool works<a class="anchor" aria-label="anchor" href="#how-a-pool-works"></a>
 </h3>
 <pre><code> Initialize          Acquire            Execute           Release
 +-------------+   +-------------+   +-------------+   +-------------+
@@ -249,8 +291,8 @@ startup and reuses them across requests.</p>
 | startup     |   | from pool   |   | session     |   | (or restart |
 |             |   |             |   |             |   |  if dead)   |
 +-------------+   +-------------+   +-------------+   +-------------+</code></pre>
-<p><code>SecureSessionPool</code> pre-warms multiple sessions for
-low-latency execution:</p>
+<p><code>SecureSessionPool</code> starts its sessions when you create
+it:</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pool</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSessionPool.html">SecureSessionPool</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>size <span class="op">=</span> <span class="fl">4</span>, sandbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
@@ -259,8 +301,10 @@ low-latency execution:</p>
 <span></span>
 <span><span class="va">pool</span><span class="op">$</span><span class="fu">status</span><span class="op">(</span><span class="op">)</span>  <span class="co"># returns list(total, busy, idle, dead)</span></span>
 <span><span class="va">pool</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-<p>Set <code>reset_between_uses = TRUE</code> to restart sessions after
-each execution, preventing state leakage between callers:</p>
+<p>Sessions in a pool keep their variables between uses. If different
+users share the pool, set <code>reset_between_uses = TRUE</code> so each
+session restarts after every call and one caller can’t see another’s
+data:</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pool</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSessionPool.html">SecureSessionPool</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  size <span class="op">=</span> <span class="fl">2</span>,</span>
@@ -273,9 +317,9 @@ each execution, preventing state leakage between callers:</p>
 <span><span class="co">#&gt; [1] FALSE</span></span>
 <span></span>
 <span><span class="va">pool</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-<p>Dead sessions are automatically restarted on acquire. The pool is
-<strong>not</strong> thread-safe; create separate instances when using
-<code>parallel</code> or <code>future</code>.</p>
+<p>If a session has died, the pool restarts it before handing it out.
+The pool isn’t thread-safe. With <code>parallel</code> or
+<code>future</code>, give each worker its own pool.</p>
 </div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
@@ -285,7 +329,20 @@ each execution, preventing state leakage between callers:</p>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Ian Flores Siaca.</p>
+  <div class="title-block">
+<div>
+<b>Sheet</b>1 of 4
+</div>
+<div>
+<b>Quadrangle</b>securer
+</div>
+<div>
+<b>Survey</b>Sandbox
+</div>
+<div>
+<b>Series</b>secure-r-dev
+</div>
+</div>
 </div>
 
 <div class="pkgdown-footer-right">

@@ -1,12 +1,11 @@
 # Default resource limits for sandboxed sessions
 
-Returns the default resource limits that are applied automatically when
-`sandbox = TRUE` and no explicit `limits` are provided to
+Returns the resource limits that
 [SecureSession](https://ian-flores.github.io/securer/reference/SecureSession.md)
-or
-[`execute_r()`](https://ian-flores.github.io/securer/reference/execute_r.md).
-Useful for inspecting the defaults and creating custom limits based on
-them.
+and
+[`execute_r()`](https://ian-flores.github.io/securer/reference/execute_r.md)
+use when `sandbox = TRUE` and you don't pass `limits`. Use it to see the
+defaults, or as a starting point for your own.
 
 ## Usage
 
@@ -36,15 +35,15 @@ The returned list contains:
 
 - nproc:
 
-  Maximum number of child processes (default: 50).
+  Maximum number of processes (default: 50).
 
 - nofile:
 
   Maximum number of open file descriptors (default: 256).
 
-You can pass a modified copy to `SecureSession$new(limits = ...)` or
-`execute_r(limits = ...)`. Pass `limits = list()` to explicitly disable
-all resource limits.
+Pass a changed copy to `SecureSession$new(limits = ...)` or
+`execute_r(limits = ...)`. Pass `limits = list()` to turn all limits
+off.
 
 ## Examples
 

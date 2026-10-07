@@ -1,7 +1,7 @@
 # Validate a list of tools
 
-Accepts either a named list of bare functions (legacy format from
-increment 1) or a list of
+Accepts either a named list of plain functions (the older format) or a
+list of
 [`securer_tool()`](https://ian-flores.github.io/securer/reference/securer_tool.md)
 objects. Returns a named list with two components: `fns` (tool functions
 keyed by name) and `arg_meta` (expected argument names keyed by tool

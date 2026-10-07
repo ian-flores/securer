@@ -1,9 +1,9 @@
 # Execute R code securely with tool support
 
-A convenience wrapper that creates a
+Starts a
 [SecureSession](https://ian-flores.github.io/securer/reference/SecureSession.md),
-executes code, and returns the result. The session is automatically
-closed when done.
+runs `code` in it, and returns the result. The session is closed
+afterwards, even if the code fails.
 
 ## Usage
 
@@ -50,31 +50,31 @@ execute_r(
 
 - verbose:
 
-  Logical, whether to emit diagnostic messages via
-  [`message()`](https://rdrr.io/r/base/message.html). Useful for
-  debugging. Users can suppress with
-  [`suppressMessages()`](https://rdrr.io/r/base/message.html).
+  Logical, whether to print what the session is doing with
+  [`message()`](https://rdrr.io/r/base/message.html). Handy for
+  debugging. Wrap the call in
+  [`suppressMessages()`](https://rdrr.io/r/base/message.html) to hide
+  them.
 
 - validate:
 
-  Logical, whether to pre-validate the code for syntax errors before
-  sending it to the child process (default `TRUE`).
+  Logical, whether to check the code for syntax errors before sending it
+  to the child process (default `TRUE`).
 
 - sandbox_strict:
 
-  Logical, whether to error if sandbox tools are not available (default
-  `FALSE`). See
-  [SecureSession](https://ian-flores.github.io/securer/reference/SecureSession.md)
-  for details.
+  Logical, whether to stop with an error if the sandbox tools aren't
+  available (default `FALSE`). See
+  [SecureSession](https://ian-flores.github.io/securer/reference/SecureSession.md).
 
 - audit_log:
 
-  Optional path to a JSONL file for persistent audit logging (default
-  `NULL`, no file logging).
+  Optional path to a JSONL file to log session events to. The default,
+  `NULL`, writes no log.
 
 ## Value
 
-The result of evaluating `code` in the secure session.
+The value of the last expression in `code`.
 
 ## Examples
 

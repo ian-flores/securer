@@ -13,7 +13,8 @@ Creates a Seatbelt policy string that:
 
 - Denies remote network access (TCP/UDP)
 
-- Allows only process-fork and process-exec for the R binary
+- Allows process-exec only for the R binaries, `/bin/sh`, and a few
+  utilities R's startup script needs
 
 - Allows only specific system operations R needs
 

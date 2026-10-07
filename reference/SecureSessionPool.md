@@ -1,27 +1,26 @@
 # SecureSessionPool
 
-R6 class for a pool of pre-warmed
+An R6 class for a pool of
 [SecureSession](https://ian-flores.github.io/securer/reference/SecureSession.md)
-instances.
+objects that are started ahead of time.
 
-Creates multiple sessions at initialization time so that `$execute()`
-calls can run immediately on an idle session without waiting for process
-startup. Sessions are returned to the pool after each execution
-completes (or errors).
+The pool starts all its sessions when you create it, so `$execute()` can
+use an idle one straight away instead of waiting for R to start. Each
+session goes back to the pool when its run finishes, whether it
+succeeded or failed.
 
 ## Value
 
 An R6 object of class `SecureSessionPool`.
 
-## Thread Safety
+## Threads and forks
 
-`SecureSessionPool` is **NOT** thread-safe. The acquire/release
-mechanism uses no locking and assumes single-threaded access. If you
-need to use pools from multiple processes (e.g., via
+`SecureSessionPool` isn't thread-safe. Handing out and taking back
+sessions uses no locks. If you use pools from several processes (for
+example with
 [`parallel::mclapply`](https://rdrr.io/r/parallel/mclapply.html) or
-`future`), each process should create its own pool instance. Sharing a
-single pool across threads or forked processes will lead to race
-conditions in session acquisition.
+`future`), create a pool in each process. Two processes sharing one pool
+can end up grabbing the same session.
 
 ## Methods
 
@@ -47,7 +46,7 @@ conditions in session acquisition.
 
 ### Method `new()`
 
-Create a new SecureSessionPool
+Start a new SecureSessionPool
 
 #### Usage
 
@@ -64,7 +63,7 @@ Create a new SecureSessionPool
 
 - `size`:
 
-  Integer, number of sessions to pre-warm (default 4, minimum 1).
+  Integer, number of sessions to start (default 4, minimum 1).
 
 - `tools`:
 
@@ -74,7 +73,7 @@ Create a new SecureSessionPool
 
 - `sandbox`:
 
-  Logical, whether to enable OS-level sandboxing.
+  Logical, whether to use the OS sandbox.
 
 - `limits`:
 
@@ -82,21 +81,20 @@ Create a new SecureSessionPool
 
 - `verbose`:
 
-  Logical, whether to emit diagnostic messages.
+  Logical, whether to print what each session is doing.
 
 - `reset_between_uses`:
 
-  Logical, whether to restart each session after an execution before
-  returning it to the pool (default `FALSE`). When `TRUE`, calls
-  `session$restart()` after every `$execute()` to prevent state leaking
-  between executions (e.g., variables, loaded packages, options set by
-  prior code).
+  Logical, whether to restart each session before it goes back to the
+  pool (default `FALSE`). With `TRUE`, the pool calls
+  `session$restart()` after every `$execute()`, so variables, loaded
+  packages, and options from one run don't carry over to the next.
 
 ------------------------------------------------------------------------
 
 ### Method `execute()`
 
-Execute R code on an available pooled session
+Run R code on an idle session from the pool
 
 #### Usage
 
@@ -114,14 +112,14 @@ Execute R code on an available pooled session
 
 - `acquire_timeout`:
 
-  Optional timeout in seconds to wait for a session to become available.
-  If `NULL` (default), fails immediately when all sessions are busy. If
-  provided, retries acquisition with a short sleep (0.1s) between
-  retries until the timeout expires.
+  Optional number of seconds to wait for a free session. If `NULL` (the
+  default), the call fails straight away when every session is busy.
+  Otherwise the pool keeps trying, every 0.1 seconds, until the time is
+  up.
 
 #### Returns
 
-The result of evaluating the code.
+The value of the last expression in `code`.
 
 ------------------------------------------------------------------------
 
@@ -141,7 +139,7 @@ Integer
 
 ### Method `available()`
 
-Number of idle (non-busy) sessions
+Number of idle sessions
 
 #### Usage
 
@@ -155,7 +153,7 @@ Integer
 
 ### Method `status()`
 
-Summary of pool state
+Count sessions by state
 
 #### Usage
 
@@ -164,13 +162,13 @@ Summary of pool state
 #### Returns
 
 A named list with `total`, `busy`, `idle`, and `dead` counts. `dead`
-indicates sessions that have crashed and need restart.
+counts sessions whose process has stopped and that need a restart.
 
 ------------------------------------------------------------------------
 
 ### Method [`format()`](https://rdrr.io/r/base/format.html)
 
-Format method for display
+Format the pool for printing
 
 #### Usage
 
@@ -210,7 +208,7 @@ Invisible self.
 
 ### Method [`close()`](https://rdrr.io/r/base/connections.html)
 
-Close all sessions and shut down the pool
+Close every session in the pool
 
 #### Usage
 

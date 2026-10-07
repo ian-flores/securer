@@ -1,14 +1,13 @@
 # securer_tool S7 class
 
-S7 class for tool definitions.
+The S7 class behind `securer_tool()`. You normally create tools with
+`securer_tool()` rather than with this class directly.
 
-Defines a named tool with a function implementation and typed argument
-metadata. Tool objects are passed to
+A tool is a function that code in the sandbox can call by name, but that
+runs in your session. Pass a list of tools to
 [SecureSession](https://ian-flores.github.io/securer/reference/SecureSession.md)
 or
-[`execute_r()`](https://ian-flores.github.io/securer/reference/execute_r.md)
-so that code running in the sandboxed child process can call the tool by
-name and the parent process executes the actual function.
+[`execute_r()`](https://ian-flores.github.io/securer/reference/execute_r.md).
 
 ## Usage
 
@@ -31,17 +30,20 @@ securer_tool(name, description, fn, args = list())
 
 - description:
 
-  Character, description of what the tool does.
+  Character, what the tool does. You can show this to an LLM so it knows
+  when to use the tool.
 
 - fn:
 
-  Function that implements the tool.
+  The function that runs when the tool is called.
 
 - args:
 
-  Named list mapping argument names to type strings (e.g.
-  `list(city = "character")`). Used to generate wrapper functions in the
-  child process with the correct formal arguments.
+  Named list of argument names and their types, such as
+  `list(city = "character")`. securer uses it to build a function with
+  the same arguments in the child, and to check argument types. Allowed
+  types are `"numeric"`, `"character"`, `"logical"`, `"integer"`,
+  `"list"`, and `"data.frame"`.
 
 ## Value
 

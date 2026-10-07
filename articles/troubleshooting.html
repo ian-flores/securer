@@ -8,9 +8,13 @@
 <title>Troubleshooting • securer</title>
 <script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
-<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/Hanken_Grotesk-0.4.10/font.css" rel="stylesheet">
+<link href="../deps/Space_Mono-0.4.10/font.css" rel="stylesheet">
+<link href="../deps/Fraunces-0.4.10/font.css" rel="stylesheet">
+<link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Troubleshooting">
+<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><link href="../extra.css" rel="stylesheet">
+<meta property="og:title" content="Troubleshooting">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -36,7 +40,7 @@
 <li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json">
 </form></li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/ian-flores/securer"><span class="fa fa-github"></span></a></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/ian-flores/securer" aria-label="securer on GitHub"><span class="fa fa-github"></span></a></li>
       </ul>
 </div>
 
@@ -60,68 +64,71 @@
     
     
 <div class="section level2">
-<h2 id="common-issues-and-solutions">Common issues and solutions<a class="anchor" aria-label="anchor" href="#common-issues-and-solutions"></a>
+<h2 id="common-problems">Common problems<a class="anchor" aria-label="anchor" href="#common-problems"></a>
 </h2>
 <div class="section level3">
-<h3 id="bwrap-no-such-file-or-directory-sandbox-exec-not-found">“bwrap: No such file or directory” / “sandbox-exec not found”<a class="anchor" aria-label="anchor" href="#bwrap-no-such-file-or-directory-sandbox-exec-not-found"></a>
+<h3 id="bwrap-no-such-file-or-directory-or-sandbox-exec-not-found">“bwrap: No such file or directory” or “sandbox-exec not found”<a class="anchor" aria-label="anchor" href="#bwrap-no-such-file-or-directory-or-sandbox-exec-not-found"></a>
 </h3>
-<p>The sandbox backend is missing for your platform. On Linux, securer
-uses bubblewrap (<code>bwrap</code>) for namespace isolation. On macOS,
-<code>sandbox-exec</code> ships with the OS and should already be
-available.</p>
+<p>The sandbox tool for your platform is missing. On Linux, securer
+needs bubblewrap (<code>bwrap</code>). On macOS it uses
+<code>sandbox-exec</code>, which comes with the OS, so you shouldn’t see
+this there.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Linux -- install bubblewrap</span></span>
+<code class="sourceCode R"><span><span class="co"># Linux: install bubblewrap</span></span>
 <span><span class="co"># Debian/Ubuntu: sudo apt install bubblewrap</span></span>
 <span><span class="co"># Fedora:        sudo dnf install bubblewrap</span></span>
 <span></span>
-<span><span class="co"># Use sandbox_strict = TRUE to get a hard error instead of a silent fallback</span></span>
+<span><span class="co"># With sandbox_strict = TRUE, a missing sandbox is an error, not a warning</span></span>
 <span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>sandbox <span class="op">=</span> <span class="cn">TRUE</span>, sandbox_strict <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
-<p>If you want the session to proceed without sandboxing when tools are
-missing, leave <code>sandbox_strict = FALSE</code> (the default);
-securer will emit a warning and continue unsandboxed.</p>
+<p>If you’d rather run without the sandbox when the tool is missing,
+leave <code>sandbox_strict = FALSE</code>, the default. securer warns
+you and carries on.</p>
 </div>
 <div class="section level3">
-<h3 id="socket-connection-timed-out">“Socket connection timed out”<a class="anchor" aria-label="anchor" href="#socket-connection-timed-out"></a>
+<h3 id="timeout-waiting-for-client-connection">“Timeout waiting for client connection”<a class="anchor" aria-label="anchor" href="#timeout-waiting-for-client-connection"></a>
 </h3>
-<p>Unix domain socket paths are limited to approximately 104 characters
-on macOS. securer creates sockets in <code>/tmp</code> directly to keep
-paths short. If you have overridden <code>TMPDIR</code> or
-<code><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir()</a></code> to a deeply nested directory, the resulting
-socket path may exceed this limit.</p>
+<p>The child R process didn’t connect to the socket within a few
+seconds. Usually that means the child failed to start, often because the
+sandbox wrapper couldn’t run.</p>
+<p>The socket path isn’t the problem. On macOS and Linux, securer always
+puts the socket in a new directory under <code>/tmp</code>, whatever
+<code>TMPDIR</code> is set to, because macOS limits socket paths to
+about 104 characters.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Check your current tempdir length</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/nchar.html" class="external-link">nchar</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co"># If this exceeds ~80 characters, reset TMPDIR before creating a session</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/Sys.setenv.html" class="external-link">Sys.setenv</a></span><span class="op">(</span>TMPDIR <span class="op">=</span> <span class="st">"/tmp"</span><span class="op">)</span></span>
-<span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="co"># /tmp has to be writable</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/file.access.html" class="external-link">file.access</a></span><span class="op">(</span><span class="st">"/tmp"</span>, <span class="fl">2</span><span class="op">)</span> <span class="op">==</span> <span class="fl">0</span></span>
+<span></span>
+<span><span class="co"># If this works, the sandbox is what's failing</span></span>
+<span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>sandbox <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="session-is-not-running">“Session is not running”<a class="anchor" aria-label="anchor" href="#session-is-not-running"></a>
 </h3>
-<p>The child R process has exited unexpectedly. This can happen when the
-child is killed by the OS (out-of-memory), hits a resource limit, or
-receives an external signal.</p>
+<p>The child R process has stopped. The OS may have killed it for using
+too much memory, it may have hit a resource limit, or something else
+sent it a signal.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>sandbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Check whether the child process is still alive</span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">is_alive</span><span class="op">(</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># After a timeout, securer auto-restarts the session automatically.</span></span>
-<span><span class="co"># For other crashes, create a fresh session:</span></span>
+<span><span class="co"># After a timeout, securer restarts the session by itself.</span></span>
+<span><span class="co"># After any other crash, start a new one:</span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>sandbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="windows-sandbox-limitations">Windows sandbox limitations<a class="anchor" aria-label="anchor" href="#windows-sandbox-limitations"></a>
 </h3>
-<p>On Windows, securer provides environment isolation only: environment
-variables are sanitized (<code>HOME</code>, <code>TMPDIR</code>,
-<code>R_LIBS_USER</code>) and resource limits are applied via Job
-Objects. There are <strong>no</strong> filesystem or network
-restrictions.</p>
-<p>For full isolation on Windows, run your R process inside Docker or
-WSL2 with bubblewrap:</p>
+<p>On Windows, securer only cleans the child’s environment
+(<code>HOME</code>, <code>TMPDIR</code>, and <code>R_LIBS_USER</code>,
+among others) and sets resource limits with Job Objects. It doesn’t
+restrict files or the network.</p>
+<p>To get those restrictions, set
+<code>SECURER_SANDBOX_MODE=docker-spawn</code> so each session runs in
+its own Docker container. Or run R inside WSL2 with bubblewrap
+installed:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Inside WSL2 with bwrap installed, securer uses the Linux sandbox backend</span></span>
 <span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>sandbox <span class="op">=</span> <span class="cn">TRUE</span>, sandbox_strict <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
@@ -129,27 +136,27 @@ WSL2 with bubblewrap:</p>
 <div class="section level3">
 <h3 id="maximum-executions-n-reached-for-this-session">“Maximum executions (N) reached for this session”<a class="anchor" aria-label="anchor" href="#maximum-executions-n-reached-for-this-session"></a>
 </h3>
-<p>The <code>max_executions</code> safety limit has been reached. This
-feature exists for disposable agent sessions where you want to cap how
-many times code can run.</p>
+<p>The session has run code as many times as <code>max_executions</code>
+allows. The limit is for throwaway agent sessions, where you want a hard
+cap on how often code can run.</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># This session allows only 5 executions</span></span>
 <span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>max_executions <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># After 5 calls to $execute(), further calls will error.</span></span>
-<span><span class="co"># Either create a new session:</span></span>
+<span><span class="co"># After 5 calls to $execute(), the next one is an error.</span></span>
+<span><span class="co"># Start a new session:</span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>max_executions <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Or omit the limit entirely for unlimited executions:</span></span>
+<span><span class="co"># Or leave out the limit:</span></span>
 <span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="execution-blocked-by-pre_execute_hook">“Execution blocked by pre_execute_hook”<a class="anchor" aria-label="anchor" href="#execution-blocked-by-pre_execute_hook"></a>
 </h3>
-<p>Your <code>pre_execute_hook</code> function returned
-<code>FALSE</code>, which blocks execution. Debug by testing the hook
-directly with the code string that was rejected.</p>
+<p>Your <code>pre_execute_hook</code> returned <code>FALSE</code> for
+this code. To see why, call the hook yourself on the code that was
+rejected.</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Example hook that blocks system() calls</span></span>
 <span><span class="va">my_hook</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">code</span><span class="op">)</span> <span class="op">{</span></span>
@@ -157,26 +164,26 @@ directly with the code string that was rejected.</p>
 <span>  <span class="cn">TRUE</span></span>
 <span><span class="op">}</span></span>
 <span></span>
-<span><span class="co"># Test it directly to understand what triggers rejection</span></span>
-<span><span class="fu">my_hook</span><span class="op">(</span><span class="st">"x &lt;- 1 + 1"</span><span class="op">)</span>          <span class="co"># TRUE -- allowed</span></span>
-<span><span class="fu">my_hook</span><span class="op">(</span><span class="st">"system('whoami')"</span><span class="op">)</span>     <span class="co"># FALSE -- blocked</span></span>
+<span><span class="co"># Call it directly to see what it rejects</span></span>
+<span><span class="fu">my_hook</span><span class="op">(</span><span class="st">"x &lt;- 1 + 1"</span><span class="op">)</span>          <span class="co"># TRUE: allowed</span></span>
+<span><span class="fu">my_hook</span><span class="op">(</span><span class="st">"system('whoami')"</span><span class="op">)</span>     <span class="co"># FALSE: blocked</span></span>
 <span></span>
 <span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>pre_execute_hook <span class="op">=</span> <span class="va">my_hook</span><span class="op">)</span></span></code></pre></div>
-<p>Any return value other than <code>FALSE</code> (including
-<code>NULL</code> or <code>TRUE</code>) allows execution to proceed.</p>
+<p>Only <code>FALSE</code> blocks the code. Anything else the hook
+returns, <code>NULL</code> included, lets it run.</p>
 </div>
 <div class="section level3">
 <h3 id="package-foo-not-found-in-child-process">“Package ‘foo’ not found” in child process<a class="anchor" aria-label="anchor" href="#package-foo-not-found-in-child-process"></a>
 </h3>
-<p>The child process runs with <code>R_LIBS_USER</code> deliberately
-emptied for security. Only system-level packages (from
-<code>R_LIBS_SITE</code> and <code>R.home("library")</code>) are
-available inside the sandbox.</p>
+<p>securer empties <code>R_LIBS_USER</code> in the child on purpose, so
+a package in a user library can’t run code when it loads. Inside the
+sandbox you only get packages from <code>R_LIBS_SITE</code> and
+<code>R.home("library")</code>.</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Option 1: Install the package system-wide</span></span>
 <span><span class="co"># install.packages("foo", lib = .Library)</span></span>
 <span></span>
-<span><span class="co"># Option 2: Register a tool that calls the package on the host side</span></span>
+<span><span class="co"># Option 2: Register a tool that uses the package in your session</span></span>
 <span><span class="va">tools</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="../reference/securer_tool.html">securer_tool</a></span><span class="op">(</span></span>
 <span>    name <span class="op">=</span> <span class="st">"run_foo"</span>,</span>
@@ -191,23 +198,23 @@ available inside the sandbox.</p>
 <div class="section level3">
 <h3 id="slow-session-startup">Slow session startup<a class="anchor" aria-label="anchor" href="#slow-session-startup"></a>
 </h3>
-<p>The <code><a href="../reference/execute_r.html">execute_r()</a></code> convenience function creates and tears
-down a session for every call. For repeated executions, reuse a
-persistent session or use a pool.</p>
+<p><code><a href="../reference/execute_r.html">execute_r()</a></code> starts and stops a session every time you
+call it. If you run code many times, keep one session open or use a
+pool.</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Slow -- new session per call</span></span>
+<code class="sourceCode R"><span><span class="co"># Slow: a new session for every call</span></span>
 <span><span class="kw">for</span> <span class="op">(</span><span class="va">i</span> <span class="kw">in</span> <span class="fl">1</span><span class="op">:</span><span class="fl">100</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="fu"><a href="../reference/execute_r.html">execute_r</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="st">"sqrt("</span>, <span class="va">i</span>, <span class="st">")"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span></span>
-<span><span class="co"># Fast -- reuse a single session</span></span>
+<span><span class="co"># Fast: one session, reused</span></span>
 <span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="kw">for</span> <span class="op">(</span><span class="va">i</span> <span class="kw">in</span> <span class="fl">1</span><span class="op">:</span><span class="fl">100</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="st">"sqrt("</span>, <span class="va">i</span>, <span class="st">")"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Fast with concurrency management -- use a pool</span></span>
+<span><span class="co"># Fast, and handles several callers at once: a pool</span></span>
 <span><span class="va">pool</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSessionPool.html">SecureSessionPool</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>size <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span>
 <span><span class="kw">for</span> <span class="op">(</span><span class="va">i</span> <span class="kw">in</span> <span class="fl">1</span><span class="op">:</span><span class="fl">100</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">pool</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="st">"sqrt("</span>, <span class="va">i</span>, <span class="st">")"</span><span class="op">)</span><span class="op">)</span></span>
@@ -217,28 +224,25 @@ persistent session or use a pool.</p>
 <div class="section level3">
 <h3 id="ipc-authentication-failed">“IPC authentication failed”<a class="anchor" aria-label="anchor" href="#ipc-authentication-failed"></a>
 </h3>
-<p>The child process failed to present the correct authentication token
-when connecting to the Unix domain socket. This typically means another
-process on the system connected to the socket before the legitimate
-child did.</p>
-<p>securer creates socket directories with <code>0700</code> permissions
-to prevent this. If you are on a shared system, ensure <code>/tmp</code>
-subdirectories are not world-accessible.</p>
+<p>Whatever connected to the socket first didn’t send the random token
+securer gave the child. Either the child failed before it could send it,
+or another process on the machine connected first.</p>
+<p>securer creates each socket directory with <code>0700</code>
+permissions, so only your user can get in. On a shared machine, check
+that those directories really are private.</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Verify socket directory permissions</span></span>
-<span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="co"># Verbose mode logs the socket path -- check its permissions with:</span></span>
-<span><span class="co"># ls -la /tmp/securer_sock_*</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="co"># Socket directories are /tmp/securer_*. Check their permissions with:</span></span>
+<span><span class="co"># ls -ld /tmp/securer_*</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="audit-log-not-written">“Audit log not written”<a class="anchor" aria-label="anchor" href="#audit-log-not-written"></a>
 </h3>
-<p>The <code>audit_log</code> path must be passed at session creation
-time. Ensure the parent directory exists and is writable. The log file
-is created with <code>0600</code> permissions, and symlinks are rejected
-for security.</p>
+<p>Pass <code>audit_log</code> when you create the session. The
+directory it goes in has to exist and be writable. securer creates the
+file with <code>0600</code> permissions and refuses a path that’s a
+symlink.</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Ensure the directory exists</span></span>
+<code class="sourceCode R"><span><span class="co"># Make sure the directory exists</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">dir.create</a></span><span class="op">(</span><span class="st">"logs"</span>, showWarnings <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
@@ -248,7 +252,7 @@ for security.</p>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="st">"1 + 1"</span><span class="op">)</span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Verify the log was written</span></span>
+<span><span class="co"># Check the log was written</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/readLines.html" class="external-link">readLines</a></span><span class="op">(</span><span class="st">"logs/securer-audit.jsonl"</span><span class="op">)</span></span></code></pre></div>
 </div>
 </div>
@@ -259,7 +263,20 @@ for security.</p>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Ian Flores Siaca.</p>
+  <div class="title-block">
+<div>
+<b>Sheet</b>1 of 4
+</div>
+<div>
+<b>Quadrangle</b>securer
+</div>
+<div>
+<b>Survey</b>Sandbox
+</div>
+<div>
+<b>Series</b>secure-r-dev
+</div>
+</div>
 </div>
 
 <div class="pkgdown-footer-right">

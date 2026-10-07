@@ -1,34 +1,29 @@
-# Deployment and Sandboxing
+# Deployment and sandboxing
 
-## Sandbox overview
+## The sandbox
 
-When `sandbox = TRUE`, the child process runs inside platform-native
-OS-level restrictions. The sandbox prevents LLM-generated code from
-accessing the filesystem, network, or other processes beyond what R
-needs to function. Each platform uses a different mechanism, described
-below.
+With `sandbox = TRUE`, the child R process runs under restrictions set
+by the operating system. It can read what R needs to run and write to a
+temp directory. It can’t use the network or touch the rest of your
+files. Each platform does this differently, as described below.
 
-### Sandbox lifecycle
+### What happens on each call
 
-The lifecycle of a sandboxed execution follows five stages:
+A sandboxed call goes through five steps:
 
-     Create           Configure         Execute          Collect          Cleanup
-    +-----------+   +------------+   +------------+   +-----------+   +-----------+
-    | Start R   |-->| Apply      |-->| Run code   |-->| Return    |-->| Kill      |
-    | child     |   | sandbox +  |   | in child;  |   | result +  |   | child or  |
-    | process   |   | resource   |   | handle IPC |   | output to |   | reuse for |
-    |           |   | limits     |   | tool calls |   | host      |   | next call |
-    +-----------+   +------------+   +------------+   +-----------+   +-----------+
+![](data:image/svg+xml;base64,PHN2ZyByb2xlPSJpbWciIGFyaWEtbGFiZWw9IkNyZWF0ZSwgY29uZmlndXJlLCBleGVjdXRlLCBjb2xsZWN0LCBjbGVhbiB1cDsgdGhlIGNoaWxkIGNhbiBiZSByZXVzZWQgZm9yIHRoZSBuZXh0IGNhbGwiIHZpZXdib3g9IjAgMCA5MjAgMTcyIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxkZWZzPjxtYXJrZXIgaWQ9ImxjLWFycm93IiB2aWV3Ym94PSIwIDAgMTAgMTAiIHJlZng9IjkiIHJlZnk9IjUiIG1hcmtlcndpZHRoPSI3IiBtYXJrZXJoZWlnaHQ9IjciIG9yaWVudD0iYXV0by1zdGFydC1yZXZlcnNlIj48cGF0aCBkPSJNMSAxTDkgNUwxIDkiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzJiMWYxMiIgc3Ryb2tlLXdpZHRoPSIxIiAvPjwvbWFya2VyPjxwYXR0ZXJuIGlkPSJsYy1oYXRjaCIgd2lkdGg9IjYiIGhlaWdodD0iNiIgcGF0dGVybnVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgcGF0dGVybnRyYW5zZm9ybT0icm90YXRlKDQ1KSI+PGxpbmUgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjYiIHN0cm9rZT0iI2JmNWEzNiIgc3Ryb2tlLXdpZHRoPSIwLjYiIG9wYWNpdHk9IjAuNTUiPjwvbGluZT48L3BhdHRlcm4+PC9kZWZzPjx0ZXh0IHg9IjIwIiB5PSIzNCIgZm9udC1mYW1pbHk9IlNwYWNlIE1vbm8sIHVpLW1vbm9zcGFjZSwgbW9ub3NwYWNlIiBmb250LXNpemU9IjguNSIgZmlsbD0iI2JmNWEzNiIgdGV4dC1hbmNob3I9InN0YXJ0IiBmb250LXdlaWdodD0iNDAwIiBsZXR0ZXItc3BhY2luZz0iMS40Ij4wMTwvdGV4dD48dGV4dCB4PSI0MiIgeT0iMzQiIGZvbnQtZmFtaWx5PSJTcGFjZSBNb25vLCB1aS1tb25vc3BhY2UsIG1vbm9zcGFjZSIgZm9udC1zaXplPSI4LjUiIGZpbGw9IiM2YjU2MzgiIHRleHQtYW5jaG9yPSJzdGFydCIgZm9udC13ZWlnaHQ9IjQwMCIgbGV0dGVyLXNwYWNpbmc9IjEuNiI+Q1JFQVRFPC90ZXh0PjxyZWN0IHg9IjIwIiB5PSI1MCIgd2lkdGg9IjE1MCIgaGVpZ2h0PSI3MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMmIxZjEyIiBzdHJva2Utd2lkdGg9IjAuNzUiIC8+PHRleHQgeD0iOTUuMCIgeT0iODIuMCIgZm9udC1mYW1pbHk9IlNwYWNlIE1vbm8sIHVpLW1vbm9zcGFjZSwgbW9ub3NwYWNlIiBmb250LXNpemU9IjEwLjUiIGZpbGw9IiMyYjFmMTIiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtd2VpZ2h0PSI3MDAiIGxldHRlci1zcGFjaW5nPSIxLjIiPlNUQVJUIFI8L3RleHQ+PHRleHQgeD0iOTUuMCIgeT0iOTYuMCIgZm9udC1mYW1pbHk9IlNwYWNlIE1vbm8sIHVpLW1vbm9zcGFjZSwgbW9ub3NwYWNlIiBmb250LXNpemU9IjkiIGZpbGw9IiM2YjU2MzgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtd2VpZ2h0PSI0MDAiIGxldHRlci1zcGFjaW5nPSIwLjQiPmEgY2hpbGQgcHJvY2VzczwvdGV4dD48dGV4dCB4PSIyMDAiIHk9IjM0IiBmb250LWZhbWlseT0iU3BhY2UgTW9ubywgdWktbW9ub3NwYWNlLCBtb25vc3BhY2UiIGZvbnQtc2l6ZT0iOC41IiBmaWxsPSIjYmY1YTM2IiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZvbnQtd2VpZ2h0PSI0MDAiIGxldHRlci1zcGFjaW5nPSIxLjQiPjAyPC90ZXh0Pjx0ZXh0IHg9IjIyMiIgeT0iMzQiIGZvbnQtZmFtaWx5PSJTcGFjZSBNb25vLCB1aS1tb25vc3BhY2UsIG1vbm9zcGFjZSIgZm9udC1zaXplPSI4LjUiIGZpbGw9IiM2YjU2MzgiIHRleHQtYW5jaG9yPSJzdGFydCIgZm9udC13ZWlnaHQ9IjQwMCIgbGV0dGVyLXNwYWNpbmc9IjEuNiI+Q09ORklHVVJFPC90ZXh0PjxyZWN0IHg9IjIwMCIgeT0iNTAiIHdpZHRoPSIxNTAiIGhlaWdodD0iNzAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzJiMWYxMiIgc3Ryb2tlLXdpZHRoPSIwLjc1IiAvPjx0ZXh0IHg9IjI3NS4wIiB5PSI3NS4wIiBmb250LWZhbWlseT0iU3BhY2UgTW9ubywgdWktbW9ub3NwYWNlLCBtb25vc3BhY2UiIGZvbnQtc2l6ZT0iMTAuNSIgZmlsbD0iIzJiMWYxMiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC13ZWlnaHQ9IjcwMCIgbGV0dGVyLXNwYWNpbmc9IjEuMiI+TE9DSyBJVCBET1dOPC90ZXh0Pjx0ZXh0IHg9IjI3NS4wIiB5PSI4OS4wIiBmb250LWZhbWlseT0iU3BhY2UgTW9ubywgdWktbW9ub3NwYWNlLCBtb25vc3BhY2UiIGZvbnQtc2l6ZT0iOSIgZmlsbD0iIzZiNTYzOCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC13ZWlnaHQ9IjQwMCIgbGV0dGVyLXNwYWNpbmc9IjAuNCI+c2FuZGJveCBhbmQ8L3RleHQ+PHRleHQgeD0iMjc1LjAiIHk9IjEwMi4wIiBmb250LWZhbWlseT0iU3BhY2UgTW9ubywgdWktbW9ub3NwYWNlLCBtb25vc3BhY2UiIGZvbnQtc2l6ZT0iOSIgZmlsbD0iIzZiNTYzOCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC13ZWlnaHQ9IjQwMCIgbGV0dGVyLXNwYWNpbmc9IjAuNCI+cmVzb3VyY2UgbGltaXRzPC90ZXh0PjxwYXRoIGQ9Ik0xNzAgODVIMTk4IiBmaWxsPSJub25lIiBzdHJva2U9IiMyYjFmMTIiIHN0cm9rZS13aWR0aD0iMC43NSIgbWFya2VyLWVuZD0idXJsKCNsYy1hcnJvdykiIC8+PHRleHQgeD0iMzgwIiB5PSIzNCIgZm9udC1mYW1pbHk9IlNwYWNlIE1vbm8sIHVpLW1vbm9zcGFjZSwgbW9ub3NwYWNlIiBmb250LXNpemU9IjguNSIgZmlsbD0iI2JmNWEzNiIgdGV4dC1hbmNob3I9InN0YXJ0IiBmb250LXdlaWdodD0iNDAwIiBsZXR0ZXItc3BhY2luZz0iMS40Ij4wMzwvdGV4dD48dGV4dCB4PSI0MDIiIHk9IjM0IiBmb250LWZhbWlseT0iU3BhY2UgTW9ubywgdWktbW9ub3NwYWNlLCBtb25vc3BhY2UiIGZvbnQtc2l6ZT0iOC41IiBmaWxsPSIjNmI1NjM4IiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZvbnQtd2VpZ2h0PSI0MDAiIGxldHRlci1zcGFjaW5nPSIxLjYiPkVYRUNVVEU8L3RleHQ+PHJlY3QgeD0iMzgwIiB5PSI1MCIgd2lkdGg9IjE1MCIgaGVpZ2h0PSI3MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMmIxZjEyIiBzdHJva2Utd2lkdGg9IjAuNzUiIC8+PHRleHQgeD0iNDU1LjAiIHk9Ijc1LjAiIGZvbnQtZmFtaWx5PSJTcGFjZSBNb25vLCB1aS1tb25vc3BhY2UsIG1vbm9zcGFjZSIgZm9udC1zaXplPSIxMC41IiBmaWxsPSIjMmIxZjEyIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXdlaWdodD0iNzAwIiBsZXR0ZXItc3BhY2luZz0iMS4yIj5SVU4gVEhFIENPREU8L3RleHQ+PHRleHQgeD0iNDU1LjAiIHk9Ijg5LjAiIGZvbnQtZmFtaWx5PSJTcGFjZSBNb25vLCB1aS1tb25vc3BhY2UsIG1vbm9zcGFjZSIgZm9udC1zaXplPSI5IiBmaWxsPSIjNmI1NjM4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXdlaWdodD0iNDAwIiBsZXR0ZXItc3BhY2luZz0iMC40Ij5hbmQgYW5zd2VyIGl0czwvdGV4dD48dGV4dCB4PSI0NTUuMCIgeT0iMTAyLjAiIGZvbnQtZmFtaWx5PSJTcGFjZSBNb25vLCB1aS1tb25vc3BhY2UsIG1vbm9zcGFjZSIgZm9udC1zaXplPSI5IiBmaWxsPSIjNmI1NjM4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXdlaWdodD0iNDAwIiBsZXR0ZXItc3BhY2luZz0iMC40Ij50b29sIGNhbGxzPC90ZXh0PjxwYXRoIGQ9Ik0zNTAgODVIMzc4IiBmaWxsPSJub25lIiBzdHJva2U9IiMyYjFmMTIiIHN0cm9rZS13aWR0aD0iMC43NSIgbWFya2VyLWVuZD0idXJsKCNsYy1hcnJvdykiIC8+PHRleHQgeD0iNTYwIiB5PSIzNCIgZm9udC1mYW1pbHk9IlNwYWNlIE1vbm8sIHVpLW1vbm9zcGFjZSwgbW9ub3NwYWNlIiBmb250LXNpemU9IjguNSIgZmlsbD0iI2JmNWEzNiIgdGV4dC1hbmNob3I9InN0YXJ0IiBmb250LXdlaWdodD0iNDAwIiBsZXR0ZXItc3BhY2luZz0iMS40Ij4wNDwvdGV4dD48dGV4dCB4PSI1ODIiIHk9IjM0IiBmb250LWZhbWlseT0iU3BhY2UgTW9ubywgdWktbW9ub3NwYWNlLCBtb25vc3BhY2UiIGZvbnQtc2l6ZT0iOC41IiBmaWxsPSIjNmI1NjM4IiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZvbnQtd2VpZ2h0PSI0MDAiIGxldHRlci1zcGFjaW5nPSIxLjYiPkNPTExFQ1Q8L3RleHQ+PHJlY3QgeD0iNTYwIiB5PSI1MCIgd2lkdGg9IjE1MCIgaGVpZ2h0PSI3MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMmIxZjEyIiBzdHJva2Utd2lkdGg9IjAuNzUiIC8+PHRleHQgeD0iNjM1LjAiIHk9Ijc1LjAiIGZvbnQtZmFtaWx5PSJTcGFjZSBNb25vLCB1aS1tb25vc3BhY2UsIG1vbm9zcGFjZSIgZm9udC1zaXplPSIxMC41IiBmaWxsPSIjMmIxZjEyIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXdlaWdodD0iNzAwIiBsZXR0ZXItc3BhY2luZz0iMS4yIj5SRVRVUk48L3RleHQ+PHRleHQgeD0iNjM1LjAiIHk9Ijg5LjAiIGZvbnQtZmFtaWx5PSJTcGFjZSBNb25vLCB1aS1tb25vc3BhY2UsIG1vbm9zcGFjZSIgZm9udC1zaXplPSI5IiBmaWxsPSIjNmI1NjM4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXdlaWdodD0iNDAwIiBsZXR0ZXItc3BhY2luZz0iMC40Ij50aGUgcmVzdWx0IGFuZDwvdGV4dD48dGV4dCB4PSI2MzUuMCIgeT0iMTAyLjAiIGZvbnQtZmFtaWx5PSJTcGFjZSBNb25vLCB1aS1tb25vc3BhY2UsIG1vbm9zcGFjZSIgZm9udC1zaXplPSI5IiBmaWxsPSIjNmI1NjM4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXdlaWdodD0iNDAwIiBsZXR0ZXItc3BhY2luZz0iMC40Ij50aGUgb3V0cHV0PC90ZXh0PjxwYXRoIGQ9Ik01MzAgODVINTU4IiBmaWxsPSJub25lIiBzdHJva2U9IiMyYjFmMTIiIHN0cm9rZS13aWR0aD0iMC43NSIgbWFya2VyLWVuZD0idXJsKCNsYy1hcnJvdykiIC8+PHRleHQgeD0iNzQwIiB5PSIzNCIgZm9udC1mYW1pbHk9IlNwYWNlIE1vbm8sIHVpLW1vbm9zcGFjZSwgbW9ub3NwYWNlIiBmb250LXNpemU9IjguNSIgZmlsbD0iI2JmNWEzNiIgdGV4dC1hbmNob3I9InN0YXJ0IiBmb250LXdlaWdodD0iNDAwIiBsZXR0ZXItc3BhY2luZz0iMS40Ij4wNTwvdGV4dD48dGV4dCB4PSI3NjIiIHk9IjM0IiBmb250LWZhbWlseT0iU3BhY2UgTW9ubywgdWktbW9ub3NwYWNlLCBtb25vc3BhY2UiIGZvbnQtc2l6ZT0iOC41IiBmaWxsPSIjNmI1NjM4IiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZvbnQtd2VpZ2h0PSI0MDAiIGxldHRlci1zcGFjaW5nPSIxLjYiPkNMRUFOIFVQPC90ZXh0PjxyZWN0IHg9Ijc0MCIgeT0iNTAiIHdpZHRoPSIxNTAiIGhlaWdodD0iNzAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzJiMWYxMiIgc3Ryb2tlLXdpZHRoPSIwLjc1IiAvPjx0ZXh0IHg9IjgxNS4wIiB5PSI4Mi4wIiBmb250LWZhbWlseT0iU3BhY2UgTW9ubywgdWktbW9ub3NwYWNlLCBtb25vc3BhY2UiIGZvbnQtc2l6ZT0iMTAuNSIgZmlsbD0iIzJiMWYxMiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC13ZWlnaHQ9IjcwMCIgbGV0dGVyLXNwYWNpbmc9IjEuMiI+U1RPUCBPUiBSRVVTRTwvdGV4dD48dGV4dCB4PSI4MTUuMCIgeT0iOTYuMCIgZm9udC1mYW1pbHk9IlNwYWNlIE1vbm8sIHVpLW1vbm9zcGFjZSwgbW9ub3NwYWNlIiBmb250LXNpemU9IjkiIGZpbGw9IiM2YjU2MzgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtd2VpZ2h0PSI0MDAiIGxldHRlci1zcGFjaW5nPSIwLjQiPnRoZSBjaGlsZCBwcm9jZXNzPC90ZXh0PjxwYXRoIGQ9Ik03MTAgODVINzM4IiBmaWxsPSJub25lIiBzdHJva2U9IiMyYjFmMTIiIHN0cm9rZS13aWR0aD0iMC43NSIgbWFya2VyLWVuZD0idXJsKCNsYy1hcnJvdykiIC8+PHBhdGggZD0iTTgxNS4wIDEyMFYxNTZINDU1LjBWMTIyIiBmaWxsPSJub25lIiBzdHJva2U9IiMyYjFmMTIiIHN0cm9rZS13aWR0aD0iMC43NSIgbWFya2VyLWVuZD0idXJsKCNsYy1hcnJvdykiIHN0cm9rZS1kYXNoYXJyYXk9IjMgMyIgLz48dGV4dCB4PSI2MzUuMCIgeT0iMTUwIiBmb250LWZhbWlseT0iU3BhY2UgTW9ubywgdWktbW9ub3NwYWNlLCBtb25vc3BhY2UiIGZvbnQtc2l6ZT0iOC41IiBmaWxsPSIjNmI1NjM4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXdlaWdodD0iNDAwIiBsZXR0ZXItc3BhY2luZz0iMS42Ij5SRVVTRSBGT1IgVEhFIE5FWFQgQ0FMTDwvdGV4dD48L3N2Zz4=)
+
+Fig. 1 · The five steps of a sandboxed call
 
 ## macOS (Seatbelt)
 
-Uses `sandbox-exec` with a generated Seatbelt profile:
-
-- File reads are allowed everywhere (R needs system libs and packages)
-- File writes are blocked except to temp directories (`/tmp`,
-  `/var/folders/`)
-- All remote network access is blocked (TCP/UDP)
-- Unix domain sockets are allowed (needed for IPC with the host)
+securer writes a Seatbelt profile and starts R with `sandbox-exec`. The
+profile denies everything by default, then allows a short list of things
+R needs. The child can read R itself, your R library paths, system
+libraries, and temp directories, but not your home directory, so files
+like `~/.ssh` stay out of reach. It can write only to temp directories.
+TCP and UDP are blocked. Unix domain sockets are allowed, because that’s
+how the child talks to your session.
 
 ``` r
 
@@ -51,33 +46,38 @@ session$close()
 
 ## Linux (bubblewrap)
 
-Uses `bwrap` with full namespace isolation (PID, network, user, mount,
-UTS, IPC). System libraries and R are bind-mounted read-only. `/tmp` is
-a clean writable tmpfs. Network access is blocked via the network
-namespace.
+securer starts R with `bwrap`, which gives the child its own namespaces
+for processes, network, users, mounts, host name, and IPC. System
+libraries and R are mounted read-only, and `/tmp` is an empty, writable
+in-memory directory. Because the child has its own empty network
+namespace, it has no network.
 
-Requires `bwrap` to be installed. On Debian/Ubuntu:
-`apt install bubblewrap`. Falls back to unsandboxed execution with a
-warning if not found.
+You need `bwrap` installed (`apt install bubblewrap` on Debian and
+Ubuntu). Without it, securer warns you and runs the code without a
+sandbox.
 
 ## Windows
 
-Provides environment-variable isolation only (clears `R_LIBS_USER`,
-`R_ENVIRON_USER`, `R_PROFILE_USER`; redirects `HOME`/`TMPDIR` to a clean
-temp directory). No filesystem or network restrictions. A warning is
-issued.
+Windows has no sandbox like the ones above. securer gives the child a
+clean environment: it keeps only a short list of safe variables, empties
+`R_LIBS_USER`, and points `HOME`, `TMPDIR`, `TMP`, and `TEMP` at a
+private temp directory. It can also set memory, CPU, and process limits
+with a Job Object. It can’t restrict files or the network, and it prints
+a message saying so the first time you start a session. If you need
+those restrictions on Windows, set `SECURER_SANDBOX_MODE=docker-spawn`
+to run each session in its own Docker container, or use a Linux VM.
 
 ## Resource limits
 
-Apply `ulimit`-based caps to the child process. These work with or
-without the sandbox:
+Resource limits cap what the child process can use. They’re set with
+`ulimit` and work with or without the sandbox:
 
 ``` r
 
 execute_r("1 + 1", limits = list(cpu = 10, memory = 256 * 1024 * 1024))
 ```
 
-Supported limits:
+The limits you can set:
 
 | Name     | Unit    | ulimit flag | Description           |
 |----------|---------|-------------|-----------------------|
@@ -88,7 +88,8 @@ Supported limits:
 | `nofile` | count   | `-n`        | Maximum open files    |
 | `stack`  | bytes   | `-s`        | Stack size            |
 
-Default limits applied when `sandbox = TRUE`:
+If you use the sandbox and don’t pass `limits`, securer applies these
+defaults. Pass `limits = list()` to turn them off:
 
 ``` r
 
@@ -98,8 +99,8 @@ default_limits()
 ## Code pre-validation
 
 [`validate_code()`](https://ian-flores.github.io/securer/reference/validate_code.md)
-checks for syntax errors and dangerous patterns before sending code to
-the child process:
+checks code for syntax errors and for calls that look risky, before the
+code goes to the child process:
 
 ``` r
 
@@ -109,15 +110,15 @@ validate_code("1 + 1")
 # Syntax error
 validate_code("if (TRUE {")
 
-# Dangerous pattern (advisory warning, not a hard block)
+# Risky call: a warning, not a block
 validate_code("system('ls')")
 ```
 
-## Sandbox verification
+## Checking the sandbox is available
 
-Before deploying, verify that sandbox tooling is available on your
-target platform. Missing tools cause a fallback to unsandboxed execution
-(or an error if `sandbox_strict = TRUE`):
+Before you deploy, check that the sandbox tools exist on the machine. If
+they’re missing, securer runs code without a sandbox, or stops with an
+error if `sandbox_strict = TRUE`:
 
 ``` r
 
@@ -127,14 +128,10 @@ if (Sys.info()[["sysname"]] == "Darwin") stopifnot(file.exists("/usr/bin/sandbox
 
 ## Strict sandbox mode
 
-By default, if sandbox tools are not available on the current platform,
-securer falls back to unsandboxed execution with a warning. In
-production, this fallback may be unacceptable — you want a hard error
-instead of silently running without protection.
-
-The `sandbox_strict` parameter controls this behavior. When `TRUE` and
-`sandbox = TRUE`, the session will stop with an informative error if the
-OS-level sandbox cannot be set up:
+By default, if the sandbox tools aren’t there, securer warns you and
+runs the code without a sandbox. In production you probably want it to
+stop instead. Set `sandbox_strict = TRUE` along with `sandbox = TRUE`
+and the session fails to start if it can’t set up the sandbox:
 
 ``` r
 
@@ -142,57 +139,45 @@ OS-level sandbox cannot be set up:
 session <- SecureSession$new(sandbox = TRUE, sandbox_strict = TRUE)
 ```
 
-When `FALSE` (the default), the existing behavior is preserved: a
-warning is emitted and the session continues without OS-level
-sandboxing. Resource limits, IPC validation, and environment
-sanitization still apply.
+With `sandbox_strict = FALSE`, the default, you get a warning and the
+session runs without the OS sandbox. Resource limits, the socket checks,
+and the clean environment still apply.
+
+Strict mode doesn’t stop a session on Windows, because the clean
+environment there counts as the sandbox.
 
 ## Architecture
 
-    Host process                          Child R process (sandboxed)
-    -----------                          ---------------------------
-    SecureSession$new()
-      |-- callr::r_session$new()  ------>  R starts inside sandbox
-      |-- UDS server socket        <---->  UDS client connect
-      |-- inject runtime code      ------>  .securer_call_tool() defined
-      |-- inject tool wrappers     ------>  tool_name() wrappers defined
+![](data:image/svg+xml;base64,PHN2ZyByb2xlPSJpbWciIGFyaWEtbGFiZWw9IlNlcXVlbmNlIGJldHdlZW4gdGhlIGhvc3QgYW5kIHRoZSBzYW5kYm94ZWQgY2hpbGQ6IHN0YXJ0LXVwLCB0aGVuIGVhY2ggY2FsbCB3aXRoIGEgdG9vbCByb3VuZCB0cmlwIiB2aWV3Ym94PSIwIDAgOTAwIDUwNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48bWFya2VyIGlkPSJhci1hcnJvdyIgdmlld2JveD0iMCAwIDEwIDEwIiByZWZ4PSI5IiByZWZ5PSI1IiBtYXJrZXJ3aWR0aD0iNyIgbWFya2VyaGVpZ2h0PSI3IiBvcmllbnQ9ImF1dG8tc3RhcnQtcmV2ZXJzZSI+PHBhdGggZD0iTTEgMUw5IDVMMSA5IiBmaWxsPSJub25lIiBzdHJva2U9IiMyYjFmMTIiIHN0cm9rZS13aWR0aD0iMSIgLz48L21hcmtlcj48cGF0dGVybiBpZD0iYXItaGF0Y2giIHdpZHRoPSI2IiBoZWlnaHQ9IjYiIHBhdHRlcm51bml0cz0idXNlclNwYWNlT25Vc2UiIHBhdHRlcm50cmFuc2Zvcm09InJvdGF0ZSg0NSkiPjxsaW5lIHgxPSIwIiB5MT0iMCIgeDI9IjAiIHkyPSI2IiBzdHJva2U9IiNiZjVhMzYiIHN0cm9rZS13aWR0aD0iMC42IiBvcGFjaXR5PSIwLjU1Ij48L2xpbmU+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB4PSI0NDAiIHk9IjIwIiB3aWR0aD0iNDQwIiBoZWlnaHQ9IjQ3MCIgZmlsbD0idXJsKCNhci1oYXRjaCkiIG9wYWNpdHk9IjAuMzUiIHN0cm9rZT0ibm9uZSIgLz48cmVjdCB4PSI0NDAiIHk9IjIwIiB3aWR0aD0iNDQwIiBoZWlnaHQ9IjQ3MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjYmY1YTM2IiBzdHJva2Utd2lkdGg9IjAuNzUiIHN0cm9rZS1kYXNoYXJyYXk9IjQgMyIgLz48dGV4dCB4PSI4NzIiIHk9IjM2IiBmb250LWZhbWlseT0iU3BhY2UgTW9ubywgdWktbW9ub3NwYWNlLCBtb25vc3BhY2UiIGZvbnQtc2l6ZT0iOC41IiBmaWxsPSIjYmY1YTM2IiB0ZXh0LWFuY2hvcj0iZW5kIiBmb250LXdlaWdodD0iNDAwIiBsZXR0ZXItc3BhY2luZz0iMS42Ij5PUyBTQU5EQk9YPC90ZXh0PjxyZWN0IHg9IjE0MCIgeT0iNDAiIHdpZHRoPSIxODAiIGhlaWdodD0iMzYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzJiMWYxMiIgc3Ryb2tlLXdpZHRoPSIwLjc1IiAvPjx0ZXh0IHg9IjIzMC4wIiB5PSI2Mi4wIiBmb250LWZhbWlseT0iU3BhY2UgTW9ubywgdWktbW9ub3NwYWNlLCBtb25vc3BhY2UiIGZvbnQtc2l6ZT0iMTAuNSIgZmlsbD0iIzJiMWYxMiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC13ZWlnaHQ9IjcwMCIgbGV0dGVyLXNwYWNpbmc9IjEuMiI+SE9TVCBSIFNFU1NJT048L3RleHQ+PHJlY3QgeD0iNTAwIiB5PSI0MCIgd2lkdGg9IjE4MCIgaGVpZ2h0PSIzNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMmIxZjEyIiBzdHJva2Utd2lkdGg9IjAuNzUiIC8+PHRleHQgeD0iNTkwLjAiIHk9IjYyLjAiIGZvbnQtZmFtaWx5PSJTcGFjZSBNb25vLCB1aS1tb25vc3BhY2UsIG1vbm9zcGFjZSIgZm9udC1zaXplPSIxMC41IiBmaWxsPSIjMmIxZjEyIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXdlaWdodD0iNzAwIiBsZXR0ZXItc3BhY2luZz0iMS4yIj5DSElMRCBSIFBST0NFU1M8L3RleHQ+PHBhdGggZD0iTTIzMCA3NlY0ODZNNTkwIDc2VjQ4NiIgc3Ryb2tlPSIjNmI1NjM4IiBzdHJva2Utd2lkdGg9IjAuNiIgc3Ryb2tlLWRhc2hhcnJheT0iMSAzIiAvPjxwYXRoIGQ9Ik0zMCAxMjJIMjE2IiBzdHJva2U9IiNjZGI0OGEiIHN0cm9rZS13aWR0aD0iMC43NSIgLz48dGV4dCB4PSIzMCIgeT0iMTE2IiBmb250LWZhbWlseT0iU3BhY2UgTW9ubywgdWktbW9ub3NwYWNlLCBtb25vc3BhY2UiIGZvbnQtc2l6ZT0iOC41IiBmaWxsPSIjNmI1NjM4IiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZvbnQtd2VpZ2h0PSI0MDAiIGxldHRlci1zcGFjaW5nPSIxLjYiPlNFU1NJT04gU1RBUlQgwrcgU2VjdXJlU2Vzc2lvbiRuZXcoKTwvdGV4dD48cGF0aCBkPSJNMjMwIDE1OEg1ODgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzJiMWYxMiIgc3Ryb2tlLXdpZHRoPSIwLjc1IiBtYXJrZXItZW5kPSJ1cmwoI2FyLWFycm93KSIgLz48dGV4dCB4PSI0MTAuMCIgeT0iMTUxIiBmb250LWZhbWlseT0iU3BhY2UgTW9ubywgdWktbW9ub3NwYWNlLCBtb25vc3BhY2UiIGZvbnQtc2l6ZT0iOS41IiBmaWxsPSIjMmIxZjEyIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXdlaWdodD0iNDAwIiBsZXR0ZXItc3BhY2luZz0iMC44Ij5TVEFSVCBSIFdJVEggQ0FMTFI8L3RleHQ+PHRleHQgeD0iNjA0IiB5PSIxNjIiIGZvbnQtZmFtaWx5PSJTcGFjZSBNb25vLCB1aS1tb25vc3BhY2UsIG1vbm9zcGFjZSIgZm9udC1zaXplPSI5IiBmaWxsPSIjNmI1NjM4IiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZvbnQtd2VpZ2h0PSI0MDAiIGxldHRlci1zcGFjaW5nPSIwLjMiPlIgc3RhcnRzIGluc2lkZSB0aGUgc2FuZGJveDwvdGV4dD48cGF0aCBkPSJNMjMyIDE5OEg1ODgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzJiMWYxMiIgc3Ryb2tlLXdpZHRoPSIwLjc1IiBtYXJrZXItc3RhcnQ9InVybCgjYXItYXJyb3cpIiBtYXJrZXItZW5kPSJ1cmwoI2FyLWFycm93KSIgLz48dGV4dCB4PSI0MTAuMCIgeT0iMTkxIiBmb250LWZhbWlseT0iU3BhY2UgTW9ubywgdWktbW9ub3NwYWNlLCBtb25vc3BhY2UiIGZvbnQtc2l6ZT0iOS41IiBmaWxsPSIjMmIxZjEyIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXdlaWdodD0iNDAwIiBsZXR0ZXItc3BhY2luZz0iMC44Ij5DT05ORUNUIFRIRSBVTklYIFNPQ0tFVDwvdGV4dD48cGF0aCBkPSJNMjMwIDIzOEg1ODgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzJiMWYxMiIgc3Ryb2tlLXdpZHRoPSIwLjc1IiBtYXJrZXItZW5kPSJ1cmwoI2FyLWFycm93KSIgLz48dGV4dCB4PSI0MTAuMCIgeT0iMjMxIiBmb250LWZhbWlseT0iU3BhY2UgTW9ubywgdWktbW9ub3NwYWNlLCBtb25vc3BhY2UiIGZvbnQtc2l6ZT0iOS41IiBmaWxsPSIjMmIxZjEyIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXdlaWdodD0iNDAwIiBsZXR0ZXItc3BhY2luZz0iMC44Ij5JTkpFQ1QgVEhFIFJVTlRJTUU8L3RleHQ+PHRleHQgeD0iNjA0IiB5PSIyNDIiIGZvbnQtZmFtaWx5PSJTcGFjZSBNb25vLCB1aS1tb25vc3BhY2UsIG1vbm9zcGFjZSIgZm9udC1zaXplPSI5IiBmaWxsPSIjNmI1NjM4IiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZvbnQtd2VpZ2h0PSI0MDAiIGxldHRlci1zcGFjaW5nPSIwLjMiPi5zZWN1cmVyX2NhbGxfdG9vbCgpIGRlZmluZWQ8L3RleHQ+PHBhdGggZD0iTTIzMCAyNzhINTg4IiBmaWxsPSJub25lIiBzdHJva2U9IiMyYjFmMTIiIHN0cm9rZS13aWR0aD0iMC43NSIgbWFya2VyLWVuZD0idXJsKCNhci1hcnJvdykiIC8+PHRleHQgeD0iNDEwLjAiIHk9IjI3MSIgZm9udC1mYW1pbHk9IlNwYWNlIE1vbm8sIHVpLW1vbm9zcGFjZSwgbW9ub3NwYWNlIiBmb250LXNpemU9IjkuNSIgZmlsbD0iIzJiMWYxMiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC13ZWlnaHQ9IjQwMCIgbGV0dGVyLXNwYWNpbmc9IjAuOCI+SU5KRUNUIFRPT0wgV1JBUFBFUlM8L3RleHQ+PHRleHQgeD0iNjA0IiB5PSIyODIiIGZvbnQtZmFtaWx5PSJTcGFjZSBNb25vLCB1aS1tb25vc3BhY2UsIG1vbm9zcGFjZSIgZm9udC1zaXplPSI5IiBmaWxsPSIjNmI1NjM4IiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZvbnQtd2VpZ2h0PSI0MDAiIGxldHRlci1zcGFjaW5nPSIwLjMiPnRvb2xfbmFtZSgpIGRlZmluZWQ8L3RleHQ+PHBhdGggZD0iTTMwIDMwOEgyMTYiIHN0cm9rZT0iI2NkYjQ4YSIgc3Ryb2tlLXdpZHRoPSIwLjc1IiAvPjx0ZXh0IHg9IjMwIiB5PSIzMDIiIGZvbnQtZmFtaWx5PSJTcGFjZSBNb25vLCB1aS1tb25vc3BhY2UsIG1vbm9zcGFjZSIgZm9udC1zaXplPSI4LjUiIGZpbGw9IiM2YjU2MzgiIHRleHQtYW5jaG9yPSJzdGFydCIgZm9udC13ZWlnaHQ9IjQwMCIgbGV0dGVyLXNwYWNpbmc9IjEuNiI+RUFDSCBDQUxMIMK3ICRleGVjdXRlKGNvZGUpPC90ZXh0PjxwYXRoIGQ9Ik0yMzAgMzQ0SDU4OCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMmIxZjEyIiBzdHJva2Utd2lkdGg9IjAuNzUiIG1hcmtlci1lbmQ9InVybCgjYXItYXJyb3cpIiAvPjx0ZXh0IHg9IjQxMC4wIiB5PSIzMzciIGZvbnQtZmFtaWx5PSJTcGFjZSBNb25vLCB1aS1tb25vc3BhY2UsIG1vbm9zcGFjZSIgZm9udC1zaXplPSI5LjUiIGZpbGw9IiMyYjFmMTIiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtd2VpZ2h0PSI0MDAiIGxldHRlci1zcGFjaW5nPSIwLjgiPlRIRSBDT0RFPC90ZXh0Pjx0ZXh0IHg9IjYwNCIgeT0iMzQ4IiBmb250LWZhbWlseT0iU3BhY2UgTW9ubywgdWktbW9ub3NwYWNlLCBtb25vc3BhY2UiIGZvbnQtc2l6ZT0iOSIgZmlsbD0iIzZiNTYzOCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmb250LXdlaWdodD0iNDAwIiBsZXR0ZXItc3BhY2luZz0iMC4zIj5ldmFsKGNvZGUpPC90ZXh0PjxwYXRoIGQ9Ik01OTAgMzg0SDIzMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMmIxZjEyIiBzdHJva2Utd2lkdGg9IjAuNzUiIG1hcmtlci1lbmQ9InVybCgjYXItYXJyb3cpIiAvPjx0ZXh0IHg9IjQxMC4wIiB5PSIzNzciIGZvbnQtZmFtaWx5PSJTcGFjZSBNb25vLCB1aS1tb25vc3BhY2UsIG1vbm9zcGFjZSIgZm9udC1zaXplPSI5LjUiIGZpbGw9IiMyYjFmMTIiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtd2VpZ2h0PSI0MDAiIGxldHRlci1zcGFjaW5nPSIwLjgiPnsmcXVvdDt0b29sJnF1b3Q7OiAuLi59IEFTIEpTT048L3RleHQ+PHRleHQgeD0iMjE2IiB5PSIzODgiIGZvbnQtZmFtaWx5PSJTcGFjZSBNb25vLCB1aS1tb25vc3BhY2UsIG1vbm9zcGFjZSIgZm9udC1zaXplPSI5IiBmaWxsPSIjNmI1NjM4IiB0ZXh0LWFuY2hvcj0iZW5kIiBmb250LXdlaWdodD0iNDAwIiBsZXR0ZXItc3BhY2luZz0iMC4zIj5ydW5zIGZuKGFyZyk8L3RleHQ+PHRleHQgeD0iNjA0IiB5PSIzODgiIGZvbnQtZmFtaWx5PSJTcGFjZSBNb25vLCB1aS1tb25vc3BhY2UsIG1vbm9zcGFjZSIgZm9udC1zaXplPSI5IiBmaWxsPSIjNmI1NjM4IiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZvbnQtd2VpZ2h0PSI0MDAiIGxldHRlci1zcGFjaW5nPSIwLjMiPmJsb2NrczwvdGV4dD48cGF0aCBkPSJNMjMwIDQyNEg1ODgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzJiMWYxMiIgc3Ryb2tlLXdpZHRoPSIwLjc1IiBtYXJrZXItZW5kPSJ1cmwoI2FyLWFycm93KSIgLz48dGV4dCB4PSI0MTAuMCIgeT0iNDE3IiBmb250LWZhbWlseT0iU3BhY2UgTW9ubywgdWktbW9ub3NwYWNlLCBtb25vc3BhY2UiIGZvbnQtc2l6ZT0iOS41IiBmaWxsPSIjMmIxZjEyIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXdlaWdodD0iNDAwIiBsZXR0ZXItc3BhY2luZz0iMC44Ij5SRVNVTFQgQVMgSlNPTjwvdGV4dD48dGV4dCB4PSI2MDQiIHk9IjQyOCIgZm9udC1mYW1pbHk9IlNwYWNlIE1vbm8sIHVpLW1vbm9zcGFjZSwgbW9ub3NwYWNlIiBmb250LXNpemU9IjkiIGZpbGw9IiM2YjU2MzgiIHRleHQtYW5jaG9yPSJzdGFydCIgZm9udC13ZWlnaHQ9IjQwMCIgbGV0dGVyLXNwYWNpbmc9IjAuMyI+Y2FycmllcyBvbjwvdGV4dD48cGF0aCBkPSJNNTkwIDQ2NEgyMzIiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzJiMWYxMiIgc3Ryb2tlLXdpZHRoPSIwLjc1IiBtYXJrZXItZW5kPSJ1cmwoI2FyLWFycm93KSIgLz48dGV4dCB4PSI0MTAuMCIgeT0iNDU3IiBmb250LWZhbWlseT0iU3BhY2UgTW9ubywgdWktbW9ub3NwYWNlLCBtb25vc3BhY2UiIGZvbnQtc2l6ZT0iOS41IiBmaWxsPSIjMmIxZjEyIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXdlaWdodD0iNDAwIiBsZXR0ZXItc3BhY2luZz0iMC44Ij5QUk9DRVNTIENPTVBMRVRFPC90ZXh0Pjx0ZXh0IHg9IjIxNiIgeT0iNDY4IiBmb250LWZhbWlseT0iU3BhY2UgTW9ubywgdWktbW9ub3NwYWNlLCBtb25vc3BhY2UiIGZvbnQtc2l6ZT0iOSIgZmlsbD0iIzZiNTYzOCIgdGV4dC1hbmNob3I9ImVuZCIgZm9udC13ZWlnaHQ9IjQwMCIgbGV0dGVyLXNwYWNpbmc9IjAuMyI+cmV0dXJucyB0aGUgZmluYWwgdmFsdWU8L3RleHQ+PC9zdmc+)
 
-    $execute("tool_name('arg')")
-      |                                     eval("tool_name('arg')")
-      |                                       |-- serialize as JSON
-      |   <---- {"tool":"tool_name",...} -----+
-      |-- execute fn("arg")                   |   (child blocks)
-      |-- write result JSON ---------------> |
-      |                                       +-- return result
-      |   <---- process complete -------------|
-      +-- return final value
+Fig. 2 · What happens between the two processes, from start-up to a
+finished call
 
-The sandbox wrapper is injected via
-`callr::r_session_options(arch = ...)` and IPC uses a Unix domain socket
-in `/tmp` (to stay under the ~104 char path limit on macOS). See
+securer starts the child through a wrapper script, passed to callr with
+`callr::r_session_options(arch = ...)`. The socket lives under `/tmp`,
+because macOS limits socket paths to about 104 characters and R’s own
+temp directory can be longer than that.
 [`vignette("security-model")`](https://ian-flores.github.io/securer/articles/security-model.md)
-for full details on the IPC protocol, trust boundaries, and defense
-layers.
+goes into the message format and what each part of the system trusts.
 
 ## Why not just callr or Docker?
 
-**callr** gives you process isolation — the child runs in a separate R
-process, so a crash or error does not bring down the host. But callr
-provides no filesystem or network restrictions. The child can read your
-SSH keys, make HTTP requests, and write anywhere on disk.
+callr runs code in a separate R process, so a crash there doesn’t take
+down your session. But it doesn’t restrict anything. The child can read
+your SSH keys, make HTTP requests, and write anywhere on disk. securer
+uses callr to start the child and adds the restrictions.
 
-**Docker** provides full isolation (filesystem, network, PID, user
-namespaces) but requires a running daemon, image management, and
-container orchestration. It is heavier-weight, adds startup latency, and
-does not include built-in tool-call IPC — you would need to build your
-own protocol on top of stdin/stdout, HTTP, or sockets.
+Docker isolates the filesystem, network, and processes well, but it
+needs a running daemon and an image, and containers are slower to start.
+It also has no way for the code inside to call back into your R session.
+You’d have to build that yourself. securer’s docker-spawn backend does
+use Docker, with a new container per session, for when you need it, such
+as on Windows.
 
-**securer** combines OS-native sandboxing (Seatbelt on macOS, bubblewrap
-on Linux) with a purpose-built tool-call IPC protocol, resource limits,
-environment sanitization, execution timeouts, and audit logging — all in
-a single R package with no daemon and sub-second session startup. The
-sandbox is lightweight because it uses the kernel’s own isolation
-primitives rather than running a full container.
+By default securer uses the sandbox your operating system already has
+(Seatbelt on macOS, bubblewrap on Linux). There’s no daemon, sessions
+start in under a second, and tool calls, limits, timeouts, and the audit
+log come with it.
 
 | Feature                 | callr | Docker | securer |
 |-------------------------|-------|--------|---------|

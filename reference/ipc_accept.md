@@ -1,10 +1,10 @@
 # Accept a client connection on a Unix domain socket server
 
-Polls the server connection and accepts the incoming client. Note:
+Polls the server connection and accepts the incoming client.
 [`processx::conn_accept_unix_socket()`](http://processx.r-lib.org/reference/processx_sockets.md)
-transitions the server connection itself to "connected_server" state.
-After calling this, the same `server_conn` object is used for
-bidirectional data transfer.
+doesn't return a new connection. It switches the server connection
+itself to the "connected_server" state, and from then on the same
+`server_conn` object carries data both ways.
 
 ## Usage
 

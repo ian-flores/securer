@@ -1,11 +1,10 @@
-# Execute code with an auto-managed SecureSession
+# Run a function with a SecureSession that closes itself
 
-Creates a
+Starts a
 [SecureSession](https://ian-flores.github.io/securer/reference/SecureSession.md),
-passes it to a user function, and guarantees cleanup via
-[`on.exit()`](https://rdrr.io/r/base/on.exit.html). This is useful when
-you need to run multiple executions on the same session (e.g., building
-up state across calls) without worrying about leaked processes.
+passes it to `fn`, and closes it when `fn` returns or fails. Use it when
+you want several calls to share one session, for example to build up
+variables across calls, without having to remember to close it.
 
 ## Usage
 
