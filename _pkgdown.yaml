@@ -2,6 +2,21 @@ url: https://ian-flores.github.io/securer/
 
 template:
   bootstrap: 5
+  light-switch: false
+  bslib:
+    bg: "#f4ecdc"
+    fg: "#2b1f12"
+    primary: "#bf5a36"
+    secondary: "#3f5d72"
+    success: "#7c8a4e"
+    warning: "#d4a03c"
+    border-radius: 0
+    border-color: "#cdb48a"
+    base_font: {google: "Hanken Grotesk"}
+    heading_font: {google: {family: "Fraunces", wght: [400, 500, 600]}}
+    code_font: {google: "Space Mono"}
+    font-size-base: 1.02rem
+    line-height-base: 1.65
 
 navbar:
   structure:
@@ -10,6 +25,7 @@ navbar:
   components:
     github:
       icon: fa-github
+      aria-label: securer on GitHub
       href: https://github.com/ian-flores/securer
 
 reference:
@@ -82,3 +98,16 @@ articles:
   - title: Help
     contents:
       - troubleshooting
+
+footer:
+  structure:
+    left: titleblock
+    right: built_with
+  components:
+    titleblock: >-
+      <div class="title-block">
+      <div><b>Sheet</b>1 of 4</div>
+      <div><b>Quadrangle</b>securer</div>
+      <div><b>Survey</b>Sandbox</div>
+      <div><b>Series</b>secure-r-dev</div>
+      </div>
