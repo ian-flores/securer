@@ -42,7 +42,12 @@ timeout. Returns parsed list. Raises error on timeout.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">ipc_read_message</span><span class="op">(</span><span class="va">conn</span>, timeout <span class="op">=</span> <span class="fl">30000L</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">ipc_read_message</span><span class="op">(</span></span>
+<span>  <span class="va">conn</span>,</span>
+<span>  timeout <span class="op">=</span> <span class="fl">30000L</span>,</span>
+<span>  max_size <span class="op">=</span> <span class="va">ipc_max_message_size</span>,</span>
+<span>  buffer <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/environment.html" class="external-link">new.env</a></span><span class="op">(</span>parent <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/environment.html" class="external-link">emptyenv</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -55,6 +60,15 @@ timeout. Returns parsed list. Raises error on timeout.</p>
 
 <dt id="arg-timeout">timeout<a class="anchor" aria-label="anchor" href="#arg-timeout"></a></dt>
 <dd><p>Timeout in milliseconds (default 30000)</p></dd>
+
+
+<dt id="arg-max-size">max_size<a class="anchor" aria-label="anchor" href="#arg-max-size"></a></dt>
+<dd><p>Largest message allowed, in bytes</p></dd>
+
+
+<dt id="arg-buffer">buffer<a class="anchor" aria-label="anchor" href="#arg-buffer"></a></dt>
+<dd><p>Environment holding unread data for <code>conn</code>. Pass the same
+one on every read from a connection so partial data isn't lost.</p></dd>
 
 </dl></div>
     <div class="section level2">

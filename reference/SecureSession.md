@@ -189,7 +189,9 @@ Run R code in the session
 #### Returns
 
 The value of the last expression, with an `"output"` attribute holding
-the printed stdout and stderr as a character vector.
+the printed stdout and stderr as a character vector. A `NULL` result
+can't hold attributes, so it is returned as plain `NULL`; use
+`output_handler` to see its output.
 
 ------------------------------------------------------------------------
 

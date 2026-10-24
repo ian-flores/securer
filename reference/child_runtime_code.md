@@ -6,8 +6,14 @@ process, sets up the IPC connection and defines `.securer_call_tool()`.
 ## Usage
 
 ``` r
-child_runtime_code()
+child_runtime_code(max_message_size = ipc_max_message_size)
 ```
+
+## Arguments
+
+- max_message_size:
+
+  Largest IPC message, in bytes, the child will send or accept.
 
 ## Value
 

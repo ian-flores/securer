@@ -33,6 +33,15 @@
     </div>
 
     <div class="section level2">
+<h2 class="pkg-version" data-toc-text="development version" id="securer-development-version">securer (development version)<a class="anchor" aria-label="anchor" href="#securer-development-version"></a></h2>
+<div class="section level3">
+<h3 id="bug-fixes-development-version">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-development-version"></a></h3>
+<ul><li><p><code>$execute()</code> no longer errors when the code prints output and returns <code>NULL</code>. It returns <code>NULL</code>; the output still goes to <code>output_handler</code>.</p></li>
+<li><p>Hitting <code>max_tool_calls</code> no longer leaves the session stuck as “R session busy”. The child gets the error as its tool reply and finishes, so its variables survive. If the event loop exits any other way while the child is still running (a malformed message, an interrupt), the session is restarted, as it already was after a timeout.</p></li>
+<li><p>Large values now cross the IPC channel intact. Writes over about 8 KB were truncated, partial reads were passed to the JSON parser, and the 1 MB limit was only checked after the whole line had been buffered. Data frames now arrive as data frames (column types, <code>NA</code>, factors, dates and row names kept) instead of lists of rows, and numbers keep 15 significant digits instead of 4. The 1 MB limit is now enforced on both sides with a clear error, and the session stays usable after it.</p></li>
+</ul></div>
+</div>
+    <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.2.0" id="securer-020">securer 0.2.0<a class="anchor" aria-label="anchor" href="#securer-020"></a></h2>
 <div class="section level3">
 <h3 id="new-features-0-2-0">New Features<a class="anchor" aria-label="anchor" href="#new-features-0-2-0"></a></h3>

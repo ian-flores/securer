@@ -219,7 +219,8 @@ child's output but throws it away.</p></dd>
 <h4 id="returns">Returns<a class="anchor" aria-label="anchor" href="#returns"></a></h4>
 <p>The value of the last expression, with an <code>"output"</code>
 attribute holding the printed stdout and stderr as a character
-vector.</p>
+vector. A <code>NULL</code> result can't hold attributes, so it is returned
+as plain <code>NULL</code>; use <code>output_handler</code> to see its output.</p>
 </div>
 
 </div><p></p><hr><a id="method-SecureSession-close"></a><div class="section">
