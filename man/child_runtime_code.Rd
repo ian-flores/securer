@@ -4,7 +4,11 @@
 \alias{child_runtime_code}
 \title{Generate the R code to inject into the child process}
 \usage{
-child_runtime_code()
+child_runtime_code(max_message_size = ipc_max_message_size)
+}
+\arguments{
+\item{max_message_size}{Largest IPC message, in bytes, the child will
+send or accept.}
 }
 \value{
 A single character string of R code

@@ -1,3 +1,24 @@
+# securer (development version)
+
+## Bug fixes
+
+* `$execute()` no longer errors when the code prints output and returns
+  `NULL`. It returns `NULL`; the output still goes to `output_handler`.
+
+* Hitting `max_tool_calls` no longer leaves the session stuck as "R session
+  busy". The child gets the error as its tool reply and finishes, so its
+  variables survive. If the event loop exits any other way while the child
+  is still running (a malformed message, an interrupt), the session is
+  restarted, as it already was after a timeout.
+
+* Large values now cross the IPC channel intact. Writes over about 8 KB were
+  truncated, partial reads were passed to the JSON parser, and the 1 MB
+  limit was only checked after the whole line had been buffered. Data frames
+  now arrive as data frames (column types, `NA`, factors, dates and row
+  names kept) instead of lists of rows, and numbers keep 15 significant
+  digits instead of 4. The 1 MB limit is now enforced on both sides with a
+  clear error, and the session stays usable after it.
+
 # securer 0.2.0
 
 ## New Features

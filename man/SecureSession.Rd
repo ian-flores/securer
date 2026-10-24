@@ -176,7 +176,8 @@ child's output but throws it away.}
 \subsection{Returns}{
 The value of the last expression, with an \code{"output"}
 attribute holding the printed stdout and stderr as a character
-vector.
+vector. A \code{NULL} result can't hold attributes, so it is returned
+as plain \code{NULL}; use \code{output_handler} to see its output.
 }
 }
 \if{html}{\out{<hr>}}

@@ -161,7 +161,8 @@ SecureSession <- R6::R6Class("SecureSession",
     #'   child's output but throws it away.
     #' @return The value of the last expression, with an `"output"`
     #'   attribute holding the printed stdout and stderr as a character
-    #'   vector.
+    #'   vector. A `NULL` result can't hold attributes, so it is returned
+    #'   as plain `NULL`; use `output_handler` to see its output.
     execute = function(code, timeout = 30, validate = TRUE,
                        output_handler = NULL, max_tool_calls = NULL,
                        max_code_length = 100000L,
@@ -363,6 +364,7 @@ SecureSession <- R6::R6Class("SecureSession",
   private = list(
     session = NULL,
     ipc_conn = NULL,
+    ipc_buffer = NULL,
     socket_path = NULL,
     socket_dir = NULL,
     ipc_token = NULL,
@@ -500,6 +502,7 @@ SecureSession <- R6::R6Class("SecureSession",
       }
 
       # Create server socket
+      private$ipc_buffer <- new.env(parent = emptyenv())
       private$ipc_conn <- processx::conn_create_unix_socket(
         private$socket_path
       )
@@ -580,7 +583,7 @@ SecureSession <- R6::R6Class("SecureSession",
       private$gc_prevent <- pid_env
 
       # Inject runtime into child
-      runtime_code <- child_runtime_code()
+      runtime_code <- child_runtime_code(private$max_ipc_message_size)
       private$session$call(function(code) {
         eval(parse(text = code), envir = globalenv())
       }, args = list(code = runtime_code))
@@ -600,9 +603,11 @@ SecureSession <- R6::R6Class("SecureSession",
       # Validate the authentication token sent by the child.
       # The child sends the token as its first message immediately
       # after connecting.  Reject connections with wrong tokens.
-      processx::poll(list(private$ipc_conn), 5000)
-      auth_line <- processx::conn_read_lines(private$ipc_conn, n = 1)
-      if (length(auth_line) == 0 || !identical(auth_line, private$ipc_token)) {
+      auth_line <- ipc_poll_line(
+        private$ipc_conn, private$ipc_buffer, 5000,
+        private$max_ipc_message_size
+      )
+      if (is.null(auth_line) || !identical(auth_line, private$ipc_token)) {
         .securer_closed_sessions_add(private$ipc_conn)
         private$ipc_conn <- NULL
         stop("IPC authentication failed: invalid token from child process",
@@ -640,9 +645,10 @@ SecureSession <- R6::R6Class("SecureSession",
     },
 
     # Maximum IPC message size in bytes (1 MB default). Messages larger
-    # than this are rejected before JSON parsing to prevent resource
-    # exhaustion attacks.
-    max_ipc_message_size = 1048576L,
+    # than this are rejected while being read, before JSON parsing, to
+    # prevent resource exhaustion attacks. The child refuses to send
+    # bigger tool calls and the parent refuses to send bigger results.
+    max_ipc_message_size = ipc_max_message_size,
 
     run_with_tools = function(code, timeout, output_handler = NULL,
                               max_tool_calls = NULL,
@@ -652,6 +658,7 @@ SecureSession <- R6::R6Class("SecureSession",
       output_collector <- list()
       output_line_count <- 0L
       tool_call_count <- 0L
+      tool_limit_error <- NULL
       total_messages <- 0L
       max_messages <- if (!is.null(max_tool_calls)) {
         max_tool_calls * 10L
@@ -696,6 +703,11 @@ SecureSession <- R6::R6Class("SecureSession",
         eval(parse(text = code), envir = globalenv())
       }, args = list(code = code))
 
+      # If we leave the event loop by error (or interrupt) while the child
+      # is still running, its call is never read and the callr session
+      # stays "busy" forever. Restart it so later execute() calls work.
+      on.exit(private$recover_busy_session(), add = TRUE)
+
       # Event loop: poll UDS for tool calls and check process completion
       deadline <- if (!is.null(timeout)) Sys.time() + timeout else NULL
 
@@ -715,223 +727,228 @@ SecureSession <- R6::R6Class("SecureSession",
         # Drain stdout/stderr from the child process
         drain_output()
 
-        # Poll the UDS for tool calls from the child
-        poll_result <- processx::poll(
-          list(private$ipc_conn),
-          poll_ms
+        # Poll the UDS for tool calls from the child. A big message can
+        # take several polls to arrive; ipc_poll_line() keeps the pieces
+        # and errors as soon as the message passes the size limit.
+        line <- ipc_poll_line(
+          private$ipc_conn, private$ipc_buffer, poll_ms,
+          private$max_ipc_message_size
         )
+        # The child closed its end: let the process check below report
+        # why, without spinning on the closed socket.
+        if (isTRUE(private$ipc_buffer$closed)) Sys.sleep(poll_ms / 1000)
 
-        # Check if there's data on the UDS (tool call)
-        if (poll_result[[1]] == "ready") {
-          line <- processx::conn_read_lines(private$ipc_conn, n = 1)
-          if (length(line) > 0 && nzchar(line)) {
+        if (!is.null(line) && nzchar(line)) {
 
-            # --- IPC message size check (Finding 10) ---
-            if (nchar(line, type = "bytes") > private$max_ipc_message_size) {
-              stop(
-                "IPC message too large (",
-                nchar(line, type = "bytes"), " bytes, max ",
-                private$max_ipc_message_size, ")",
-                call. = FALSE
-              )
-            }
+          # --- IPC message size check (Finding 10) is in ipc_poll_line() ---
+          request <- jsonlite::fromJSON(line, simplifyVector = FALSE)
 
-            request <- jsonlite::fromJSON(line, simplifyVector = FALSE)
+          # --- Total message rate limiting (I4 fix) ---
+          total_messages <- total_messages + 1L
+          if (total_messages > max_messages) {
+            stop(
+              sprintf(
+                "Maximum IPC messages (%d) exceeded; possible flood attack",
+                max_messages
+              ),
+              call. = FALSE
+            )
+          }
 
-            # --- Total message rate limiting (I4 fix) ---
-            total_messages <- total_messages + 1L
-            if (total_messages > max_messages) {
-              stop(
-                sprintf(
-                  "Maximum IPC messages (%d) exceeded; possible flood attack",
-                  max_messages
-                ),
-                call. = FALSE
-              )
-            }
+          # --- JSON schema validation (Finding 10) ---
+          if (!is.list(request)) {
+            stop("Malformed IPC message: expected a JSON object",
+                 call. = FALSE)
+          }
+          if (!is.character(request$type) || length(request$type) != 1) {
+            stop("Malformed IPC message: 'type' must be a scalar string",
+                 call. = FALSE)
+          }
 
-            # --- JSON schema validation (Finding 10) ---
-            if (!is.list(request)) {
-              stop("Malformed IPC message: expected a JSON object",
+          if (identical(request$type, "tool_call")) {
+            # Validate tool_call-specific fields
+            if (!is.character(request$tool) || length(request$tool) != 1) {
+              stop("Malformed IPC message: 'tool' must be a scalar string",
                    call. = FALSE)
             }
-            if (!is.character(request$type) || length(request$type) != 1) {
-              stop("Malformed IPC message: 'type' must be a scalar string",
+            if (!is.null(request$args) && !is.list(request$args)) {
+              stop("Malformed IPC message: 'args' must be a list or null",
                    call. = FALSE)
             }
 
-            if (identical(request$type, "tool_call")) {
-              # Validate tool_call-specific fields
-              if (!is.character(request$tool) || length(request$tool) != 1) {
-                stop("Malformed IPC message: 'tool' must be a scalar string",
-                     call. = FALSE)
-              }
-              if (!is.null(request$args) && !is.list(request$args)) {
-                stop("Malformed IPC message: 'args' must be a list or null",
-                     call. = FALSE)
-              }
-
-              # --- Rate limiting (Finding 14) ---
-              tool_call_count <- tool_call_count + 1L
-              if (!is.null(max_tool_calls) &&
-                  tool_call_count > max_tool_calls) {
-                stop(
-                  sprintf("Maximum tool calls (%d) exceeded",
-                          max_tool_calls),
-                  call. = FALSE
-                )
-              }
-
-              # Execute the tool on the parent side
-              tool_name <- request$tool
-              tool_args <- request$args
-
-              # Validate tool_name is a scalar string and in the allowlist
-              if (!is.character(tool_name) || length(tool_name) != 1 ||
-                  !nzchar(tool_name) ||
-                  !grepl("^[A-Za-z.][A-Za-z0-9_.]*$", tool_name)) {
-                tool_name <- "<invalid>"
-              }
-
-              # --- Parent-side argument validation (Finding 5) ---
-              # Ensure tool_args is a list (not some other type)
-              if (!is.null(tool_args) && !is.list(tool_args)) {
-                tool_args <- list()
-              }
-
-              # If we have arg metadata for this tool, validate arg names
-              expected_args <- private$tool_arg_meta[[tool_name]]
-              if (!is.null(expected_args) &&
-                  !is.null(tool_args) && length(tool_args) > 0) {
-                # When expected_args is empty (tool defined with args=list()),
-                # ALL provided arguments are unexpected (T4 fix).
-                # When expected_args is non-empty, only check for extras.
-                actual_names <- names(tool_args)
-                unexpected <- if (length(expected_args) == 0) {
-                  actual_names
-                } else {
-                  setdiff(actual_names, expected_args)
-                }
-                if (length(unexpected) > 0) {
-                  # Send error back to child rather than crashing
-                  response <- list(
-                    error = sprintf(
-                      "Unexpected arguments for tool '%s': %s",
-                      tool_name,
-                      paste(sQuote(unexpected), collapse = ", ")
-                    )
-                  )
-                  response_json <- jsonlite::toJSON(
-                    response, auto_unbox = TRUE
-                  )
-                  processx::conn_write(
-                    private$ipc_conn,
-                    paste0(response_json, "\n")
-                  )
-                  next
-                }
-              }
-
-              # Log the tool call with arguments
-              if (private$verbose) {
-                args_str <- paste(
-                  names(tool_args),
-                  tool_args,
-                  sep = "=", collapse = ", "
-                )
-                private$log(sprintf("Tool call: %s(%s)", tool_name, args_str))
-              }
-
-              private$audit_log("tool_call",
-                tool = tool_name, args = tool_args)
-
-              tool_start <- Sys.time()
-              .do_tool_call <- function() {
-                tryCatch({
-                  if (is.null(private$tool_fns[[tool_name]])) {
-                    list(error = paste0("Unknown tool: ", tool_name))
-                  } else {
-                    result <- do.call(private$tool_fns[[tool_name]], tool_args)
-                    list(value = result)
-                  }
-                }, error = function(e) {
-                  list(error = sanitize_error_message(conditionMessage(e)))
-                })
-              }
-
-              if (.trace_active()) {
-                response <- .with_span(
-                  paste0("securer::tool/", tool_name),
-                  {
-                    resp <- .do_tool_call()
-                    .span_event("tool.complete", list(
-                      tool = tool_name,
-                      error = !is.null(resp$error)
-                    ))
-                    resp
-                  },
-                  attributes = list(tool.name = tool_name)
-                )
-              } else {
-                response <- .do_tool_call()
-              }
-
-              # Log the tool result
-              if (private$verbose) {
-                elapsed <- sprintf(
-                  "%.2fs",
-                  as.numeric(difftime(Sys.time(), tool_start, units = "secs"))
-                )
-                if (!is.null(response$error)) {
-                  private$log(sprintf(
-                    "Tool result: %s -> error: %s (%s)",
-                    tool_name, response$error, elapsed
-                  ))
-                } else {
-                  result_str <- tryCatch(
-                    paste(utils::head(response$value, 1), collapse = ", "),
-                    error = function(e) "<complex>"
-                  )
-                  private$log(sprintf(
-                    "Tool result: %s -> %s (%s)",
-                    tool_name, result_str, elapsed
-                  ))
-                }
-              }
-
-              result_summary <- if (!is.null(response$error)) {
-                NULL
-              } else {
-                tryCatch(
-                  substr(deparse(response$value, control = "keepNA")[1], 1, 500),
-                  error = function(e) "<unserializable>"
-                )
-              }
-              private$audit_log("tool_result",
-                tool = tool_name,
-                error = response$error,
-                result_summary = result_summary,
-                elapsed_secs = as.numeric(
-                  difftime(Sys.time(), tool_start, units = "secs")
-                )
+            # --- Rate limiting (Finding 14) ---
+            # Reply with an error instead of stopping here: the child is
+            # blocked waiting for this reply, and stopping would leave
+            # it busy. The limit error is raised once the child is done.
+            tool_call_count <- tool_call_count + 1L
+            if (!is.null(max_tool_calls) &&
+                tool_call_count > max_tool_calls) {
+              tool_limit_error <- sprintf(
+                "Maximum tool calls (%d) exceeded", max_tool_calls
               )
+              ipc_write_message(
+                private$ipc_conn, list(error = tool_limit_error)
+              )
+              next
+            }
 
-              # Send response back to child
-              response_json <- jsonlite::toJSON(response, auto_unbox = TRUE)
-              processx::conn_write(
-                private$ipc_conn,
-                paste0(response_json, "\n")
+            # Execute the tool on the parent side
+            tool_name <- request$tool
+            tool_args <- ipc_decode_value(request$args)
+
+            # Validate tool_name is a scalar string and in the allowlist
+            if (!is.character(tool_name) || length(tool_name) != 1 ||
+                !nzchar(tool_name) ||
+                !grepl("^[A-Za-z.][A-Za-z0-9_.]*$", tool_name)) {
+              tool_name <- "<invalid>"
+            }
+
+            # --- Parent-side argument validation (Finding 5) ---
+            # Ensure tool_args is a list (not some other type)
+            if (!is.null(tool_args) && !is.list(tool_args)) {
+              tool_args <- list()
+            }
+
+            # If we have arg metadata for this tool, validate arg names
+            expected_args <- private$tool_arg_meta[[tool_name]]
+            if (!is.null(expected_args) &&
+                !is.null(tool_args) && length(tool_args) > 0) {
+              # When expected_args is empty (tool defined with args=list()),
+              # ALL provided arguments are unexpected (T4 fix).
+              # When expected_args is non-empty, only check for extras.
+              actual_names <- names(tool_args)
+              unexpected <- if (length(expected_args) == 0) {
+                actual_names
+              } else {
+                setdiff(actual_names, expected_args)
+              }
+              if (length(unexpected) > 0) {
+                # Send error back to child rather than crashing
+                response <- list(
+                  error = sprintf(
+                    "Unexpected arguments for tool '%s': %s",
+                    tool_name,
+                    paste(sQuote(unexpected), collapse = ", ")
+                  )
+                )
+                ipc_write_message(private$ipc_conn, response)
+                next
+              }
+            }
+
+            # Log the tool call with arguments
+            if (private$verbose) {
+              args_str <- paste(
+                names(tool_args),
+                tool_args,
+                sep = "=", collapse = ", "
+              )
+              private$log(sprintf("Tool call: %s(%s)", tool_name, args_str))
+            }
+
+            private$audit_log("tool_call",
+              tool = tool_name, args = tool_args)
+
+            tool_start <- Sys.time()
+            .do_tool_call <- function() {
+              tryCatch({
+                if (is.null(private$tool_fns[[tool_name]])) {
+                  list(error = paste0("Unknown tool: ", tool_name))
+                } else {
+                  result <- do.call(private$tool_fns[[tool_name]], tool_args)
+                  list(value = result)
+                }
+              }, error = function(e) {
+                list(error = sanitize_error_message(conditionMessage(e)))
+              })
+            }
+
+            if (.trace_active()) {
+              response <- .with_span(
+                paste0("securer::tool/", tool_name),
+                {
+                  resp <- .do_tool_call()
+                  .span_event("tool.complete", list(
+                    tool = tool_name,
+                    error = !is.null(resp$error)
+                  ))
+                  resp
+                },
+                attributes = list(tool.name = tool_name)
               )
             } else {
-              # --- Unknown message type warning (I4 fix) ---
-              warning(
-                sprintf(
-                  "Unknown IPC message type: %s",
-                  sQuote(request$type)
-                ),
-                call. = FALSE
+              response <- .do_tool_call()
+            }
+
+            # Log the tool result
+            if (private$verbose) {
+              elapsed <- sprintf(
+                "%.2fs",
+                as.numeric(difftime(Sys.time(), tool_start, units = "secs"))
+              )
+              if (!is.null(response$error)) {
+                private$log(sprintf(
+                  "Tool result: %s -> error: %s (%s)",
+                  tool_name, response$error, elapsed
+                ))
+              } else {
+                result_str <- tryCatch(
+                  paste(utils::head(response$value, 1), collapse = ", "),
+                  error = function(e) "<complex>"
+                )
+                private$log(sprintf(
+                  "Tool result: %s -> %s (%s)",
+                  tool_name, result_str, elapsed
+                ))
+              }
+            }
+
+            result_summary <- if (!is.null(response$error)) {
+              NULL
+            } else {
+              tryCatch(
+                substr(deparse(response$value, control = "keepNA")[1], 1, 500),
+                error = function(e) "<unserializable>"
               )
             }
+            private$audit_log("tool_result",
+              tool = tool_name,
+              error = response$error,
+              result_summary = result_summary,
+              elapsed_secs = as.numeric(
+                difftime(Sys.time(), tool_start, units = "secs")
+              )
+            )
+
+            # Send response back to child. A result that can't be encoded
+            # or is over the size limit goes back as an error instead, so
+            # the child's tool call fails cleanly.
+            response_json <- tryCatch(
+              ipc_to_json(response),
+              error = function(e) {
+                ipc_to_json(list(error = sprintf(
+                  "Result of tool '%s' can't be sent over IPC: %s",
+                  tool_name, conditionMessage(e)
+                )))
+              }
+            )
+            size <- nchar(response_json, type = "bytes")
+            if (size > private$max_ipc_message_size) {
+              response_json <- ipc_to_json(list(error = sprintf(
+                "Result of tool '%s' too large to send over IPC (%d bytes, max %d)",
+                tool_name, size, private$max_ipc_message_size
+              )))
+            }
+            ipc_write_line(private$ipc_conn, response_json)
+          } else {
+            # --- Unknown message type warning (I4 fix) ---
+            warning(
+              sprintf(
+                "Unknown IPC message type: %s",
+                sQuote(request$type)
+              ),
+              call. = FALSE
+            )
           }
         }
 
@@ -977,6 +994,16 @@ SecureSession <- R6::R6Class("SecureSession",
             "%.2fs",
             as.numeric(difftime(Sys.time(), exec_start, units = "secs"))
           )
+          if (!is.null(tool_limit_error)) {
+            private$log(sprintf(
+              "Execution error: %s (%s)", tool_limit_error, elapsed
+            ))
+            private$audit_log("execute_error",
+              error = tool_limit_error,
+              elapsed = elapsed
+            )
+            stop(tool_limit_error, call. = FALSE)
+          }
           if (!is.null(result$error)) {
             private$log(sprintf(
               "Execution error: %s (%s)",
@@ -991,12 +1018,32 @@ SecureSession <- R6::R6Class("SecureSession",
           private$log(sprintf("Execution complete (%s)", elapsed))
           private$audit_log("execute_complete", elapsed = elapsed)
           val <- result$result
-          if (length(output_lines) > 0) {
+          # NULL can't carry attributes; its output still reached
+          # output_handler, so return the bare NULL.
+          if (length(output_lines) > 0 && !is.null(val)) {
             attr(val, "output") <- output_lines
           }
           return(val)
         }
       }
+    },
+
+    recover_busy_session = function() {
+      if (is.null(private$session)) return(invisible(NULL))
+      state <- tryCatch(private$session$get_state(), error = function(e) NULL)
+      if (!identical(state, "busy")) return(invisible(NULL))
+      private$log("Execution aborted mid-call; restarting session")
+      private$audit_log("session_restart", reason = "aborted_execution")
+      private$cleanup_resources()
+      tryCatch(
+        private$start_session(),
+        error = function(e) {
+          private$log(sprintf(
+            "Session restart failed: %s", conditionMessage(e)
+          ))
+        }
+      )
+      invisible(NULL)
     },
 
     handle_timeout = function(timeout) {

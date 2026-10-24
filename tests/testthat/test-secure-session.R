@@ -181,6 +181,29 @@ test_that("output and return value are separate", {
   expect_true(any(grepl("msg", output)))
 })
 
+test_that("NULL result with output returns NULL instead of erroring", {
+  skip_if_no_session()
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  collected <- character()
+  handler <- function(line) collected <<- c(collected, line)
+
+  # NULL can't carry attributes, so the output goes to the handler only
+  result <- session$execute('cat("hi"); NULL', output_handler = handler)
+  expect_null(result)
+  expect_true("hi" %in% collected)
+
+  collected <- character()
+  result <- session$execute("print(1); invisible(NULL)",
+                            output_handler = handler)
+  expect_null(result)
+  expect_true(any(grepl("1", collected)))
+
+  # Session is still usable afterwards
+  expect_equal(session$execute("1 + 1"), 2)
+})
+
 # --- Rate limiting tests (Finding 14) ---
 
 test_that("max_tool_calls limits tool invocations", {
@@ -200,6 +223,68 @@ test_that("max_tool_calls limits tool invocations", {
     session$execute("counter(); counter(); counter()", max_tool_calls = 2),
     "Maximum tool calls \\(2\\) exceeded"
   )
+})
+
+test_that("session is usable after max_tool_calls is exceeded", {
+  skip_if_no_session()
+  tools <- list(
+    securer_tool(
+      "counter", "Count calls",
+      function() 1,
+      args = list()
+    )
+  )
+  session <- SecureSession$new(tools = tools)
+  on.exit(session$close())
+
+  session$execute("x <- 5")
+  expect_error(
+    session$execute("counter(); counter(); counter()", max_tool_calls = 2),
+    "Maximum tool calls \\(2\\) exceeded"
+  )
+  expect_equal(session$execute("1 + 1"), 2)
+  expect_equal(session$execute("counter() + 1"), 2)
+  # The child wasn't restarted, so earlier state survives
+  expect_equal(session$execute("x"), 5)
+})
+
+test_that("max_tool_calls still errors if child code catches the error", {
+  skip_if_no_session()
+  tools <- list(
+    securer_tool(
+      "counter", "Count calls",
+      function() 1,
+      args = list()
+    )
+  )
+  session <- SecureSession$new(tools = tools)
+  on.exit(session$close())
+
+  expect_error(
+    session$execute(
+      "for (i in 1:5) try(counter(), silent = TRUE); 'done'",
+      max_tool_calls = 2
+    ),
+    "Maximum tool calls \\(2\\) exceeded"
+  )
+  expect_equal(session$execute("1 + 1"), 2)
+})
+
+test_that("session is usable after an IPC protocol error mid-execution", {
+  skip_if_no_session()
+  session <- SecureSession$new()
+  on.exit(session$close())
+
+  # A non-string tool name aborts the event loop while the child is
+  # still blocked waiting for a reply.
+  expect_error(
+    session$execute(
+      ".securer_call_tool(1:2)",
+      validate = FALSE
+    ),
+    "Malformed IPC message"
+  )
+  expect_equal(session$execute("1 + 1"), 2)
 })
 
 test_that("max_tool_calls NULL allows unlimited tool calls", {

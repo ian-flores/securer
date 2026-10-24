@@ -4,12 +4,22 @@
 \alias{ipc_read_message}
 \title{Read a message from an IPC connection}
 \usage{
-ipc_read_message(conn, timeout = 30000L)
+ipc_read_message(
+  conn,
+  timeout = 30000L,
+  max_size = ipc_max_message_size,
+  buffer = new.env(parent = emptyenv())
+)
 }
 \arguments{
 \item{conn}{A connection object}
 
 \item{timeout}{Timeout in milliseconds (default 30000)}
+
+\item{max_size}{Largest message allowed, in bytes}
+
+\item{buffer}{Environment holding unread data for \code{conn}. Pass the same
+one on every read from a connection so partial data isn't lost.}
 }
 \value{
 A parsed list from the JSON message

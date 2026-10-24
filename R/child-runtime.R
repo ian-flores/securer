@@ -3,11 +3,34 @@
 #' Returns a character string of R code that, when evaluated in the child
 #' process, sets up the IPC connection and defines `.securer_call_tool()`.
 #'
+#' @param max_message_size Largest IPC message, in bytes, the child will
+#'   send or accept.
 #' @return A single character string of R code
 #' @keywords internal
-child_runtime_code <- function() {
-  '
+child_runtime_code <- function(max_message_size = ipc_max_message_size) {
+  # The IPC framing and encoding helpers from R/ipc.R are copied into the
+  # child, so both ends of the socket share one implementation.
+  helpers <- c(
+    "ipc_encode_value", "ipc_encode_column", "ipc_decode_value",
+    "ipc_decode_data_frame", "ipc_decode_column", "ipc_to_json",
+    "ipc_write_line", "ipc_poll_line"
+  )
+  helper_code <- vapply(helpers, function(nm) {
+    paste0(nm, " <- ", paste(deparse(get(nm)), collapse = "\n"))
+  }, character(1))
+  # Splice with strsplit() rather than sub(), which would treat
+  # backslashes in the deparsed code as escapes.
+  parts <- strsplit(child_runtime_template, "%HELPERS%", fixed = TRUE)[[1]]
+  code <- paste0(parts[1], paste(helper_code, collapse = "\n"), parts[2])
+  parts <- strsplit(code, "%MAX_SIZE%", fixed = TRUE)[[1]]
+  paste0(parts[1], format(as.integer(max_message_size)), parts[2])
+}
+
+child_runtime_template <- '
   .securer_call_tool <- local({
+    %HELPERS%
+    .max_size <- %MAX_SIZE%
+
     socket_path <- Sys.getenv("SECURER_SOCKET")
     .conn <- processx::conn_connect_unix_socket(socket_path)
 
@@ -39,19 +62,29 @@ child_runtime_code <- function() {
     # environment directly. Only .securer_call_tool can use it.
     .get_conn <- function() .ipc_store[[".c"]]
 
+    .buffer <- new.env(parent = emptyenv())
+
     function(tool_name, ...) {
       c <- .get_conn()
       args <- list(...)
-      request <- jsonlite::toJSON(
-        list(type = "tool_call", tool = tool_name, args = args),
-        auto_unbox = TRUE
+      request <- ipc_to_json(
+        list(type = "tool_call", tool = tool_name, args = args)
       )
-      processx::conn_write(c, paste0(request, "\\n"))
+      size <- nchar(request, type = "bytes")
+      if (size > .max_size) {
+        stop("Tool call arguments too large to send over IPC (", size,
+             " bytes, max ", .max_size, ")", call. = FALSE)
+      }
+      ipc_write_line(c, request)
 
-      # Poll then read
-      processx::poll(list(c), 30000)
-      response_raw <- processx::conn_read_lines(c, n = 1)
-      result <- jsonlite::fromJSON(response_raw, simplifyVector = FALSE)
+      response_raw <- ipc_poll_line(c, .buffer, 30000, .max_size)
+      if (is.null(response_raw)) {
+        stop("No response to tool call ", sQuote(tool_name),
+             " from the parent process", call. = FALSE)
+      }
+      result <- ipc_decode_value(
+        jsonlite::fromJSON(response_raw, simplifyVector = FALSE)
+      )
       if (!is.null(result$error)) stop(result$error, call. = FALSE)
       result$value
     }
@@ -90,5 +123,4 @@ child_runtime_code <- function() {
     stop("getNativeSymbolInfo is not permitted in secure sessions", call. = FALSE)
   }, globalenv())
   lockBinding("getNativeSymbolInfo", globalenv())
-  '
-}
+'

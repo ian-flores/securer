@@ -288,3 +288,137 @@ test_that("each session gets a unique token", {
   t2 <- s2$.__enclos_env__$private$ipc_token
   expect_false(identical(t1, t2))
 })
+
+# --- Large payloads and data frame fidelity ---
+
+test_that("ipc_write_message() and ipc_read_message() handle large messages", {
+  skip_if_no_session()
+  socket_path <- file.path("/tmp", paste0("securer_test_big_", Sys.getpid(), ".sock"))
+  on.exit(unlink(socket_path), add = TRUE)
+
+  server <- processx::conn_create_unix_socket(socket_path)
+
+  # Much bigger than one socket write (~8 KB on macOS). The writer runs in
+  # another process, as the child does, so both loops run concurrently.
+  payload <- strrep("x", 300000)
+  write_line <- ipc_write_line
+  environment(write_line) <- globalenv()
+  writer <- callr::r_bg(
+    function(path, write_line, line) {
+      conn <- processx::conn_connect_unix_socket(path)
+      write_line(conn, line)
+      Sys.sleep(10)
+    },
+    args = list(socket_path, write_line,
+                ipc_to_json(list(type = "big", value = payload)))
+  )
+  on.exit(writer$kill(), add = TRUE)
+
+  ipc_accept(server, timeout = 5000L)
+  msg <- ipc_read_message(server, timeout = 10000L)
+  expect_identical(msg$value, payload)
+})
+
+test_that("ipc_read_message() errors clearly when a message is too large", {
+  skip_if_no_session()
+  socket_path <- file.path("/tmp", paste0("securer_test_huge_", Sys.getpid(), ".sock"))
+  on.exit(unlink(socket_path), add = TRUE)
+
+  server <- processx::conn_create_unix_socket(socket_path)
+  client <- processx::conn_connect_unix_socket(socket_path)
+  ipc_accept(server, timeout = 1000L)
+
+  ipc_write_message(client, list(value = strrep("x", 5000)))
+  expect_error(
+    ipc_read_message(server, timeout = 5000L, max_size = 1000),
+    "IPC message too large"
+  )
+})
+
+big_payload_tools <- function() {
+  list(
+    securer_tool("get_iris", "Return iris", function() iris, args = list()),
+    securer_tool("echo_df", "Return a data frame unchanged",
+                 function(df) df, args = list(df = "data.frame")),
+    securer_tool("is_iris", "Check the argument is iris",
+                 function(df) identical(df, iris),
+                 args = list(df = "data.frame")),
+    securer_tool("get_pi", "Return pi", function() pi, args = list())
+  )
+}
+
+test_that("a tool can return iris intact", {
+  skip_if_no_session()
+  session <- SecureSession$new(tools = big_payload_tools())
+  on.exit(session$close())
+
+  expect_true(session$execute("identical(get_iris(), iris)"))
+  expect_identical(session$execute("get_iris()"), iris)
+})
+
+test_that("a tool receives a data frame argument intact", {
+  skip_if_no_session()
+  session <- SecureSession$new(tools = big_payload_tools())
+  on.exit(session$close())
+
+  expect_true(session$execute("is_iris(iris)"))
+})
+
+test_that("data frames ~10x iris round-trip through a tool intact", {
+  skip_if_no_session()
+  session <- SecureSession$new(tools = big_payload_tools())
+  on.exit(session$close())
+
+  expect_true(session$execute("
+    big <- do.call(rbind, replicate(10, iris, simplify = FALSE))
+    identical(echo_df(big), big)
+  "))
+  expect_true(session$execute("
+    cars <- do.call(rbind, replicate(100, mtcars, simplify = FALSE))
+    identical(echo_df(cars), cars)
+  "))
+  # Column types, NA, factor levels and Dates survive too
+  expect_true(session$execute("
+    df <- data.frame(
+      i = c(1L, NA, 3L), d = c(1.5, NA, Inf), s = c('a', NA, 'c'),
+      l = c(TRUE, NA, FALSE), f = factor(c('x', NA, 'y'), levels = c('y', 'x')),
+      dt = as.Date(c('2020-01-01', NA, '2021-06-30'))
+    )
+    identical(echo_df(df), df)
+  "))
+})
+
+test_that("numbers keep full precision over IPC", {
+  skip_if_no_session()
+  session <- SecureSession$new(tools = big_payload_tools())
+  on.exit(session$close())
+
+  expect_equal(session$execute("get_pi()"), pi, tolerance = 1e-14)
+})
+
+test_that("oversized tool results fail clearly and keep the session usable", {
+  skip_if_no_session()
+  tools <- list(
+    securer_tool("huge", "Return a huge string",
+                 function() strrep("x", 2e6), args = list())
+  )
+  session <- SecureSession$new(tools = tools)
+  on.exit(session$close())
+
+  expect_error(session$execute("huge()"), "too large")
+  expect_equal(session$execute("1 + 1"), 2)
+})
+
+test_that("oversized tool arguments fail clearly and keep the session usable", {
+  skip_if_no_session()
+  tools <- list(
+    securer_tool("take", "Take a string", function(x) nchar(x),
+                 args = list(x = "character"))
+  )
+  session <- SecureSession$new(tools = tools)
+  on.exit(session$close())
+
+  session$execute("y <- 1")
+  expect_error(session$execute("take(strrep('x', 2e6))"), "too large")
+  expect_equal(session$execute("y"), 1)
+})

@@ -4,18 +4,21 @@
 \alias{ipc_write_message}
 \title{Write a message to an IPC connection}
 \usage{
-ipc_write_message(conn, msg)
+ipc_write_message(conn, msg, timeout = 30000L)
 }
 \arguments{
 \item{conn}{A connection object}
 
 \item{msg}{A list to serialize and send}
+
+\item{timeout}{Timeout in milliseconds (default 30000)}
 }
 \value{
 Invisible \code{NULL}; called for its side effect of writing to the
 connection.
 }
 \description{
-Serializes a list to JSON and writes it as a single newline-terminated line.
+Serializes a list to JSON and writes it as a single newline-terminated
+line, looping until all of it is written.
 }
 \keyword{internal}
