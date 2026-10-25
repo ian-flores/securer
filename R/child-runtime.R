@@ -16,7 +16,7 @@ child_runtime_code <- function(max_message_size = ipc_max_message_size) {
     "ipc_write_line", "ipc_poll_line"
   )
   helper_code <- vapply(helpers, function(nm) {
-    paste0(nm, " <- ", paste(deparse(get(nm)), collapse = "\n"))
+    paste0(nm, " <- ", paste(deparse(strip_coverage(get(nm))), collapse = "\n"))
   }, character(1))
   # Splice with strsplit() rather than sub(), which would treat
   # backslashes in the deparsed code as escapes.
@@ -24,6 +24,43 @@ child_runtime_code <- function(max_message_size = ipc_max_message_size) {
   code <- paste0(parts[1], paste(helper_code, collapse = "\n"), parts[2])
   parts <- strsplit(code, "%MAX_SIZE%", fixed = TRUE)[[1]]
   paste0(parts[1], format(as.integer(max_message_size)), parts[2])
+}
+
+#' Remove covr instrumentation from a function
+#'
+#' Under covr, every expression is wrapped as
+#' `if (TRUE) { covr:::count(id); expr }`. Deparsing that breaks else-if
+#' chains (the `else` binds to covr's `if (TRUE)`), so helpers copied into
+#' the child must be unwrapped first. Functions without instrumentation
+#' are returned unchanged.
+#'
+#' @param fn A function.
+#' @return `fn`, with covr wrappers removed from its body.
+#' @keywords internal
+strip_coverage <- function(fn) {
+  is_count <- function(x) {
+    is.call(x) && identical(x[[1L]], quote(covr:::count))
+  }
+  strip <- function(x) {
+    if (!is.call(x)) return(x)
+    if (identical(x[[1L]], as.name("if")) && length(x) == 3L &&
+          isTRUE(x[[2L]]) && is.call(x[[3L]]) &&
+          identical(x[[3L]][[1L]], as.name("{")) && length(x[[3L]]) == 3L &&
+          is_count(x[[3L]][[2L]])) {
+      return(strip(x[[3L]][[3L]]))
+    }
+    for (i in seq_along(x)) {
+      if (!identical(x[[i]], quote(expr = )) && !is.null(x[[i]])) {
+        x[[i]] <- strip(x[[i]])
+      }
+    }
+    x
+  }
+  if (!any(grepl("covr:::count", deparse(body(fn)), fixed = TRUE))) {
+    return(fn)
+  }
+  body(fn) <- strip(body(fn))
+  fn
 }
 
 child_runtime_template <- '

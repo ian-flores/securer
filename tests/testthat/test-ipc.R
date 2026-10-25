@@ -422,3 +422,25 @@ test_that("oversized tool arguments fail clearly and keep the session usable", {
   expect_error(session$execute("take(strrep('x', 2e6))"), "too large")
   expect_equal(session$execute("y"), 1)
 })
+
+test_that("child helpers are deparsed without covr instrumentation", {
+  # covr wraps each expression as `if (TRUE) { covr:::count(id); expr }`.
+  # Deparsed, an else-if chain then binds its `else` to covr's inner
+  # `if (TRUE)`, so the child would parse different logic.
+  f <- function(v) if (v > 1) "big" else if (v > 0) "small" else "none"
+  # Build the wrappers as covr does, on the language object, so the
+  # nesting is exact (writing them as source text would hit the same bug).
+  wrap <- function(e) bquote(if (TRUE) { covr:::count("id"); .(e) })
+  instrumented <- f
+  body(instrumented) <- wrap(call("if", wrap(quote(v > 1)), wrap("big"),
+    call("if", wrap(quote(v > 0)), wrap("small"), wrap("none"))))
+  # The bug: deparsed as-is, the instrumented function loses a branch
+  broken <- eval(parse(text = deparse(instrumented)))
+  expect_null(broken(-1))
+  stripped <- eval(parse(text = deparse(strip_coverage(instrumented))))
+  expect_equal(vapply(c(2, 0.5, -1), stripped, ""), c("big", "small", "none"))
+  expect_equal(body(strip_coverage(instrumented)), body(f))
+  expect_false(any(grepl("covr", deparse(strip_coverage(instrumented)))))
+  # Uninstrumented functions come back unchanged
+  expect_identical(strip_coverage(f), f)
+})
